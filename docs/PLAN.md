@@ -1,6 +1,6 @@
 # Piano di Lanterna
 
-Stato: decisioni chiuse, in attesa del via per la M0. Nessun codice scritto.
+Stato: M0 in corso (scaffolding). Gestore pacchetti: npm workspaces (pnpm non è installato e non serviva).
 
 ## Decisioni prese
 
@@ -16,7 +16,7 @@ Stato: decisioni chiuse, in attesa del via per la M0. Nessun codice scritto.
 | Accesso | Autenticazione robusta nell'app. Cloudflare Access forse più avanti. |
 | Contenuti di gioco | Mai nel repo. Strumento di importazione per inserirli a mano nell'istanza. |
 | Licenza | AGPL-3.0-or-later. |
-| Sistema di regole | D&D 5e, tutto tranne i punti esperienza. Le regole si implementano come logica nostra; i testi (mostri, incantesimi, manuali) non entrano nel repo. |
+| Sistema di regole | D&D 5e, edizione 2024, tutto tranne i punti esperienza. Le regole si implementano come logica nostra; i testi (mostri, incantesimi, manuali) non entrano nel repo. |
 | Stack | PixiJS, Fastify, `ws`, Better Auth, confermati. |
 | Audio | Fuori ambito iniziale (si usa Discord). |
 | MVP | Lista dell'autore, più caricamento mappa e salvataggio automatico. |
@@ -41,7 +41,7 @@ Complessità: S = giorni, M = 1-2 settimane, L = 2-4 settimane, XL = oltre.
 
 | # | Contenuto | Output verificabile | Test | Compl. | Rischi |
 |---|---|---|---|---|---|
-| M0 | Scaffolding, CI, `LICENSE` (AGPL), README con tabella licenze, `.env.example`, scelte stack chiuse | `pnpm install && pnpm test && pnpm build` verdi in CI; `/health` risponde | smoke test client e server | S | scelte stack sbagliate |
+| M0 | Scaffolding, CI, `LICENSE` (AGPL), README con tabella licenze, `.env.example`, scelte stack chiuse | `npm install && npm test && npm run build` verdi in CI; `/health` risponde | smoke test client e server | S | scelte stack sbagliate |
 | M1 | Login, sessioni, ruoli, creazione utenti solo admin, primo admin da riga di comando | admin crea utente; giocatore riceve 403 chiamando l'endpoint a mano; nessuna registrazione pubblica | integrazione per ogni endpoint e ruolo; sessione scaduta; rate limit login | M | cookie dietro Cloudflare, brute force |
 | M2 | Protocollo WebSocket, riconnessione, upload mappa, canvas PixiJS con zoom e pan, griglia e scala, salvataggio automatico | due browser vedono la stessa mappa; cambio griglia in tempo reale; stato intatto dopo riavvio server | unitari protocollo e griglia; integrazione con due client; e2e Playwright; upload non valido | L | sincronizzazione, upload enormi, mappe grandi |
 | M3 | Token, drag con snap, assegnazione, token nascosti, barra della vita (solo GM e proprietario), condizioni, ridimensionamento e rotazione solo GM | token nascosto assente anche dal traffico di rete del giocatore; vita non inviata ai non autorizzati; spostamento del token altrui rifiutato | integrazione sui payload per utente; permessi; e2e drag | L | filtro per utente, concorrenza, 300 token a 60 fps |
@@ -54,7 +54,7 @@ Complessità: S = giorni, M = 1-2 settimane, L = 2-4 settimane, XL = oltre.
 |---|---|---|---|
 | M6 | Nebbia manuale con maschera per giocatore, rivelazione con un clic; poi vista automatica come aiuto visivo | XL | la mappa sotto la nebbia non deve mai arrivare al client; prestazioni delle maschere; linea di vista |
 | M7 | Iniziativa, round, effetti con durata, righello e aree, selezione multipla e gruppi, frecce dei giocatori, undo/redo | L | stato di combattimento condiviso, undo per utente |
-| M8 | Schede D&D 5e (caratteristiche, modificatori, bonus di competenza, abilità, tiri salvezza, CA, PF, incantesimi e slot, inventario, note; niente XP) con ricerca e pagine multiple, statblock, tiro cliccando su abilità o arma | XL | volume di regole 5e, versione delle regole (2014 o 2024), contenuti solo via importazione |
+| M8 | Schede D&D 5e (caratteristiche, modificatori, bonus di competenza, abilità, tiri salvezza, CA, PF, incantesimi e slot, inventario, note; niente XP) con ricerca e pagine multiple, statblock, tiro cliccando su abilità o arma | XL | volume di regole 5e, contenuti solo via importazione |
 | M9 | Finestre multiple e vista giocatore per il GM | M | stato filtrato "come il giocatore X" generato dal server |
 | M10 | Libreria token, livelli, più scene, esportazione/importazione campagna, scorciatoie, mobile completo | L | formato di esportazione, upload in importazione |
 
