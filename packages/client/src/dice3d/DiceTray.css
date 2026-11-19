@@ -1,0 +1,50 @@
+/* Stile neutro: ogni colore e misura ha un fallback, il design system puo' ridefinire le variabili --lanterna-*. */
+.lanterna-dice-tray {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  color: var(--lanterna-text, inherit);
+}
+
+.lanterna-dice-tray__stage {
+  position: relative;
+  height: var(--lanterna-dice-height, 240px);
+  min-width: 0;
+  overflow: hidden;
+  background: var(--lanterna-surface, #fff);
+  border: 1px solid var(--lanterna-border, #d4d4d8);
+  border-radius: var(--lanterna-radius, 12px);
+  touch-action: manipulation;
+}
+
+.lanterna-dice-tray__stage[hidden] {
+  display: none;
+}
+
+.lanterna-dice-tray__stage[role="button"] {
+  cursor: pointer;
+}
+
+.lanterna-dice-tray__stage:focus-visible {
+  outline: 2px solid var(--lanterna-focus, #2563eb);
+  outline-offset: 2px;
+}
+
+.lanterna-dice-tray__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.lanterna-dice-tray__result {
+  margin: 0;
+  min-height: 1.5em;
+  font-variant-numeric: tabular-nums;
+  color: var(--lanterna-text, inherit);
+}
+
+.lanterna-dice-tray__note {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--lanterna-text-muted, #52525b);
+}
