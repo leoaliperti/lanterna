@@ -1,0 +1,57 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: 1.3;
+  letter-spacing: -0.022em;
+  color: var(--label);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+
+/* Sotto-alberi con tema forzato (es. gallery affiancata) */
+[data-theme] { background: var(--bg); color: var(--label); }
+
+button, input, select, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
+button { touch-action: manipulation; -webkit-touch-callout: none; }
+
+/* Focus ring visibile da tastiera */
+:focus { outline: none; }
+:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+
+/* Solo per screen reader */
+.l-sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Scala tipografica HIG. Tracking: negativo sul testo piccolo come SF, positivo sui titoli grandi tende a 0. */
+.t-large-title { font-size: var(--text-large-title); line-height: 1.18; font-weight: 700; letter-spacing: 0.012em; }
+.t-title1 { font-size: var(--text-title1); line-height: 1.2; font-weight: 700; letter-spacing: 0.012em; }
+.t-title2 { font-size: var(--text-title2); line-height: 1.25; font-weight: 700; letter-spacing: 0.01em; }
+.t-title3 { font-size: var(--text-title3); line-height: 1.25; font-weight: 600; letter-spacing: 0.01em; }
+.t-headline { font-size: var(--text-headline); line-height: 1.3; font-weight: 600; }
+.t-body { font-size: var(--text-body); line-height: 1.3; }
+.t-callout { font-size: var(--text-callout); line-height: 1.3; }
+.t-subhead { font-size: var(--text-subhead); line-height: 1.3; letter-spacing: -0.015em; }
+.t-footnote { font-size: var(--text-footnote); line-height: 1.3; letter-spacing: -0.006em; }
+.t-caption1 { font-size: var(--text-caption1); line-height: 1.3; letter-spacing: 0; }
+.t-caption2 { font-size: var(--text-caption2); line-height: 1.2; letter-spacing: 0.006em; font-weight: 500; }
+
+/* Movimento ridotto: rete di sicurezza globale */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
