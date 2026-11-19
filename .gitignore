@@ -1,0 +1,23 @@
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+# database e file caricati dagli utenti
+*.sqlite
+*.sqlite-*
+*.db
+data/
+uploads/
+# contenuti di gioco importati nell'istanza (mai nel repo)
+content/
+imports/
+# editor e strumenti locali
+.idea/
+.vscode/
+.claude/settings.local.json
