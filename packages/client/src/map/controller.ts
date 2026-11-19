@@ -58,6 +58,7 @@ export class MapController {
   onInvalidate: () => void = () => {};
   onCursor: (cursor: string) => void = () => {};
   onRuler: (text: string | null) => void = () => {};
+  onTool: (tool: Tool) => void = () => {};
 
   scene: MapScene | null = null;
   size: Size = { width: 0, height: 0 };
@@ -126,6 +127,7 @@ export class MapController {
   setTool(tool: Tool) {
     if (this.tool === tool) return;
     this.tool = tool;
+    this.onTool(tool);
     if (tool === "select") this.clearRuler();
     this.updateCursor();
     this.invalidate();
