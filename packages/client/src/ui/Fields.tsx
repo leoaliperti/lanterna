@@ -19,7 +19,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
   const hintId = `${fid}-hint`;
   const hint = error ?? helper;
   return (
-    <div className={cx("l-field", error && "l-field--error", className)}>
+    <div className={cx("l-field", error ? "l-field--error" : undefined, className)}>
       <label htmlFor={fid} className={cx("l-field__label", hideLabel && "l-sr-only")}>
         {label}
       </label>

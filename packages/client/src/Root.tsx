@@ -1,7 +1,8 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { App } from "./App";
 
-const Gallery = lazy(() => import("./ui/Gallery").then((m) => ({ default: m.Gallery })));
+// In produzione la costante e' null e il chunk della gallery non entra nel bundle.
+const Gallery = import.meta.env.DEV ? lazy(() => import("./ui/Gallery").then((m) => ({ default: m.Gallery }))) : null;
 
 function isGalleryHash(): boolean {
   return window.location.hash === "#/ui";
@@ -16,7 +17,7 @@ export function Root() {
     return () => window.removeEventListener("hashchange", on);
   }, []);
 
-  if (import.meta.env.DEV && gallery) {
+  if (Gallery && gallery) {
     return (
       <Suspense fallback={null}>
         <Gallery />

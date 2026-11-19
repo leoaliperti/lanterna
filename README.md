@@ -22,6 +22,10 @@ Ogni libreria o snippet copiato va elencato qui con licenza e fonte.
 | Three.js 0.160.0 | MIT | https://github.com/mrdoob/three.js | rendering 3D dei dadi |
 | Zod | MIT | https://github.com/colinhacks/zod | validazione dello schema `CharacterSheet` (`packages/shared`) |
 | System Reference Document 5.2 (SRD 5.2) | CC-BY-4.0 | https://www.dndbeyond.com/srd | formule e tabelle numeriche del motore di regole 5e 2024 (`packages/shared/src/rules5e`); nessun testo copiato |
+| Lucide (`lucide-react`) | ISC | https://github.com/lucide-icons/lucide | icone del design system (client). Non si usano SF Symbols: la licenza Apple ne vieta l'uso fuori dalle piattaforme Apple |
+| `@testing-library/user-event` | MIT | https://github.com/testing-library/user-event | solo test: simulazione di tastiera e puntatore |
+
+Il design system del client (`packages/client/src/ui`) e' scritto da zero in CSS puro e React, senza librerie di animazione ne' primitive esterne; segue le Human Interface Guidelines di Apple come ispirazione, senza includere font, icone o asset Apple (si usa lo stack di sistema `-apple-system, system-ui`). Dettagli in [`docs/DESIGN.md`](docs/DESIGN.md); la gallery e' su `#/ui` in sviluppo.
 
 Non viene copiato codice da Owlbear Rodeo Legacy (licenza non commerciale).
 
