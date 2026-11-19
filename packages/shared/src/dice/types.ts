@@ -54,8 +54,11 @@ export type ParseResult =
   | { ok: false; error: DiceError };
 
 export interface DieResult {
+  /** Numero di facce del dado (6 per un d6, 100 per d%). */
   face: number;
+  /** Valore uscito, da 1 a `face`. */
   value: number;
+  /** Se il dado contribuisce al totale (keep, vantaggio/svantaggio). */
   kept: boolean;
 }
 
