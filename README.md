@@ -20,8 +20,16 @@ Ogni libreria o snippet copiato va elencato qui con licenza e fonte.
 |---|---|---|---|
 | DiceGen (dadi 3D) | MIT | https://git.aliperti.me/alipe/DiceGen.git (stesso autore) | base dell'animazione dei dadi, con esito deciso dal server |
 | Three.js 0.160.0 | MIT | https://github.com/mrdoob/three.js | rendering 3D dei dadi |
+| Zod | MIT | https://github.com/colinhacks/zod | validazione dello schema `CharacterSheet` (`packages/shared`) |
+| System Reference Document 5.2 (SRD 5.2) | CC-BY-4.0 | https://www.dndbeyond.com/srd | formule e tabelle numeriche del motore di regole 5e 2024 (`packages/shared/src/rules5e`); nessun testo copiato |
 
 Non viene copiato codice da Owlbear Rodeo Legacy (licenza non commerciale).
+
+### Attribuzione SRD 5.2
+
+This work includes material from the System Reference Document 5.2 ("SRD 5.2") by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd. The SRD 5.2 is licensed under the Creative Commons Attribution 4.0 International License, available at https://creativecommons.org/licenses/by/4.0/legalcode.
+
+Il motore di regole (`packages/shared/src/rules5e`) implementa solo meccaniche (formule, tabelle numeriche, identificatori generici). Classi, specie, incantesimi, mostri e armature arrivano da contenuti importati dall'utente e iniettati a runtime.
 
 ## Sviluppo
 
