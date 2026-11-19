@@ -1,0 +1,177 @@
+/* Lanterna: design tokens, ispirati alle Human Interface Guidelines di Apple.
+   Nessun font Apple incluso: si usa lo stack di sistema.
+   Chiaro/scuro: light-dark() + color-scheme. Automatico (prefers-color-scheme) e
+   forzabile con <html data-theme="light|dark">. */
+
+:root {
+  color-scheme: light dark;
+}
+[data-theme="light"] { color-scheme: light; }
+[data-theme="dark"] { color-scheme: dark; }
+
+:root {
+  /* Font */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro", system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Tipografia HIG in rem (seguono la dimensione del testo scelta dall'utente) */
+  --text-large-title: 2.125rem; /* 34 */
+  --text-title1: 1.75rem; /* 28 */
+  --text-title2: 1.375rem; /* 22 */
+  --text-title3: 1.25rem; /* 20 */
+  --text-headline: 1.0625rem; /* 17, semibold */
+  --text-body: 1.0625rem; /* 17 */
+  --text-callout: 1rem; /* 16 */
+  --text-subhead: 0.9375rem; /* 15 */
+  --text-footnote: 0.8125rem; /* 13 */
+  --text-caption1: 0.75rem; /* 12 */
+  --text-caption2: 0.6875rem; /* 11 */
+
+  /* Spaziatura: griglia 4/8pt */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* Raggi generosi */
+  --radius-xs: 0.375rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.375rem;
+  --radius-sheet: 1.75rem;
+  --radius-full: 999px;
+
+  /* Target touch minimo 44x44 */
+  --hit-min: 2.75rem;
+  --control-h: 2.75rem;
+  --control-h-sm: 2rem;
+
+  /* Safe area */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
+  /* Movimento: solo transform e opacity. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: cubic-bezier(0.34, 1.35, 0.64, 1); /* molla smorzata, overshoot lieve */
+  --dur-press: 120ms;
+  --dur-fast: 160ms;
+  --dur-base: 220ms;
+  --dur-slow: 340ms;
+  --press-scale: 0.97;
+
+  /* Z-index */
+  --z-bar: 10;
+  --z-popover: 50;
+  --z-sheet: 60;
+  --z-alert: 70;
+  --z-toast: 80;
+  --z-tooltip: 90;
+
+  /* Colori di sistema semantici */
+  --label: light-dark(#000000, #ffffff);
+  --label-secondary: light-dark(rgb(60 60 67 / 0.72), rgb(235 235 245 / 0.65)); /* alzato per AA */
+  --label-tertiary: light-dark(rgb(60 60 67 / 0.58), rgb(235 235 245 / 0.5));
+  --label-quaternary: light-dark(rgb(60 60 67 / 0.3), rgb(235 235 245 / 0.3));
+
+  --bg: light-dark(#ffffff, #000000);
+  --bg-secondary: light-dark(#f2f2f7, #1c1c1e);
+  --bg-tertiary: light-dark(#ffffff, #2c2c2e);
+  --bg-grouped: light-dark(#f2f2f7, #000000);
+  --bg-grouped-secondary: light-dark(#ffffff, #1c1c1e);
+  --bg-grouped-tertiary: light-dark(#f2f2f7, #2c2c2e);
+
+  --fill: light-dark(rgb(120 120 128 / 0.2), rgb(120 120 128 / 0.36));
+  --fill-secondary: light-dark(rgb(120 120 128 / 0.16), rgb(120 120 128 / 0.32));
+  --fill-tertiary: light-dark(rgb(118 118 128 / 0.12), rgb(118 118 128 / 0.24));
+  --fill-quaternary: light-dark(rgb(116 116 128 / 0.08), rgb(116 116 128 / 0.18));
+
+  --separator: light-dark(rgb(60 60 67 / 0.29), rgb(84 84 88 / 0.65));
+  --separator-opaque: light-dark(#c6c6c8, #38383a);
+
+  /* Tint di sistema blu. --tint per riempimenti, --tint-text per testo/icone su sfondo neutro (AA). */
+  --tint: light-dark(#007aff, #0a84ff);
+  --tint-text: light-dark(#0062cc, #409cff);
+  --tint-pressed: light-dark(#0062cc, #409cff);
+  --tint-bg: light-dark(rgb(0 122 255 / 0.12), rgb(10 132 255 / 0.22));
+  --on-tint: #ffffff;
+  --on-tint-fill: light-dark(#ffffff, #ffffff);
+  /* testo bianco su riempimento tint: #007aff dà 4.0:1, usiamo una tinta piena più scura per i bottoni */
+  --tint-solid: light-dark(#0071eb, #0a6fe0);
+
+  --red: light-dark(#d70015, #ff6961);
+  --green: light-dark(#248a3d, #30d158);
+  --orange: light-dark(#c93400, #ff9f0a);
+  --yellow: light-dark(#a05a00, #ffd60a);
+  --teal: light-dark(#0f7c8f, #40c8e0);
+  --indigo: light-dark(#4a4ad6, #7d7aff);
+  --purple: light-dark(#8a2fb5, #bf5af2);
+  --pink: light-dark(#d30f45, #ff6482);
+  --gray: light-dark(#6c6c70, #98989d);
+  --red-solid: light-dark(#d70015, #e5362d);
+  --red-bg: light-dark(rgb(255 59 48 / 0.12), rgb(255 69 58 / 0.22));
+  --green-fill: light-dark(#34c759, #30d158);
+  --orange-fill: light-dark(#ff9500, #ff9f0a);
+
+  /* Materiali traslucidi (con fallback opaco sotto) */
+  --material-ultrathin: light-dark(rgb(255 255 255 / 0.55), rgb(40 40 42 / 0.5));
+  --material-regular: light-dark(rgb(255 255 255 / 0.75), rgb(30 30 32 / 0.72));
+  --material-thick: light-dark(rgb(255 255 255 / 0.88), rgb(28 28 30 / 0.88));
+  --material-opaque: light-dark(#f9f9fb, #1c1c1e);
+  --blur-ultrathin: blur(10px) saturate(160%);
+  --blur-regular: blur(20px) saturate(180%);
+  --blur-thick: blur(32px) saturate(190%);
+  --scrim: light-dark(rgb(0 0 0 / 0.32), rgb(0 0 0 / 0.55));
+  --focus-ring: light-dark(#007aff, #409cff);
+  --hairline: light-dark(rgb(0 0 0 / 0.1), rgb(255 255 255 / 0.12));
+
+  /* Ombre morbide */
+  --shadow-color: light-dark(rgb(0 0 0 / 0.1), rgb(0 0 0 / 0.5));
+  --shadow-sm: 0 1px 2px var(--shadow-color);
+  --shadow-md: 0 4px 14px var(--shadow-color), 0 1px 3px var(--shadow-color);
+  --shadow-lg: 0 14px 36px var(--shadow-color), 0 2px 8px var(--shadow-color);
+  --shadow-sheet: 0 -8px 40px var(--shadow-color);
+}
+
+/* Contrasto aumentato: testi piu' forti, materiali opachi, bordi definiti */
+@media (prefers-contrast: more) {
+  :root {
+    --label-secondary: light-dark(rgb(0 0 0 / 0.88), rgb(255 255 255 / 0.92));
+    --label-tertiary: light-dark(rgb(0 0 0 / 0.78), rgb(255 255 255 / 0.82));
+    --separator: light-dark(rgb(0 0 0 / 0.6), rgb(255 255 255 / 0.6));
+    --tint-text: light-dark(#004a99, #70b4ff);
+    --hairline: light-dark(rgb(0 0 0 / 0.55), rgb(255 255 255 / 0.6));
+    --material-ultrathin: var(--material-opaque);
+    --material-regular: var(--material-opaque);
+    --material-thick: var(--material-opaque);
+  }
+}
+
+/* Trasparenza ridotta: materiali opachi, niente blur */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --material-ultrathin: var(--material-opaque);
+    --material-regular: var(--material-opaque);
+    --material-thick: var(--material-opaque);
+  }
+}
+
+/* Movimento ridotto: nessuna molla/spostamento, solo cambi istantanei o dissolvenze brevi */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-press: 0.01ms;
+    --dur-fast: 0.01ms;
+    --dur-base: 0.01ms;
+    --dur-slow: 0.01ms;
+    --press-scale: 1;
+  }
+}
