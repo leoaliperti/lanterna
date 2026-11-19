@@ -8,10 +8,20 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "create-admin": "tsx src/scripts/create-admin.ts"
   },
   "dependencies": {
-    "fastify": "^5.12.8",
-    "@lanterna/shared": "*"
+    "@fastify/helmet": "^13.2.0",
+    "@fastify/rate-limit": "^11.2.2",
+    "@lanterna/shared": "*",
+    "@libsql/client": "^0.18.0",
+    "better-auth": "^1.7.26",
+    "drizzle-orm": "^0.45.4",
+    "fastify": "^5.12.8"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.11"
   }
 }

@@ -27,9 +27,20 @@ npm run build       # build di shared, server e client
 npm start           # avvio in produzione (server compilato)
 npm test            # test unitari e di integrazione (Vitest)
 npm run lint        # ESLint + typecheck
+npm run create-admin -w @lanterna/server   # crea il primo admin/GM (idempotente)
+npm run db:generate -w @lanterna/server    # genera una migrazione dopo aver cambiato src/db/schema.ts
 ```
 
-Previsti nelle milestone successive: migrazioni Drizzle (M1/M2) e test end-to-end con Playwright (M2). Configurazione: copia `.env.example` in `.env`.
+Le migrazioni (in `packages/server/drizzle/`) si applicano da sole all'avvio del server e di `create-admin`. Previsti: test end-to-end con Playwright (M2). Configurazione: copia `.env.example` in `.env` (nella radice).
+
+## Autenticazione (M1)
+
+- **Better Auth** montato sotto `/auth`, con un elenco chiuso di rotte (`src/auth/routes.ts`): `POST /auth/sign-in/email`, `POST /auth/sign-out`, `GET /auth/get-session`, `POST /auth/change-password`. Tutto il resto, `sign-up` compreso, risponde 404; in più `disableSignUp: true`.
+- **Gestione utenti** sotto `/admin/users` (`src/users/`), solo ruolo `admin`: elenco, creazione, cambio ruolo, eliminazione, reset password. L'ultimo admin non si può declassare né eliminare (controllo atomico in SQL).
+- **Hook riusabili** (`src/auth/session.ts`): `requireSession` e `requireRole("admin")`, da usare come `onRequest` così il ruolo si verifica prima di leggere il corpo; `getSessionFromUpgradeRequest` per il WebSocket (M2) insieme a `isAllowedOrigin` (`src/security.ts`).
+- **Database:** SQLite con Drizzle e driver `@libsql/client` (binari precompilati, nessuno script di installazione: npm 11 li blocca). Schema in `src/db/schema.ts`.
+- **Sicurezza:** password con scrypt (default Better Auth), minimo 12 caratteri; rate limit per IP su login, cambio password e creazione utenti (`@fastify/rate-limit`); cookie `HttpOnly`, `SameSite=Lax`, `Secure` in produzione; `TRUST_PROXY` per leggere l'IP reale dietro Cloudflare Tunnel; ogni POST/PATCH/DELETE deve avere Origin (o Referer) fra le origini ammesse; header di sicurezza con `@fastify/helmet`; login errato e utente inesistente danno la stessa risposta. In produzione `BETTER_AUTH_SECRET` e `BETTER_AUTH_URL` sono obbligatori.
+- **Test:** ogni nuova rotta protetta va aggiunta alla tabella `endpoints` in `src/users/admin.test.ts` (o equivalente) con i casi anonimo 401, giocatore 403, admin ok.
 
 ## Regole non negoziabili
 
