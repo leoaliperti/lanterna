@@ -2,7 +2,7 @@
 
 Tavolo virtuale (VTT) open source per giocare di ruolo online con gli amici: mappa con griglia, token, chat, dadi e, in seguito, nebbia di guerra, iniziativa e schede D&D 5e. Pensato per essere ospitato su un server di casa e raggiunto tramite Cloudflare Tunnel.
 
-**Stato:** in fase di pianificazione, ancora nessun codice. Vedi [`docs/PLAN.md`](docs/PLAN.md) per decisioni e milestone e [`CLAUDE.md`](CLAUDE.md) per stack e regole di sviluppo.
+**Stato:** milestone M0 (scaffolding) in corso. Vedi [`docs/PLAN.md`](docs/PLAN.md) per decisioni e milestone e [`CLAUDE.md`](CLAUDE.md) per stack e regole di sviluppo.
 
 ## Licenza
 
@@ -22,3 +22,14 @@ Ogni libreria o snippet copiato va elencato qui con licenza e fonte.
 | Three.js 0.160.0 | MIT | https://github.com/mrdoob/three.js | rendering 3D dei dadi |
 
 Non viene copiato codice da Owlbear Rodeo Legacy (licenza non commerciale).
+
+## Sviluppo
+
+Richiede Node 22 o superiore.
+
+```
+npm install
+npm run dev      # server su :3000 e client Vite
+npm test
+npm run lint
+```

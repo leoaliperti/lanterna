@@ -18,18 +18,18 @@ I requisiti completi sono in `DnD REMOTE INTERFACE REQUIREMENTS.txt` (Desktop de
 
 ## Comandi
 
-Provvisori: lo scaffolding non esiste ancora. Aggiornare questa sezione quando viene creato.
+Gestore pacchetti: npm (workspace in `packages/shared`, `server`, `client`). Node 22 o superiore.
 
 ```
-pnpm install        # installa le dipendenze
-pnpm dev            # avvio sviluppo (client Vite + server)
-pnpm build          # build di produzione
-pnpm start          # avvio in produzione
-pnpm test           # test unitari e di integrazione
-pnpm test:e2e       # test end-to-end (Playwright)
-pnpm lint           # lint + typecheck
-pnpm db:migrate     # migrazioni Drizzle
+npm install         # installa le dipendenze
+npm run dev         # sviluppo: server (porta 3000) + client Vite con proxy /api
+npm run build       # build di shared, server e client
+npm start           # avvio in produzione (server compilato)
+npm test            # test unitari e di integrazione (Vitest)
+npm run lint        # ESLint + typecheck
 ```
+
+Previsti nelle milestone successive: migrazioni Drizzle (M1/M2) e test end-to-end con Playwright (M2). Configurazione: copia `.env.example` in `.env`.
 
 ## Regole non negoziabili
 
@@ -48,6 +48,6 @@ pnpm db:migrate     # migrazioni Drizzle
 - La nebbia di guerra è manuale, in mano al GM, con maschera per giocatore. Il calcolo automatico della vista dei token è solo un aiuto visivo e non scopre mai la nebbia.
 - Le misurazioni private restano sul client; quelle pubbliche sono eventi sincronizzati.
 - Contenuti di gioco (mostri, regole, manuali) non vanno mai nel repo. Si inseriscono nella propria istanza con uno strumento di importazione.
-- Sistema di regole: D&D 5e, tutto tranne i punti esperienza. La logica è nostra; i testi dei manuali non vanno nel repo.
+- Sistema di regole: D&D 5e, edizione 2024, tutto tranne i punti esperienza. La logica è nostra; i testi dei manuali non vanno nel repo.
 - Fuori ambito per ora: audio e voce (si usa Discord).
 - Repo pubblico: niente segreti nel codice o nella cronologia git. Solo `.env.example`; `.env` e il file SQLite sono in `.gitignore`.
