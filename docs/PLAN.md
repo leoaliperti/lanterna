@@ -1,6 +1,6 @@
 # Piano di Lanterna
 
-Stato: M0 in corso (scaffolding). Gestore pacchetti: npm workspaces (pnpm non è installato e non serviva).
+Stato: M0 completata; M1 backend (auth, ruoli, gestione utenti) in revisione, manca la UI di login e amministrazione. Gestore pacchetti: npm workspaces (pnpm non è installato e non serviva).
 
 ## Decisioni prese
 
@@ -18,6 +18,7 @@ Stato: M0 in corso (scaffolding). Gestore pacchetti: npm workspaces (pnpm non è
 | Licenza | AGPL-3.0-or-later. |
 | Sistema di regole | D&D 5e, edizione 2024, tutto tranne i punti esperienza. Le regole si implementano come logica nostra; i testi (mostri, incantesimi, manuali) non entrano nel repo. |
 | Stack | PixiJS, Fastify, `ws`, Better Auth, confermati. |
+| Driver SQLite | `@libsql/client` con file locale: binari precompilati, nessuno script di installazione (npm 11 li blocca; `better-sqlite3` richiederebbe compilazione nativa). `node:sqlite` scartato perché in Node 22 è ancora sperimentale e Drizzle non lo supporta ufficialmente. |
 | Audio | Fuori ambito iniziale (si usa Discord). |
 | MVP | Lista dell'autore, più caricamento mappa e salvataggio automatico. |
 
