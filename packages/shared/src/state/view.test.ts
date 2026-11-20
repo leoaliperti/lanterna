@@ -191,7 +191,7 @@ describe("filterEventFor: nessuna fuga nei delta", () => {
 
   it("eliminare la scena attiva: il giocatore riceve solo la disattivazione", () => {
     const { events, json } = eventsJson({ type: "scene.delete", sceneId: MAIN }, P1);
-    expect(events).toEqual([{ type: "scene.activated", sceneId: null, scene: null, tokens: [] }]);
+    expect(events).toEqual([{ type: "scene.activated", sceneId: null, scene: null, tokens: [], fog: null, walls: [] }]);
     expectNoLeak(json, ALWAYS_SECRET);
   });
 

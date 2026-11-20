@@ -21,15 +21,19 @@
     "@fastify/multipart": "^10.1.9",
     "@fastify/rate-limit": "^11.2.2",
     "@fastify/static": "^10.1.12",
+    "@jsquash/webp": "^1.5.0",
     "@lanterna/shared": "*",
     "@libsql/client": "^0.18.0",
     "better-auth": "^1.7.26",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.8",
+    "jpeg-js": "^0.4.4",
+    "pngjs": "^7.0.0",
     "ws": "^8.23.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@types/pngjs": "^6.0.5",
     "@types/ws": "^8.18.2",
     "drizzle-kit": "^0.31.11"
   }

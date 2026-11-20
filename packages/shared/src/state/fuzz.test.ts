@@ -5,8 +5,8 @@ import { filterEventsFor } from "./filter.js";
 import { GM, P1, P2, STRANGER, deepFreeze, rng, scene, token } from "./fixtures.test-utils.js";
 import { createHistory, execute, redo, undo, type History, type HistoryResult } from "./history.js";
 import { checkInvariants } from "./invariants.js";
-import { CampaignStateSchema, type Actor, type CampaignState } from "./schema.js";
-import { canSeeToken, viewFor, type CampaignView } from "./view.js";
+import { CampaignStateSchema, fogOf, type Actor, type CampaignState } from "./schema.js";
+import { canSeeToken, projectWall, viewFor, type CampaignView } from "./view.js";
 
 /**
  * Fuzz/property-based: sequenze casuali (ma riproducibili) di comandi validi,
@@ -26,6 +26,7 @@ const PLAYERS: Actor[] = [P1, P2];
 
 const tid = (n: number) => `tk-${n}-z`;
 const sid = (n: number) => `sc-${n}-z`;
+const wid = (n: number) => `wl-${n}-z`;
 
 function initial(): CampaignState {
   return CampaignStateSchema.parse({
@@ -54,7 +55,7 @@ function gen(r: () => number) {
   const anySid = () => sid(int(4));
 
   function command(): unknown {
-    switch (int(12)) {
+    switch (int(18)) {
       case 0:
       case 1:
       case 2:
@@ -108,6 +109,56 @@ function gen(r: () => number) {
         return { type: "scene.setGrid", sceneId: anySid(), grid: pick<unknown>([{ cellSize: 20 + int(100) }, { snap: r() < 0.5 }, { offsetX: 5 }, { opacity: 3 }]) };
       case 10:
         return r() < 0.3 ? { type: "scene.delete", sceneId: anySid() } : { type: "token.move", tokenId: anyTid(), x: weird(), y: coord() };
+      case 11:
+      case 12:
+      case 13:
+      case 14:
+      case 15:
+      case 16: {
+        // Nebbia (M6).
+        const target = () =>
+          pick<unknown>([
+            { kind: "all" },
+            { kind: "players", userIds: ["p1"] },
+            { kind: "players", userIds: ["p2"] },
+            { kind: "players", userIds: ["p1", "p2"] },
+            { kind: "players", userIds: ["gm1"] },
+          ]);
+        const shape = () =>
+          pick<unknown>([
+            { kind: "rect", x: coord(), y: coord(), width: r() * 600, height: r() * 600 },
+            { kind: "circle", x: coord(), y: coord(), radius: r() * 400 },
+            { kind: "polygon", points: [coord(), coord(), coord(), coord(), coord(), coord()] },
+            { kind: "cells", cells: [int(20), int(15), int(20), int(15)] },
+            { kind: "rect", x: weird(), y: 0, width: 1, height: 1 },
+          ]);
+        switch (int(9)) {
+          case 0:
+            return { type: "fog.enable", sceneId: anySid(), initial: pick(["covered", "revealed"]) };
+          case 1:
+            return { type: "fog.disable", sceneId: anySid() };
+          case 2:
+          case 3:
+            return { type: "fog.reveal", sceneId: anySid(), shape: shape(), target: target() };
+          case 4:
+            return { type: "fog.cover", sceneId: anySid(), shape: shape(), target: target() };
+          case 5:
+            return { type: pick(["fog.revealAll", "fog.coverAll"]), sceneId: anySid(), target: target() };
+          case 6:
+            return { type: "fog.setLighting", sceneId: anySid(), lighting: pick(["bright", "dim", "dark"]) };
+          case 7: {
+            const id = int(10);
+            return {
+              type: "wall.add",
+              wall: { id: wid(id), sceneId: anySid(), x1: coord(), y1: coord(), x2: coord(), y2: coord(), door: r() < 0.3, open: r() < 0.5 },
+            };
+          }
+          default:
+            return r() < 0.5
+              ? { type: "wall.update", wallId: wid(int(10)), patch: pick<unknown>([{ open: r() < 0.5 }, { x1: coord() }, { door: true }]) }
+              : { type: "wall.remove", wallId: wid(int(10)) };
+        }
+      }
       default:
         return pick<unknown>([null, 42, "x", {}, { type: "token.move" }, { type: "token.move", tokenId: anyTid(), x: 1, y: 1, evil: 1 }, { type: "__proto__" }]);
     }
@@ -118,6 +169,8 @@ function gen(r: () => number) {
 const sortTokens = (v: CampaignView): CampaignView => ({
   ...v,
   tokens: [...v.tokens].sort((a, b) => a.id.localeCompare(b.id)),
+  walls: [...(v.walls ?? [])].sort((a, b) => a.id.localeCompare(b.id)),
+  fogs: [...(v.fogs ?? [])].sort((a, b) => a.sceneId.localeCompare(b.sceneId)),
 });
 
 /** Stringhe che `viewer` non deve mai vedere nello stato `s`. */
@@ -125,9 +178,15 @@ function forbiddenFor(s: CampaignState, viewer: Actor): string[] {
   const out: string[] = [];
   for (const t of s.tokens) {
     out.push(`Nota-${t.id}`);
-    if (!canSeeToken(t, viewer, s.activeSceneId)) out.push(t.id, `Nome-${t.id}`);
+    if (!canSeeToken(t, viewer, s.activeSceneId, fogOf(s, t.sceneId))) out.push(t.id, `Nome-${t.id}`);
   }
   for (const sc of s.scenes) if (sc.id !== s.activeSceneId) out.push(sc.id, `Nome-${sc.id}`);
+  for (const w of s.walls ?? []) if (!projectWall(w, viewer, s.activeSceneId, fogOf(s, w.sceneId))) out.push(w.id);
+  // Nebbia: un giocatore non riceve mai le maschere degli altri né la mappa sotto la nebbia.
+  for (const f of s.fogs ?? []) {
+    out.push(`"userId":"p${viewer.userId === "p1" ? 2 : 1}","mask"`);
+    if (f.sceneId === s.activeSceneId) out.push(`asset-${f.sceneId}`);
+  }
   return out;
 }
 
@@ -152,6 +211,7 @@ describe("fuzz del riduttore con filtro e annulla/ripeti", () => {
       let history: History = createHistory(50);
       const views = new Map<string, CampaignView>(ACTORS.slice(0, 3).map((a) => [a.userId, viewFor(state, a)]));
       let applied = 0;
+      let fogApplied = 0;
 
       for (let step = 0; step < STEPS; step++) {
         const actor = r() < 0.4 ? GM : g.pick(ACTORS);
@@ -175,6 +235,7 @@ describe("fuzz del riduttore con filtro e annulla/ripeti", () => {
         expect(res.state.version, ctx()).toBe(res.changes.length > 0 ? prev.version + 1 : prev.version);
         if (res.changes.length === 0) continue;
         applied++;
+        if (String((cmd as { type?: unknown } | null)?.type).startsWith("fog.")) fogApplied++;
         state = deepFreeze(res.state);
         history = res.history;
         expect(checkInvariants(state), ctx()).toEqual([]);
@@ -200,6 +261,7 @@ describe("fuzz del riduttore con filtro e annulla/ripeti", () => {
       }
       // Il fuzz deve effettivamente esercitare il riduttore.
       expect(applied).toBeGreaterThan(100);
+      expect(fogApplied).toBeGreaterThan(5);
     });
   }
 });

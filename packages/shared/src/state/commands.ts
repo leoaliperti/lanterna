@@ -11,7 +11,10 @@ import {
   SceneSchema,
   TokenKindSchema,
   TokenSchema,
+  TokenVisionSchema,
 } from "./schema.js";
+import { FogLightingSchema, FogSchema, FogShapeSchema, FogStateSchema, FogTargetSchema } from "./fog.js";
+import { WallSchema } from "./walls.js";
 
 /**
  * Comandi che mutano lo stato. Sono l'unico modo di cambiare una campagna:
@@ -49,6 +52,7 @@ export const TokenPatchSchema = z
     conditions: ConditionsSchema,
     health: HealthSchema.nullable(),
     gmNotes: z.string().max(LIMITS.notesMaxLength),
+    vision: TokenVisionSchema.nullable(),
   })
   .partial()
   .refine((p) => Object.keys(p).length > 0, { message: "patch vuota" });
@@ -120,6 +124,90 @@ export const ChangeSceneSchema = z.strictObject({
   sceneId: IdSchema.nullable(),
 });
 
+// ---------------------------------------------------------------------------
+// Nebbia di guerra (M6): tutti solo GM
+// ---------------------------------------------------------------------------
+
+/**
+ * Attiva la nebbia sulla scena. `initial`: stato iniziale per tutti ("covered" = tutto coperto,
+ * "revealed" = tutto scoperto). La griglia della nebbia è quella della scena, salvo override.
+ */
+export const FogEnableSchema = z.strictObject({
+  type: z.literal("fog.enable"),
+  sceneId: IdSchema,
+  initial: FogStateSchema,
+  lighting: FogLightingSchema.optional(),
+  cellSize: z.number().min(LIMITS.cellMinSize).max(LIMITS.cellMaxSize).optional(),
+  offsetX: z.number().optional(),
+  offsetY: z.number().optional(),
+});
+
+/** Toglie la nebbia (la scena torna visibile a tutti come prima di M6). */
+export const FogDisableSchema = z.strictObject({ type: z.literal("fog.disable"), sceneId: IdSchema });
+
+/** Imposta la nebbia completa di una scena: è l'inverso usato da annulla/ripeti. */
+export const FogRestoreSchema = z.strictObject({ type: z.literal("fog.restore"), fog: FogSchema });
+
+export const FogRevealSchema = z.strictObject({
+  type: z.literal("fog.reveal"),
+  sceneId: IdSchema,
+  shape: FogShapeSchema,
+  target: FogTargetSchema,
+});
+
+export const FogCoverSchema = z.strictObject({
+  type: z.literal("fog.cover"),
+  sceneId: IdSchema,
+  shape: FogShapeSchema,
+  target: FogTargetSchema,
+});
+
+export const FogRevealAllSchema = z.strictObject({
+  type: z.literal("fog.revealAll"),
+  sceneId: IdSchema,
+  target: FogTargetSchema,
+});
+
+export const FogCoverAllSchema = z.strictObject({
+  type: z.literal("fog.coverAll"),
+  sceneId: IdSchema,
+  target: FogTargetSchema,
+});
+
+export const FogSetLightingSchema = z.strictObject({
+  type: z.literal("fog.setLighting"),
+  sceneId: IdSchema,
+  lighting: FogLightingSchema,
+});
+
+// ---------------------------------------------------------------------------
+// Muri e porte (M6): solo GM
+// ---------------------------------------------------------------------------
+
+export const WallAddSchema = z.strictObject({ type: z.literal("wall.add"), wall: WallSchema });
+
+const finiteCoord = z.number().refine(Number.isFinite, "numero non finito");
+export const WallPatchSchema = z
+  .strictObject({
+    x1: finiteCoord,
+    y1: finiteCoord,
+    x2: finiteCoord,
+    y2: finiteCoord,
+    door: z.boolean(),
+    open: z.boolean(),
+  })
+  .partial()
+  .refine((p) => Object.keys(p).length > 0, { message: "patch vuota" });
+export type WallPatch = z.infer<typeof WallPatchSchema>;
+
+export const WallUpdateSchema = z.strictObject({
+  type: z.literal("wall.update"),
+  wallId: IdSchema,
+  patch: WallPatchSchema,
+});
+
+export const WallRemoveSchema = z.strictObject({ type: z.literal("wall.remove"), wallId: IdSchema });
+
 export const CommandSchema = z.discriminatedUnion("type", [
   MoveTokenSchema,
   CreateTokenSchema,
@@ -130,6 +218,17 @@ export const CommandSchema = z.discriminatedUnion("type", [
   SetSceneGridSchema,
   DeleteSceneSchema,
   ChangeSceneSchema,
+  FogEnableSchema,
+  FogDisableSchema,
+  FogRestoreSchema,
+  FogRevealSchema,
+  FogCoverSchema,
+  FogRevealAllSchema,
+  FogCoverAllSchema,
+  FogSetLightingSchema,
+  WallAddSchema,
+  WallUpdateSchema,
+  WallRemoveSchema,
 ]);
 export type Command = z.infer<typeof CommandSchema>;
 export type CommandType = Command["type"];

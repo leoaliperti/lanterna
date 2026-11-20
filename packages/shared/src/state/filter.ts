@@ -1,23 +1,31 @@
 import { z } from "zod";
 import type { StateChange } from "./changes.js";
+import type { Fog } from "./fog.js";
 import type { Actor, Scene, Token } from "./schema.js";
 import {
+  FogViewSchema,
   SceneViewSchema,
   TokenViewSchema,
+  WallViewSchema,
   canSeeScene,
   canSeeToken,
+  isGm,
+  projectFog,
   projectScene,
   projectToken,
+  projectWall,
+  type FogView,
   type SceneView,
   type TokenView,
+  type WallView,
 } from "./view.js";
 
 /**
  * Eventi per un singolo utente (server -> client). Derivano SEMPRE dalle
- * proiezioni di `view.ts`: si calcola la vista del token/scena prima e dopo
- * il cambiamento e si invia solo la differenza. Così un token che diventa
- * nascosto è, per un giocatore, una "scomparsa" (`token.deleted`) e uno che
- * viene rivelato una "creazione" (`token.created`).
+ * proiezioni di `view.ts`: si calcola la vista del token/scena/muro/nebbia prima e
+ * dopo il cambiamento e si invia solo la differenza. Così un token che diventa
+ * nascosto (o finisce sotto la nebbia) è, per un giocatore, una "scomparsa"
+ * (`token.deleted`) e uno che viene rivelato una "creazione" (`token.created`).
  */
 export const ServerEventSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("token.created"), token: TokenViewSchema }),
@@ -40,7 +48,15 @@ export const ServerEventSchema = z.discriminatedUnion("type", [
     /** La scena attivata e i suoi token visibili: il client sostituisce quelli della scena precedente. */
     scene: SceneViewSchema.nullable(),
     tokens: z.array(TokenViewSchema),
+    /** Nebbia e muri visibili della scena attivata (M6): sostituiscono quelli precedenti. */
+    fog: FogViewSchema.nullable().optional(),
+    walls: z.array(WallViewSchema).optional(),
   }),
+  /** Nebbia di una scena sostituita per intero (`null` = nebbia tolta). */
+  z.strictObject({ type: z.literal("fog.updated"), sceneId: z.string(), fog: FogViewSchema.nullable() }),
+  z.strictObject({ type: z.literal("wall.created"), wall: WallViewSchema }),
+  z.strictObject({ type: z.literal("wall.updated"), wall: WallViewSchema }),
+  z.strictObject({ type: z.literal("wall.deleted"), wallId: z.string() }),
 ]);
 export type ServerEvent = z.infer<typeof ServerEventSchema>;
 
@@ -68,47 +84,124 @@ function diff<T extends object>(before: T, after: T): Partial<T> {
   return out;
 }
 
-function tokenView(t: Token | null, viewer: Actor, activeSceneId: string | null): TokenView | null {
-  return t && canSeeToken(t, viewer, activeSceneId) ? projectToken(t, viewer) : null;
+function tokenView(t: Token | null, viewer: Actor, activeSceneId: string | null, fog: Fog | null): TokenView | null {
+  return t && canSeeToken(t, viewer, activeSceneId, fog) ? projectToken(t, viewer) : null;
 }
 
-function sceneView(s: Scene | null, viewer: Actor, activeSceneId: string | null): SceneView | null {
-  return s && canSeeScene(s, viewer, activeSceneId) ? projectScene(s) : null;
+function sceneView(s: Scene | null, viewer: Actor, activeSceneId: string | null, fog: Fog | null): SceneView | null {
+  return s && canSeeScene(s, viewer, activeSceneId) ? projectScene(s, viewer, fog) : null;
+}
+
+function fogView(f: Fog | null, viewer: Actor, activeSceneId: string | null, scene: Scene | null): FogView | null {
+  if (!f) return null;
+  if (!isGm(viewer) && f.sceneId !== activeSceneId) return null;
+  return projectFog(f, viewer, scene && scene.id === f.sceneId ? scene : null);
+}
+
+function tokenEvents(b: TokenView | null, a: TokenView | null): ServerEvent[] {
+  if (!b && !a) return [];
+  if (!b && a) return [{ type: "token.created", token: a }];
+  if (b && !a) return [{ type: "token.deleted", tokenId: b.id }];
+  const changes = diff(b as TokenView, a as TokenView);
+  if (Object.keys(changes).length === 0) return [];
+  return [{ type: "token.updated", tokenId: (a as TokenView).id, changes }];
+}
+
+function wallEvents(b: WallView | null, a: WallView | null): ServerEvent[] {
+  if (!b && !a) return [];
+  if (!b && a) return [{ type: "wall.created", wall: a }];
+  if (b && !a) return [{ type: "wall.deleted", wallId: b.id }];
+  return deepEqual(a, b) ? [] : [{ type: "wall.updated", wall: a as WallView }];
+}
+
+function sceneEvents(b: SceneView | null, a: SceneView | null): ServerEvent[] {
+  if (!b && !a) return [];
+  if (!b && a) return [{ type: "scene.created", scene: a }];
+  if (b && !a) return [{ type: "scene.deleted", sceneId: b.id }];
+  const changes = diff(b as SceneView, a as SceneView);
+  if (Object.keys(changes).length === 0) return [];
+  return [{ type: "scene.updated", sceneId: (a as SceneView).id, changes }];
+}
+
+function fogEvents(sceneId: string, b: FogView | null, a: FogView | null): ServerEvent[] {
+  if (deepEqual(a, b)) return [];
+  return [{ type: "fog.updated", sceneId, fog: a }];
 }
 
 /**
- * Traduce un cambiamento interno negli eventi che `viewer` può ricevere
- * (zero o uno). Mai un evento contiene dati che `viewFor` non mostrerebbe.
+ * Traduce un cambiamento interno negli eventi che `viewer` può ricevere.
+ * Mai un evento contiene dati che `viewFor` non mostrerebbe.
  */
 export function filterEventFor(change: StateChange, viewer: Actor): ServerEvent[] {
   switch (change.type) {
     case "token": {
-      const b = tokenView(change.before, viewer, change.activeSceneId);
-      const a = tokenView(change.after, viewer, change.activeSceneId);
-      if (!b && !a) return [];
-      if (!b && a) return [{ type: "token.created", token: a }];
-      if (b && !a) return [{ type: "token.deleted", tokenId: b.id }];
-      const changes = diff(b as TokenView, a as TokenView);
-      if (Object.keys(changes).length === 0) return [];
-      return [{ type: "token.updated", tokenId: (a as TokenView).id, changes }];
+      const fog = change.fog ?? null;
+      return tokenEvents(
+        tokenView(change.before, viewer, change.activeSceneId, fog),
+        tokenView(change.after, viewer, change.activeSceneId, fog),
+      );
     }
     case "scene": {
-      const b = sceneView(change.before, viewer, change.activeSceneId);
-      const a = sceneView(change.after, viewer, change.activeSceneId);
-      if (!b && !a) return [];
-      if (!b && a) return [{ type: "scene.created", scene: a }];
-      if (b && !a) return [{ type: "scene.deleted", sceneId: b.id }];
-      const changes = diff(b as SceneView, a as SceneView);
-      if (Object.keys(changes).length === 0) return [];
-      return [{ type: "scene.updated", sceneId: (a as SceneView).id, changes }];
+      const fog = change.fog ?? null;
+      const events = sceneEvents(
+        sceneView(change.before, viewer, change.activeSceneId, fog),
+        sceneView(change.after, viewer, change.activeSceneId, fog),
+      );
+      // Con la nebbia, mappa e dimensioni della scena entrano nelle tessere della vista della nebbia.
+      if (fog && change.before && change.after) {
+        events.push(
+          ...fogEvents(
+            fog.sceneId,
+            fogView(fog, viewer, change.activeSceneId, change.before),
+            fogView(fog, viewer, change.activeSceneId, change.after),
+          ),
+        );
+      }
+      return events;
     }
     case "activeScene": {
       const active = change.after;
-      const scene = change.scene && active !== null ? projectScene(change.scene) : null;
+      const fog = change.fog ?? null;
+      const scene = change.scene && active !== null ? projectScene(change.scene, viewer, fog) : null;
       const tokens = change.tokens
-        .filter((t) => canSeeToken(t, viewer, active))
+        .filter((t) => canSeeToken(t, viewer, active, fog))
         .map((t) => projectToken(t, viewer));
-      return [{ type: "scene.activated", sceneId: active, scene, tokens }];
+      const walls = (change.walls ?? []).flatMap((w) => {
+        const v = projectWall(w, viewer, active, fog);
+        return v ? [v] : [];
+      });
+      return [
+        {
+          type: "scene.activated",
+          sceneId: active,
+          scene,
+          tokens,
+          fog: fog && change.scene ? fogView(fog, viewer, active, change.scene) : null,
+          walls,
+        },
+      ];
+    }
+    case "wall":
+      return wallEvents(
+        change.before ? projectWall(change.before, viewer, change.activeSceneId, change.fog) : null,
+        change.after ? projectWall(change.after, viewer, change.activeSceneId, change.fog) : null,
+      );
+    case "fog": {
+      const active = change.activeSceneId;
+      const scene = change.scene;
+      if (!isGm(viewer) && change.sceneId !== active) return [];
+      const events: ServerEvent[] = [];
+      if (scene) events.push(...sceneEvents(sceneView(scene, viewer, active, change.before), sceneView(scene, viewer, active, change.after)));
+      events.push(
+        ...fogEvents(change.sceneId, fogView(change.before, viewer, active, scene), fogView(change.after, viewer, active, scene)),
+      );
+      for (const t of change.tokens) {
+        events.push(...tokenEvents(tokenView(t, viewer, active, change.before), tokenView(t, viewer, active, change.after)));
+      }
+      for (const w of change.walls) {
+        events.push(...wallEvents(projectWall(w, viewer, active, change.before), projectWall(w, viewer, active, change.after)));
+      }
+      return events;
     }
   }
 }

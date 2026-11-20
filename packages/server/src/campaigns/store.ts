@@ -4,10 +4,13 @@ import type { BatchItem } from "drizzle-orm/batch";
 import { z } from "zod";
 import {
   CampaignStateSchema,
-  IdSchema,
+  FogSchema,
   SceneSchema,
+  StateChangeSchema,
   TokenSchema,
+  WallSchema,
   checkInvariants,
+  withMembers,
   type CampaignState,
   type CampaignSummary,
   type LogEntry,
@@ -15,7 +18,7 @@ import {
   type StateChange,
 } from "@lanterna/shared";
 import type { Db } from "../db/client.js";
-import { campaign, campaignEvent, campaignMember, scene, token, user } from "../db/schema.js";
+import { campaign, campaignEvent, campaignMember, fog, scene, token, user, wall } from "../db/schema.js";
 
 /**
  * Persistenza delle campagne su SQLite (Drizzle + libSQL).
@@ -26,6 +29,8 @@ import { campaign, campaignEvent, campaignMember, scene, token, user } from "../
  *   (`user.role`, `user.name`): admin = GM;
  * - `scene` / `token`: una riga per oggetto con il JSON completo in `data`, validato con
  *   `SceneSchema` / `TokenSchema` a ogni lettura; `sort` conserva l'ordine (z-order dei token);
+ * - `fog` / `wall` (migrazione `0004_fog`, M6): nebbia per scena (maschere per giocatore) e muri,
+ *   JSON validato con `FogSchema` / `WallSchema`; nessuna riga = nessuna nebbia (come prima);
  * - `campaign_event`: registro dei cambiamenti per versione (ultimi `LOG_CAPACITY`), così un
  *   client può riprendere con un delta anche dopo un riavvio del server.
  *
@@ -35,27 +40,6 @@ import { campaign, campaignEvent, campaignMember, scene, token, user } from "../
 export const LOG_CAPACITY = 500;
 
 /** Lettura difensiva del registro: qualunque riga non valida invalida tutto il registro (=> snapshot). */
-const StateChangeSchema = z.discriminatedUnion("type", [
-  z.strictObject({
-    type: z.literal("token"),
-    before: TokenSchema.nullable(),
-    after: TokenSchema.nullable(),
-    activeSceneId: IdSchema.nullable(),
-  }),
-  z.strictObject({
-    type: z.literal("scene"),
-    before: SceneSchema.nullable(),
-    after: SceneSchema.nullable(),
-    activeSceneId: IdSchema.nullable(),
-  }),
-  z.strictObject({
-    type: z.literal("activeScene"),
-    before: IdSchema.nullable(),
-    after: IdSchema.nullable(),
-    scene: SceneSchema.nullable(),
-    tokens: z.array(TokenSchema),
-  }),
-]);
 const StateChangesSchema = z.array(StateChangeSchema);
 
 export class CampaignStoreError extends Error {}
@@ -90,13 +74,13 @@ export async function listCampaignIds(db: Db): Promise<string[]> {
 /**
  * Carica una campagna completa. Lancia `CampaignStoreError` se i dati salvati non sono validi:
  * meglio non partire che perdere o inventare dati in silenzio.
- * I proprietari di token non più membri (utente eliminato) diventano `null` (`sanitized`).
+ * I proprietari di token non più membri (utente eliminato) diventano `null` e le maschere di nebbia
+ * di chi non è più giocatore vengono tolte (`sanitized`, con gli id da riscrivere).
  */
-export async function loadCampaign(db: Db, id: string): Promise<(LoadedCampaign & { sanitized: boolean }) | null> {
+export async function loadCampaign(db: Db, id: string): Promise<(LoadedCampaign & { sanitized: boolean; touchedTokenIds: string[]; touchedFogSceneIds: string[] }) | null> {
   const row = await db.query.campaign.findFirst({ where: eq(campaign.id, id) });
   if (!row) return null;
   const members = await loadMembers(db, id);
-  const memberIds = new Set(members.map((m) => m.userId));
   const sceneRows = await db.select().from(scene).where(eq(scene.campaignId, id)).orderBy(asc(scene.sort));
   const tokenRows = await db.select().from(token).where(eq(token.campaignId, id)).orderBy(asc(token.sort));
 
@@ -105,25 +89,24 @@ export async function loadCampaign(db: Db, id: string): Promise<(LoadedCampaign 
     if (!r.success) throw new CampaignStoreError(`${what} non valido nel database (campagna ${id})`);
     return r.data;
   };
-  let sanitized = false;
-  const tokens = tokenRows.map((r) => {
-    const t = parse(TokenSchema, r.data, `token ${r.id}`);
-    if (t.ownerUserId !== null && !memberIds.has(t.ownerUserId)) {
-      sanitized = true;
-      return { ...t, ownerUserId: null };
-    }
-    return t;
-  });
-  const state = CampaignStateSchema.safeParse({
+  const fogRows = await db.select().from(fog).where(eq(fog.campaignId, id)).orderBy(asc(fog.sceneId));
+  const wallRows = await db.select().from(wall).where(eq(wall.campaignId, id)).orderBy(asc(wall.sort));
+  const parsed = CampaignStateSchema.safeParse({
     campaignId: row.id,
     name: row.name,
     version: row.version,
     activeSceneId: row.activeSceneId,
     members,
     scenes: sceneRows.map((r) => parse(SceneSchema, r.data, `scena ${r.id}`)),
-    tokens,
+    tokens: tokenRows.map((r) => parse(TokenSchema, r.data, `token ${r.id}`)),
+    fogs: fogRows.map((r) => parse(FogSchema, r.data, `nebbia ${r.sceneId}`)),
+    walls: wallRows.map((r) => parse(WallSchema, r.data, `muro ${r.id}`)),
   });
-  if (!state.success) throw new CampaignStoreError(`stato non valido nel database (campagna ${id})`);
+  if (!parsed.success) throw new CampaignStoreError(`stato non valido nel database (campagna ${id})`);
+  // Proprietari di token non più membri e maschere di chi non è più giocatore (utente eliminato).
+  const fixed = withMembers(parsed.data, members);
+  const sanitized = fixed.touchedTokenIds.length > 0 || fixed.touchedFogSceneIds.length > 0;
+  const state = { data: fixed.state };
   const problems = checkInvariants(state.data);
   if (problems.length > 0) {
     throw new CampaignStoreError(`stato incoerente nel database (campagna ${id}): ${problems.join("; ")}`);
@@ -147,7 +130,14 @@ export async function loadCampaign(db: Db, id: string): Promise<(LoadedCampaign 
   // Il registro serve solo se arriva esattamente alla versione attuale senza buchi.
   const contiguous = log.every((e, i) => i === 0 || log[i - 1]!.version + 1 === e.version);
   if (sanitized || !contiguous || (log.length > 0 && log[log.length - 1]!.version !== row.version)) log = [];
-  return { state: state.data, epoch: row.epoch, log, sanitized };
+  return {
+    state: state.data,
+    epoch: row.epoch,
+    log,
+    sanitized,
+    touchedTokenIds: fixed.touchedTokenIds,
+    touchedFogSceneIds: fixed.touchedFogSceneIds,
+  };
 }
 
 export async function createCampaign(db: Db, name: string, createdBy: string): Promise<CampaignSummary> {
@@ -228,7 +218,7 @@ export async function campaignIdsOf(db: Db, userId: string): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
-const nextSort = (table: typeof scene | typeof token, campaignId: string): SQL =>
+const nextSort = (table: typeof scene | typeof token | typeof wall, campaignId: string): SQL =>
   sql`(select coalesce(max(${table.sort}), 0) + 1 from ${table} where ${table.campaignId} = ${campaignId})`;
 
 /**
@@ -273,6 +263,8 @@ export async function persistChanges(
       if (c.after === null) {
         if (c.before) {
           ops.push(db.delete(token).where(and(eq(token.campaignId, id), eq(token.sceneId, c.before.id))));
+          ops.push(db.delete(wall).where(and(eq(wall.campaignId, id), eq(wall.sceneId, c.before.id))));
+          ops.push(db.delete(fog).where(and(eq(fog.campaignId, id), eq(fog.sceneId, c.before.id))));
           ops.push(db.delete(scene).where(and(eq(scene.campaignId, id), eq(scene.id, c.before.id))));
         }
       } else if (c.before === null) {
@@ -288,6 +280,30 @@ export async function persistChanges(
             .update(scene)
             .set({ data: JSON.stringify(c.after) })
             .where(and(eq(scene.campaignId, id), eq(scene.id, c.after.id))),
+        );
+      }
+    } else if (c.type === "wall") {
+      if (c.after === null) {
+        if (c.before) ops.push(db.delete(wall).where(and(eq(wall.campaignId, id), eq(wall.id, c.before.id))));
+      } else {
+        const data = JSON.stringify(c.after);
+        ops.push(
+          db
+            .insert(wall)
+            .values({ campaignId: id, id: c.after.id, sceneId: c.after.sceneId, sort: nextSort(wall, id), data })
+            .onConflictDoUpdate({ target: [wall.campaignId, wall.id], set: { sceneId: c.after.sceneId, data } }),
+        );
+      }
+    } else if (c.type === "fog") {
+      if (c.after === null) {
+        ops.push(db.delete(fog).where(and(eq(fog.campaignId, id), eq(fog.sceneId, c.sceneId))));
+      } else {
+        const data = JSON.stringify(c.after);
+        ops.push(
+          db
+            .insert(fog)
+            .values({ campaignId: id, sceneId: c.sceneId, data })
+            .onConflictDoUpdate({ target: [fog.campaignId, fog.sceneId], set: { data } }),
         );
       }
     }
@@ -306,7 +322,13 @@ export async function persistChanges(
  * Riscrive lo stato fuori dai comandi (cambio dei membri): nuova epoca, registro svuotato,
  * proprietari dei token aggiornati. Ai client connessi si invia poi uno snapshot.
  */
-export async function persistReset(db: Db, state: CampaignState, epoch: string, touchedTokenIds: string[]): Promise<void> {
+export async function persistReset(
+  db: Db,
+  state: CampaignState,
+  epoch: string,
+  touchedTokenIds: string[],
+  touchedFogSceneIds: string[] = [],
+): Promise<void> {
   const id = state.campaignId;
   const touched = new Set(touchedTokenIds);
   const ops: BatchItem<"sqlite">[] = [
@@ -316,6 +338,11 @@ export async function persistReset(db: Db, state: CampaignState, epoch: string, 
   for (const t of state.tokens) {
     if (!touched.has(t.id)) continue;
     ops.push(db.update(token).set({ data: JSON.stringify(t) }).where(and(eq(token.campaignId, id), eq(token.id, t.id))));
+  }
+  const fogScenes = new Set(touchedFogSceneIds);
+  for (const f of state.fogs ?? []) {
+    if (!fogScenes.has(f.sceneId)) continue;
+    ops.push(db.update(fog).set({ data: JSON.stringify(f) }).where(and(eq(fog.campaignId, id), eq(fog.sceneId, f.sceneId))));
   }
   await db.batch(ops as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
 }

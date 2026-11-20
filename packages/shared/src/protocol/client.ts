@@ -34,14 +34,27 @@ export function applyServerEvent(view: CampaignView, event: ServerEvent): Campai
         // Il GM ha già tutto: cambia solo la scena attiva.
         return { ...view, activeSceneId: event.sceneId };
       }
-      // Il giocatore vede solo la scena attiva: sostituisce scena e token.
+      // Il giocatore vede solo la scena attiva: sostituisce scena, token, nebbia e muri.
       return {
         ...view,
         activeSceneId: event.sceneId,
         scenes: event.scene ? [event.scene] : [],
         tokens: event.tokens,
+        fogs: event.fog ? [event.fog] : [],
+        walls: event.walls ?? [],
       };
     }
+    case "fog.updated": {
+      const others = (view.fogs ?? []).filter((f) => f.sceneId !== event.sceneId);
+      return { ...view, fogs: event.fog ? [...others, event.fog] : others };
+    }
+    case "wall.created":
+      if ((view.walls ?? []).some((w) => w.id === event.wall.id)) return view;
+      return { ...view, walls: [...(view.walls ?? []), event.wall] };
+    case "wall.updated":
+      return { ...view, walls: (view.walls ?? []).map((w) => (w.id === event.wall.id ? event.wall : w)) };
+    case "wall.deleted":
+      return { ...view, walls: (view.walls ?? []).filter((w) => w.id !== event.wallId) };
   }
 }
 

@@ -35,6 +35,10 @@ Ogni libreria o snippet copiato va elencato qui con licenza e fonte.
 | @fastify/compress | MIT | https://github.com/fastify/fastify-compress | compressione gzip/brotli delle risposte |
 | ws | MIT | https://github.com/websockets/ws | server WebSocket (`packages/server/src/realtime`) e client nei test |
 | @fastify/multipart (con @fastify/busboy) | MIT | https://github.com/fastify/fastify-multipart | upload di mappe e immagini dei token |
+| pngjs 7.0.0 | MIT | https://github.com/pngjs/pngjs | nebbia (M6): decodifica e codifica PNG in JavaScript puro per le tessere della mappa per giocatore (`packages/server/src/media/tiles.ts`) |
+| jpeg-js 0.4.4 | BSD-3-Clause | https://github.com/jpeg-js/jpeg-js | nebbia (M6): decodifica e codifica JPEG in JavaScript puro per le tessere |
+| @jsquash/webp 1.5.0 (libwebp in WebAssembly, dal progetto Squoosh) | Apache-2.0 (libwebp: BSD-3-Clause) | https://github.com/jamsinclair/jSquash | nebbia (M6): decodifica WebP per le tessere; il modulo `.wasm` è incluso nel pacchetto npm, nessuno script di installazione |
+| wasm-feature-detect (dipendenza di @jsquash/webp) | Apache-2.0 | https://github.com/GoogleChromeLabs/wasm-feature-detect | rilevamento delle funzioni WebAssembly |
 
 Il design system del client (`packages/client/src/ui`) e' scritto da zero in CSS puro e React, senza librerie di animazione ne' primitive esterne; segue le Human Interface Guidelines di Apple come ispirazione, senza includere font, icone o asset Apple (si usa lo stack di sistema `-apple-system, system-ui`). Dettagli in [`docs/DESIGN.md`](docs/DESIGN.md); la gallery e' su `#/ui` in sviluppo.
 

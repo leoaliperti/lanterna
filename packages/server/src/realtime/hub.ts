@@ -15,7 +15,14 @@ import {
   type DispatchResult,
   type ErrorMessage,
   type ServerMessage,
-  type Token,
+  withMembers,
+  canSeeToken,
+  fogOf,
+  isGm,
+  maskFor,
+  type Fog,
+  type FogMask,
+  type Scene,
 } from "@lanterna/shared";
 import type { z } from "zod";
 import {
@@ -130,7 +137,7 @@ export class Hub {
     let { epoch } = loaded;
     if (loaded.sanitized) {
       epoch = randomUUID();
-      await persistReset(this.db, loaded.state, epoch, loaded.state.tokens.map((t) => t.id));
+      await persistReset(this.db, loaded.state, epoch, loaded.touchedTokenIds, loaded.touchedFogSceneIds);
     }
     const log = { ...createEventLog(epoch, LOG_CAPACITY), entries: loaded.log };
     this.rooms.set(id, { core: { state: loaded.state, history: createHistory(), log }, peers: new Set(), queue: Promise.resolve() });
@@ -139,6 +146,60 @@ export class Hub {
   /** Stato completo (solo per test e diagnostica lato server). */
   stateOf(campaignId: string) {
     return this.rooms.get(campaignId)?.core;
+  }
+
+  // -------------------------------------------------------------------------
+  // Nebbia (M6): chi può scaricare cosa (tessere e file caricati)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Contesto per servire le tessere della mappa di una scena a `userId`, oppure `null`
+   * (campagna inesistente, non membro, scena non visibile, nebbia assente, mappa assente:
+   * il chiamante risponde con lo stesso 404 in tutti i casi).
+   * GM: `mask: null` (vede tutto). Giocatore: solo la scena attiva con nebbia, con la sua maschera.
+   */
+  tileContext(userId: string, campaignId: string, sceneId: string): { scene: Scene; fog: Fog | null; mask: FogMask | null } | null {
+    const state = this.rooms.get(campaignId)?.core.state;
+    if (!state) return null;
+    const actor = resolveActor(state, userId);
+    if (!actor) return null;
+    const scene = state.scenes.find((s) => s.id === sceneId);
+    if (!scene || !scene.map) return null;
+    const fog = fogOf(state, sceneId);
+    if (isGm(actor)) return { scene, fog, mask: null };
+    if (state.activeSceneId !== sceneId || !fog) return null;
+    return { scene, fog, mask: maskFor(fog, userId) };
+  }
+
+  /**
+   * Un giocatore può scaricare l'asset `assetId` (servito come `url`) da `/assets`?
+   * Un asset usato come mappa di una scena CON nebbia è protetto: lo si serve a un non-admin
+   * solo se lo vede anche altrove, senza nebbia (immagine di un token visibile o mappa della
+   * scena attiva senza nebbia di una sua campagna). Tutti gli altri asset: come prima.
+   */
+  assetAllowed(userId: string, assetId: string, url: string): boolean {
+    const uses = (s: Scene) => s.map !== null && (s.map.assetId === assetId || s.map.url === url);
+    let protectedAsset = false;
+    for (const room of this.rooms.values()) {
+      const st = room.core.state;
+      if (st.scenes.some((s) => uses(s) && fogOf(st, s.id))) {
+        protectedAsset = true;
+        break;
+      }
+    }
+    if (!protectedAsset) return true;
+    for (const room of this.rooms.values()) {
+      const st = room.core.state;
+      const actor = resolveActor(st, userId);
+      if (!actor) continue;
+      const active = st.scenes.find((s) => s.id === st.activeSceneId);
+      if (active && uses(active) && !fogOf(st, active.id)) return true;
+      const tokenUses = st.tokens.some(
+        (t) => t.imageUrl === url && canSeeToken(t, actor, st.activeSceneId, fogOf(st, t.sceneId)),
+      );
+      if (tokenUses) return true;
+    }
+    return false;
   }
 
   addPeer(peer: Peer): void {
@@ -338,16 +399,10 @@ export class Hub {
     if (!room) return Promise.resolve();
     return this.enqueue(room, async () => {
       const members = await loadMembers(this.db, campaignId);
-      const memberIds = new Set(members.map((m) => m.userId));
-      const touched: string[] = [];
-      const tokens: Token[] = room.core.state.tokens.map((t) => {
-        if (t.ownerUserId === null || memberIds.has(t.ownerUserId)) return t;
-        touched.push(t.id);
-        return { ...t, ownerUserId: null };
-      });
-      const state = { ...room.core.state, members, tokens };
+      // Token senza più proprietario e maschere di nebbia di chi non è più giocatore.
+      const { state, touchedTokenIds, touchedFogSceneIds } = withMembers(room.core.state, members);
       const epoch = randomUUID();
-      await persistReset(this.db, state, epoch, touched);
+      await persistReset(this.db, state, epoch, touchedTokenIds, touchedFogSceneIds);
       room.core = { state, history: createHistory(), log: createEventLog(epoch, LOG_CAPACITY) };
       for (const p of [...room.peers]) {
         const actor = resolveActor(state, p.userId);

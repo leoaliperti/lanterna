@@ -1,16 +1,21 @@
-import type { Scene, Token } from "./schema.js";
+import { z } from "zod";
+import { FogSchema, type Fog } from "./fog.js";
+import { IdSchema } from "./limits.js";
+import { SceneSchema, TokenSchema, type Scene, type Token } from "./schema.js";
+import { WallSchema, type Wall } from "./walls.js";
 
 /**
  * Cambiamenti interni prodotti dal riduttore. Contengono lo stato COMPLETO
  * (prima e dopo) e quindi **non vanno mai inviati ai client**: il server
  * li passa a `filterEventFor` per ottenere gli eventi di ciascun utente.
  *
- * Ogni cambiamento porta con sé `activeSceneId` al momento in cui avviene,
- * così il filtro non ha bisogno di consultare lo stato.
+ * Ogni cambiamento porta con sé il contesto che serve al filtro (scena attiva e,
+ * dal M6, la nebbia della scena coinvolta), così il filtro non consulta lo stato
+ * e un cambiamento rilanciato dal registro (riconnessione) dà gli stessi eventi.
  */
 export type StateChange =
-  | { type: "token"; before: Token | null; after: Token | null; activeSceneId: string | null }
-  | { type: "scene"; before: Scene | null; after: Scene | null; activeSceneId: string | null }
+  | { type: "token"; before: Token | null; after: Token | null; activeSceneId: string | null; fog?: Fog | null }
+  | { type: "scene"; before: Scene | null; after: Scene | null; activeSceneId: string | null; fog?: Fog | null }
   | {
       type: "activeScene";
       before: string | null;
@@ -18,4 +23,66 @@ export type StateChange =
       /** Scena diventata attiva e i suoi token (completi), per costruire la vista dei giocatori. */
       scene: Scene | null;
       tokens: Token[];
+      /** Nebbia e muri della scena diventata attiva (M6). */
+      fog?: Fog | null;
+      walls?: Wall[];
+    }
+  | { type: "wall"; before: Wall | null; after: Wall | null; activeSceneId: string | null; fog: Fog | null }
+  | {
+      type: "fog";
+      sceneId: string;
+      before: Fog | null;
+      after: Fog | null;
+      activeSceneId: string | null;
+      /** La scena, i suoi token e i suoi muri: la loro visibilità per i giocatori dipende dalla nebbia. */
+      scene: Scene | null;
+      tokens: Token[];
+      walls: Wall[];
     };
+
+/**
+ * Schema dei cambiamenti, per rileggere in modo difensivo il registro salvato (server).
+ * `fog` e `walls` sono facoltativi: i registri scritti prima del M6 restano validi.
+ */
+export const StateChangeSchema = z.discriminatedUnion("type", [
+  z.strictObject({
+    type: z.literal("token"),
+    before: TokenSchema.nullable(),
+    after: TokenSchema.nullable(),
+    activeSceneId: IdSchema.nullable(),
+    fog: FogSchema.nullable().optional(),
+  }),
+  z.strictObject({
+    type: z.literal("scene"),
+    before: SceneSchema.nullable(),
+    after: SceneSchema.nullable(),
+    activeSceneId: IdSchema.nullable(),
+    fog: FogSchema.nullable().optional(),
+  }),
+  z.strictObject({
+    type: z.literal("activeScene"),
+    before: IdSchema.nullable(),
+    after: IdSchema.nullable(),
+    scene: SceneSchema.nullable(),
+    tokens: z.array(TokenSchema),
+    fog: FogSchema.nullable().optional(),
+    walls: z.array(WallSchema).optional(),
+  }),
+  z.strictObject({
+    type: z.literal("wall"),
+    before: WallSchema.nullable(),
+    after: WallSchema.nullable(),
+    activeSceneId: IdSchema.nullable(),
+    fog: FogSchema.nullable(),
+  }),
+  z.strictObject({
+    type: z.literal("fog"),
+    sceneId: IdSchema,
+    before: FogSchema.nullable(),
+    after: FogSchema.nullable(),
+    activeSceneId: IdSchema.nullable(),
+    scene: SceneSchema.nullable(),
+    tokens: z.array(TokenSchema),
+    walls: z.array(WallSchema),
+  }),
+]);

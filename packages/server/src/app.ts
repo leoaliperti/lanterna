@@ -17,6 +17,7 @@ import { Hub, CLOSE } from "./realtime/hub.js";
 import { attachRealtime } from "./realtime/server.js";
 import { uploadRoutes } from "./media/routes.js";
 import { API_CSP, pageCsp, registerClient } from "./web.js";
+import { TileService } from "./media/tiles.js";
 import { adminRoutes } from "./users/routes.js";
 import { createUserService, type UserService } from "./users/service.js";
 
@@ -90,7 +91,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       });
       await campaignRoutes(api, hub);
       await chatRoutes(api, hub);
-      await uploadRoutes(api, config);
+      await uploadRoutes(api, config, hub, new TileService({ uploadDir: config.uploadDir }));
       await contentRoutes(api, config);
     },
     { prefix: config.apiPrefix },

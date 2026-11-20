@@ -1,6 +1,6 @@
 # Piano di Lanterna
 
-Stato: M0 completata; M1 backend (auth, ruoli, gestione utenti) in revisione, manca la UI di login e amministrazione. M2/M3 lato server (WebSocket, persistenza SQLite, REST campagne, upload) in revisione; mancano canvas e client WebSocket. M4 lato server (chat con whisper, tiri con esito sul server, tiri segreti, cronologia e log di sessione) in revisione; chat e dadi nel client (scheda Chat, barra dadi, overlay 3D, Impostazioni) in revisione: vedi "Chat e dadi nel client" in docs/PROTOCOL.md. Gestore pacchetti: npm workspaces (pnpm non è installato e non serviva). Client in tempo reale collegato al server (tavolo reale, strumenti GM, annulla/ripeti): vedi "Client in tempo reale" in docs/PROTOCOL.md.
+Stato: M0 completata; M1 backend (auth, ruoli, gestione utenti) in revisione, manca la UI di login e amministrazione. M2/M3 lato server (WebSocket, persistenza SQLite, REST campagne, upload) in revisione; mancano canvas e client WebSocket. M4 lato server (chat con whisper, tiri con esito sul server, tiri segreti, cronologia e log di sessione) in revisione; chat e dadi nel client (scheda Chat, barra dadi, overlay 3D, Impostazioni) in revisione: vedi "Chat e dadi nel client" in docs/PROTOCOL.md. Gestore pacchetti: npm workspaces (pnpm non è installato e non serviva). Client in tempo reale collegato al server (tavolo reale, strumenti GM, annulla/ripeti): vedi "Client in tempo reale" in docs/PROTOCOL.md. M6 (nebbia di guerra) logica condivisa e server in revisione: maschere per giocatore, muri, linea di vista come aiuto visivo, tessere della mappa per giocatore; manca la UI del client (vedi docs/FOG.md).
 
 ## Decisioni prese
 
@@ -21,6 +21,9 @@ Stato: M0 completata; M1 backend (auth, ruoli, gestione utenti) in revisione, ma
 | Driver SQLite | `@libsql/client` con file locale: binari precompilati, nessuno script di installazione (npm 11 li blocca; `better-sqlite3` richiederebbe compilazione nativa). `node:sqlite` scartato perché in Node 22 è ancora sperimentale e Drizzle non lo supporta ufficialmente. |
 | WebSocket sul server | `ws` direttamente sull'evento `upgrade` di Fastify (niente `@fastify/websocket`): rifiuto 401/403 esplicito prima dell'handshake. |
 | Persistenza campagne | Scene e token come JSON validato con Zod in lettura; registro eventi salvato per i delta dopo un riavvio. |
+| Nebbia: rappresentazione | Celle di una griglia propria della nebbia; maschera = stato base + eccezioni a terne `[riga, colInizio, colFine)` in forma canonica; maschera "di tutti" più maschere personali. Dettagli in docs/FOG.md. |
+| Nebbia: immagine della mappa | Ai giocatori solo tessere da 512 px della scena generate dal server e mascherate per utente (pngjs, jpeg-js, @jsquash/webp in WASM: nessun binario nativo); tessera coperta = 404 identico a inesistente; `/assets` non serve ai giocatori le mappe di scene con nebbia. |
+| Nebbia: token e muri | Token visibile al giocatore se almeno una cella sotto la sua impronta è rivelata a lui (il proprio sempre); muri ritagliati alle celle rivelate. |
 | Miniature delle mappe | Rimandate: `sharp` richiede binari nativi e script d'installazione (bloccati da npm 11). |
 | Whisper e tiri segreti | Whisper visibili solo ad autore e destinatario: il GM non vede i whisper altrui. Il giocatore sussurra (e tira in whisper) solo al GM; solo il GM fa tiri segreti (`gm`). L'esportazione del log per l'admin è completa. |
 | Audio | Fuori ambito iniziale (si usa Discord). |

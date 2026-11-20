@@ -140,6 +140,38 @@ export const token = sqliteTable(
   ],
 );
 
+/**
+ * Nebbia di guerra (M6): una riga per scena con nebbia, `data` = `Fog` in JSON (maschere per
+ * giocatore comprese), validata con `FogSchema` in lettura. Nessuna riga = nessuna nebbia.
+ */
+export const fog = sqliteTable(
+  "fog",
+  {
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => campaign.id, { onDelete: "cascade" }),
+    sceneId: text("scene_id").notNull(),
+    data: text("data").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.campaignId, t.sceneId] })],
+);
+
+/** Muri e porte (M6): una riga per muro, `data` = `Wall` in JSON validato con `WallSchema`. */
+export const wall = sqliteTable(
+  "wall",
+  {
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => campaign.id, { onDelete: "cascade" }),
+    id: text("id").notNull(),
+    sceneId: text("scene_id").notNull(),
+    /** Ordine di creazione (crescente). */
+    sort: integer("sort").notNull(),
+    data: text("data").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.campaignId, t.id] }), index("wall_scene_idx").on(t.campaignId, t.sceneId)],
+);
+
 /** Registro dei cambiamenti per versione (riconnessione con delta anche dopo un riavvio). */
 export const campaignEvent = sqliteTable(
   "campaign_event",
@@ -221,6 +253,8 @@ export const schema = {
   campaignMember,
   scene,
   token,
+  fog,
+  wall,
   campaignEvent,
   asset,
   chatEntry,
