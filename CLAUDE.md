@@ -77,6 +77,17 @@ Guide: `docs/DEPLOY.md` (deploy, Cloudflare Tunnel, backup, aggiornamenti, check
 - **Contenuti** (`src/content/`, tabella `content`, migrazione `0003_content`): documenti JSON tipizzati, validati con Zod (niente HTML, limiti di dimensione e profondità), importazione idempotente e transazionale. `POST /content/import` e `DELETE /content/:id` solo admin; `GET /content` e `/content/:id` per ogni utente, ma il giocatore vede solo i tipi di `CONTENT_PLAYER_KINDS` (default `item,spell`; `monster` e `note` mai), il resto 404. `.gitignore` ancora `/content/` e `/imports/` alla radice (un `content/` generico escluderebbe `src/content`).
 - **Hardening**: `src/hardening.test.ts` controlla che git non tracci file privati e che `.env.example` documenti ogni variabile letta dal server (aggiungi lì le nuove). `npm audit --omit=dev` deve restare a 0: un `overrides` in `package.json` porta l'esbuild di drizzle-kit a una versione corretta.
 
+## Nebbia di guerra (M6, logica e server)
+
+Dettagli in `docs/FOG.md`. La UI del client non c'è ancora (elenco di cosa fare in fondo a `docs/FOG.md`).
+
+- **Modello** (`shared/src/state/fog.ts`, `walls.ts`, `vision.ts`): per scena una nebbia con griglia propria e maschere per giocatore (`everyone` + `players`), ciascuna `{ base, runs }` a terne di celle in forma canonica; muri `{ x1, y1, x2, y2, door, open }`; `token.vision` facoltativo. Campi facoltativi: nessuna nebbia = comportamento di prima.
+- **Comandi** solo GM: `fog.enable/disable/reveal/cover/revealAll/coverAll/setLighting/restore`, `wall.add/update/remove`; `target` tutti o giocatori scelti; inverso esatto con `fog.restore`.
+- **Filtro**: `canSeeToken(token, viewer, activeSceneId, fog)` richiede SEMPRE la nebbia della scena (`fogOf(state, sceneId)`); i `StateChange` portano la nebbia con sé. Il giocatore riceve solo la propria maschera, i token con almeno una cella rivelata sotto l'impronta (i propri sempre), i pezzi di muro nelle celle rivelate e `map: null`.
+- **Mappa**: mai l'URL intero ai giocatori con la nebbia; tessere `GET /campaigns/:id/scenes/:sceneId/tiles/:col/:row` generate dal server (`media/tiles.ts`, pngjs/jpeg-js/@jsquash/webp, nessuna dipendenza nativa) e mascherate per utente; ogni rifiuto = stesso 404. `/assets` non serve ai giocatori una mappa usata da una scena con nebbia (`hub.assetAllowed`).
+- **Persistenza**: tabelle `fog` e `wall` (migrazione `0004_fog`); chi esce dalla campagna perde la maschera (`withMembers`).
+- **Test**: `shared/src/state/fogstate.test.ts`, `fog.test.ts`, `vision.test.ts` (con benchmark), fuzz in `fuzz.test.ts`; server `src/fog/fog.test.ts` (GM + 2 giocatori, tessere, riavvio).
+
 ## Regole non negoziabili
 
 1. **Account: solo l'admin li crea.** L'admin coincide con il GM. I ruoli sono due: admin/GM e giocatore. Nessuna registrazione pubblica. Il controllo del ruolo avviene **lato server** su ogni endpoint di creazione/modifica/eliminazione utenti. Nascondere il pulsante nella UI non basta. Ogni funzione di questo tipo deve avere un test che dimostri il rifiuto (403) per un utente non admin.

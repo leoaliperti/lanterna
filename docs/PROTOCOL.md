@@ -18,7 +18,9 @@ CampaignState
                              size (celle), rotation (gradi [0,360)), ownerUserId | null,
                              kind: "pc" | "monster" | "object", hidden,
                              conditions[{ id, name }], health { current, max, temp } | null,
-                             gmNotes }
+                             gmNotes, vision? }                     vision: M6, aiuto visivo
+├─ fogs?[]                 nebbia per scena (M6), vedi docs/FOG.md
+└─ walls?[]                muri e porte (M6), vedi docs/FOG.md
 ```
 
 L'ordine di `tokens` è l'ordine di disegno. Gli id sono stringhe opache (`[A-Za-z0-9_-]`, max 64), generate dal client (UUID) per `token.create`/`scene.create`: così l'inverso per annulla/ripeti è deterministico e gli id non rivelano contatori. Limiti in `LIMITS` (`state/schema.ts`). Tutti gli schemi sono `strict`: campi sconosciuti => `INVALID`. Coordinate e numeri devono essere finiti; le posizioni stanno dentro la mappa (`0 ≤ x ≤ width`, `0 ≤ y ≤ height`).
@@ -52,8 +54,10 @@ Un messaggio JSON per frame, massimo 64 KiB, decodificato con `parseClientMessag
 | `scene.setGrid` | `sceneId`, `grid` (parziale) | sì | no |
 | `scene.delete` | `sceneId` (elimina anche i suoi token) | sì | no |
 | `scene.activate` | `sceneId \| null` (cambio di scena) | sì | no |
+| `fog.enable`, `fog.disable`, `fog.reveal`, `fog.cover`, `fog.revealAll`, `fog.coverAll`, `fog.setLighting`, `fog.restore` | vedi [docs/FOG.md](FOG.md) | sì | no |
+| `wall.add`, `wall.update`, `wall.remove` | vedi [docs/FOG.md](FOG.md) | sì | no |
 
-Campi di `token.update`: `name`, `imageUrl`, `size`, `rotation`, `ownerUserId`, `kind`, `hidden`, `conditions`, `health`, `gmNotes`. Quindi ridimensionare, ruotare, nascondere, cambiare la vita e assegnare un token sono **solo del GM**. Una patch che mescola campi consentiti e no è rifiutata per intero.
+Campi di `token.update`: `name`, `imageUrl`, `size`, `rotation`, `ownerUserId`, `kind`, `hidden`, `conditions`, `health`, `gmNotes`, `vision`. Quindi ridimensionare, ruotare, nascondere, cambiare la vita e assegnare un token sono **solo del GM**. Una patch che mescola campi consentiti e no è rifiutata per intero.
 
 `token.move` aggancia alla griglia se `snap` (o, se assente, `grid.snap` della scena) è vero: token di lato dispari al centro della cella, di lato pari sull'incrocio. Rimpicciolire una mappa riporta dentro i token rimasti fuori.
 
@@ -70,7 +74,7 @@ Campi di `token.update`: `name`, `imageUrl`, `size`, `rotation`, `ownerUserId`, 
 | `history` | `requestId \| null`, `entries[]`, `hasMore` | cronologia filtrata (dopo `hello` e su richiesta) |
 | `pong` | | |
 
-Eventi dentro un `delta`: `token.created {token}`, `token.updated {tokenId, changes}`, `token.deleted {tokenId}`, `scene.created {scene}`, `scene.updated {sceneId, changes}`, `scene.deleted {sceneId}`, `scene.activated {sceneId, scene, tokens}` (il giocatore sostituisce scena e token con quelli ricevuti).
+Eventi dentro un `delta`: `token.created {token}`, `token.updated {tokenId, changes}`, `token.deleted {tokenId}`, `scene.created {scene}`, `scene.updated {sceneId, changes}`, `scene.deleted {sceneId}`, `scene.activated {sceneId, scene, tokens, fog, walls}` (il giocatore sostituisce scena, token, nebbia e muri con quelli ricevuti); dal M6 anche `fog.updated {sceneId, fog}`, `wall.created {wall}`, `wall.updated {wall}`, `wall.deleted {wallId}` (vedi [docs/FOG.md](FOG.md)).
 
 Codici d'errore:
 
@@ -107,6 +111,9 @@ invia r.reply al mittente (ack o errore), dopo il suo delta
 | Condizioni e stati | sì | sì | sì |
 | Barra della vita | sì | sì | no (`health: null`) |
 | Note del GM | sì | no (campo assente) | no (campo assente) |
+| Vista e luce (`vision`, M6) | sì | sì | no (`null`) |
+| Token, muri e mappa sotto la nebbia (M6) | sì | solo le parti rivelate a lui (il proprio token sempre) | idem, con la propria maschera |
+| Maschere di nebbia (M6) | tutte | solo la propria | solo la propria |
 
 - Le proiezioni copiano i campi uno per uno (lista bianca): un campo aggiunto al modello non arriva ai giocatori finché non lo si aggiunge esplicitamente in `view.ts`.
 - Gli eventi derivano dalle stesse proiezioni: per ogni cambiamento si confronta la vista dell'utente prima e dopo e si invia solo la differenza. Quindi un token che diventa nascosto arriva al giocatore come `token.deleted` (scomparsa), uno rivelato come `token.created`; un cambio di sola vita o note di un token altrui non genera alcun evento; il passaggio di proprietà invia al vecchio proprietario `health: null` e al nuovo la vita.
@@ -183,6 +190,8 @@ Lo stato si salva **prima** di essere inviato a chiunque: dopo un riavvio non si
 | `campaign_member` | (`campaign_id`, `user_id`) con cascata su campagna e utente. Ruolo e nome visualizzato vengono dall'account (`user.role`, `user.name`): admin = GM |
 | `scene` | (`campaign_id`, `id`), `sort`, `data` = `Scene` in JSON |
 | `token` | (`campaign_id`, `id`), `scene_id`, `sort` (z-order), `data` = `Token` in JSON |
+| `fog` (migrazione `0004_fog`) | (`campaign_id`, `scene_id`), `data` = `Fog` in JSON (maschere per giocatore) |
+| `wall` (migrazione `0004_fog`) | (`campaign_id`, `id`), `scene_id`, `sort`, `data` = `Wall` in JSON |
 | `campaign_event` | (`campaign_id`, `version`), `changes` = `StateChange[]` in JSON: gli ultimi 500, per riprendere con un **delta anche dopo un riavvio** |
 | `asset` | file caricati: `id` (UUID), `kind`, `mime`, `ext`, `width`, `height`, `bytes`, `uploaded_by` |
 
@@ -205,7 +214,8 @@ Tutte le rotte verificano sessione e ruolo lato server (`requireSession`, `requi
 | `POST /campaigns/:id/members` `{ userId }` | admin | 201, 404 campagna/utente, 409 già membro |
 | `DELETE /campaigns/:id/members/:userId` | admin | 204, 404, 409 se è l'ultimo GM della campagna (controllo atomico in SQL) |
 | `POST /uploads/map`, `POST /uploads/token` | admin | multipart con un solo file |
-| `GET /assets/:uuid.:ext` | autenticato | file caricato |
+| `GET /assets/:uuid.:ext` | autenticato | file caricato; 404 ai giocatori per una mappa usata da una scena con nebbia (M6) |
+| `GET /campaigns/:id/scenes/:sceneId/tiles/:col/:row` | GM; giocatore membro, scena attiva con nebbia, tessera almeno in parte rivelata | tessera della mappa mascherata per l'utente; ogni rifiuto = stesso 404 (vedi [docs/FOG.md](FOG.md)) |
 | `GET /campaigns/:id/log` `?format=json\|text&since=<ms>` | admin: tutto; giocatore membro: solo ciò che vedeva | log di sessione (vedi "Chat e dadi") |
 
 Lo schema ammette più campagne per istanza (oggi se ne usa una).
@@ -319,10 +329,10 @@ Per utente (su tutte le sue connessioni), secchiello di gettoni separato per mes
 - `members` non si modifica con i comandi: lo gestisce il server (REST e auth) con cambio d'epoca.
 - La cronologia di annulla/ripeti vive solo in memoria: si perde a ogni riavvio e a ogni cambio di membri. Stato e registro dei delta invece sono salvati.
 - Upload: nessuna miniatura o versione ridimensionata. Servirebbe decodificare l'immagine: `sharp` ha binari nativi e script d'installazione (bloccati da npm 11), e un decodificatore in puro JS per mappe fino a 100 Mpx userebbe centinaia di MB di RAM. Il formato si verifica dall'intestazione, non decodificando tutti i pixel: un file con intestazione valida e dati corrotti viene accettato (il browser semplicemente non lo mostra; con `nosniff` e la CSP non può essere eseguito). I metadati (EXIF, posizione GPS) non vengono rimossi.
-- I file caricati sono visibili a ogni utente autenticato che conosce l'URL (UUID non indovinabile), non solo ai membri della campagna; l'immagine di un token nascosto non viene inviata ai giocatori, ma l'URL non è revocabile.
+- I file caricati sono visibili a ogni utente autenticato che conosce l'URL (UUID non indovinabile), non solo ai membri della campagna (eccezione dal M6: le mappe di scene con nebbia, servite ai giocatori solo a tessere); l'immagine di un token nascosto non viene inviata ai giocatori, ma l'URL non è revocabile.
 - Il logout chiude il WebSocket solo al keep-alive successivo (al più `WS_HEARTBEAT_MS`).
 - Chat e tiri: niente modifica né cancellazione dei messaggi; niente whisper fra giocatori o a più destinatari; il client anima i dadi sui valori di `terms[].dice` di `roll.result` solo localmente (ogni client anima i tiri che riceve, non c'è un'animazione condivisa temporizzata).
-- Nebbia di guerra (M6) non ancora modellata.
+- Nebbia di guerra (M6): logica e server pronti, UI del client da fare; limiti in [docs/FOG.md](FOG.md).
 
 ## Produzione (M5): prefisso /api
 
