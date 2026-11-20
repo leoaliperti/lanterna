@@ -337,3 +337,26 @@ Per utente (su tutte le sue connessioni), secchiello di gettoni separato per mes
 ## Produzione (M5): prefisso /api
 
 In produzione tutte le rotte HTTP e il WebSocket stanno sotto `API_PREFIX` (default `/api`): il WebSocket e `/api/ws`, REST e `/api/campaigns` ecc. In sviluppo e nei test il prefisso e vuoto (il proxy Vite riscrive `/api/x` in `/x`). L url restituito dagli upload (`/assets/<uuid>.<ext>`) e relativo alla radice dell API: il client lo richiede come `/api/assets/...`. Dettagli in `docs/DEPLOY.md`; contenuti importati (`/content`) in `docs/CONTENT.md`.
+
+## Schede personaggio e statblock (M8, REST)
+
+Le schede NON passano dal WebSocket (nessun cambiamento a protocollo e stato condiviso): sono risorse REST sotto la campagna. Tipi in `packages/shared/src/sheetsApi.ts`, modello in `packages/shared/src/rules5e/doc.ts` (`SheetDoc` = `CharacterSheet` del motore + extra: inventario, attacchi, incantesimi, note, testo dello statblock). Il documento è validato con `sheetDocSchema` a ogni scrittura **e a ogni lettura** dal database (un documento corrotto dà 500, non passa). Server: `packages/server/src/sheets/`, tabella `character_sheet` (migrazione `0005_sheets`).
+
+| Richiesta | GM | Giocatore membro | Altri |
+|---|---|---|---|
+| `GET /campaigns/:id/sheets` | tutte (riepiloghi) | solo le proprie `pc` | 404 (non membro) |
+| `GET .../sheets/:sheetId` | ogni scheda | solo la propria `pc`; altre e mostri **404** | 404 |
+| `POST .../sheets` `{ kind, doc, ownerUserId?, tokenId? }` | `pc` e `monster`; proprietario = giocatore membro; token esistente e libero | solo `pc` proprio (proprietario forzato a sé, max 20); `monster`, altro proprietario o `tokenId` → 403 | 404 |
+| `PUT .../sheets/:sheetId` `{ version, doc?, ownerUserId?, tokenId? }` | tutto | solo `doc` della propria; `ownerUserId`/`tokenId` presenti → 403; altrui/mostri 404 | 404 |
+| `DELETE .../sheets/:sheetId` | sì (204) | propria → 403, altrui/mostri → 404 | 404 |
+
+- **Concorrenza**: `version` cresce di 1 a ogni scrittura; `PUT` è condizionato (`UPDATE ... WHERE version = ?`). Scrittura obsoleta → **409** `{ code: "CONFLICT", currentVersion }`, nulla cambia. Il client salva da solo (debounce) e, su conflitto, fa scegliere tra "versione più recente" e "tieni le mie".
+- **Nessuna fuga**: scheda altrui, statblock e scheda inesistente rispondono con lo stesso 404 e lo stesso corpo. L'elenco del giocatore non contiene mai mostri; il legame `tokenId` (il token potrebbe essere nascosto) non è mai inviato ai giocatori. Corpi fino a 512 KiB su queste rotte, rate limit sulle scritture.
+- **Tiri**: il client calcola la formula con `rollFor` (competenza, vantaggio/svantaggio dalle condizioni, Esaurimento) e invia `roll.request`; l'esito lo decide il server. Un fallimento automatico (es. Stordito sui TS di Forza/Destrezza) non invia nulla. Dadi vita e tiri contro la morte: il client tira con `roll.request`, e **all'arrivo del `roll.result`** applica `spendHitDie`/`deathSaveSheet` alla scheda.
+
+### Regola PF e condizioni scheda ↔ token
+
+- **Fonte di verità = la scheda** per PF, PF temporanei e condizioni. La barra della vita del token resta il dato di stato del token (visibile solo a GM e proprietario, come oggi): nessun cambiamento al modello di stato né al filtro.
+- **Scheda → token** (unica sincronizzazione automatica): il client del GM (`planTokenSync`, `SheetsProvider`) legge l'elenco schede ogni 8 s e dopo ogni salvataggio proprio; quando PF o condizioni di una scheda collegata **cambiano** rispetto all'ultima osservazione, invia `token.update { health, conditions }` (comando del GM, quindi con tutti i controlli di permesso del server). Le condizioni del token che non sono del motore 5e (personalizzate) restano. La prima osservazione fissa solo il riferimento: non sovrascrive la barra; un token senza barra la riceve subito.
+- **Token → scheda**: solo su richiesta del GM (pulsante "Copia i PF dal token alla scheda" nell'editor). Se il GM ritocca la barra del token, vale finché la scheda non cambia di nuovo (ultima scrittura vince, per sorgente).
+- **Limite noto**: se nessun GM è collegato, la barra del token resta indietro finché non si riconnette. Evita fughe: il giocatore non scrive mai sul token, e non conosce il legame.
