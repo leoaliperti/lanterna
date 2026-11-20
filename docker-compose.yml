@@ -1,0 +1,25 @@
+# Opzionale: Lanterna in un container (docs/DEPLOY.md, sezione Docker). Nessun segreto in questo file:
+# crea un file `.env` accanto con BETTER_AUTH_SECRET e BETTER_AUTH_URL (vedi .env.example).
+services:
+  lanterna:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # cloudflared (sull'host) arriva dal gateway della rete Docker, non da loopback.
+      TRUST_PROXY: ${TRUST_PROXY:-172.16.0.0/12}
+    ports:
+      # Solo sull'host locale: l'esposizione a internet passa dal Cloudflare Tunnel.
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - lanterna-data:/data
+    # Filesystem in sola lettura tranne il volume dati.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  lanterna-data:
