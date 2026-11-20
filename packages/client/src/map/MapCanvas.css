@@ -78,3 +78,8 @@
 .lanterna-map__controls { display: flex; align-items: flex-end; flex-direction: row-reverse; gap: var(--space-2); }
 .lanterna-map__measures { flex-direction: column; gap: var(--space-1); max-width: calc(100vw - 6rem); }
 .lanterna-map__row { display: flex; }
+
+/* Telefono: gli strumenti di misura salgono sopra lo zoom (a fianco coprirebbero la scala) */
+@media (max-width: 40rem) {
+  .lanterna-map__controls { flex-direction: column-reverse; align-items: flex-end; }
+}

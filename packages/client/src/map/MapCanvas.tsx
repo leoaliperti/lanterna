@@ -216,9 +216,9 @@ export function MapCanvas({
   const unavailable = status === "unavailable";
   const gmNote =
     role === "gm"
-      ? " Come GM puoi anche ruotare e ridimensionare i token selezionati. N nebbia (1 rettangolo, 2 cerchio, 3 poligono, 4 celle, X rivela o copri, Invio chiude il poligono), W muri (1 disegna, 2 porta, 3 modifica, 4 elimina), V torna alla selezione."
+      ? " Come GM puoi anche ruotare e ridimensionare i token selezionati. N nebbia (1 rettangolo, 2 cerchio, 3 poligono, 4 celle, X rivela o copri, Invio chiude il poligono), W muri (1 disegna, 2 porta, 3 modifica, 4 elimina), V torna alla selezione. Con dei token selezionati: D danno, H cura, K condizione, E effetto, M sposta, tasto destro o pressione lunga per il menu."
       : "";
-  const description = `Trascina per spostare i token, rotella o pizzico per lo zoom, tasto centrale o due dita per scorrere. Frecce, più e meno, zero per adattare, R per il righello.${gmNote}`;
+  const description = `Trascina per spostare i token, rotella o pizzico per lo zoom, tasto centrale o due dita per scorrere. Frecce, più e meno, zero per adattare. Misure e segnalazioni: R righello, O cerchio, C cono, L linea, F freccia, P segnalazione; Esc le toglie.${gmNote}`;
   useEffect(() => {
     canvasRef.current?.setAttribute("aria-label", label);
     canvasRef.current?.setAttribute("aria-description", description);

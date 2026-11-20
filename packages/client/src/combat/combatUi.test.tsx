@@ -136,7 +136,7 @@ describe("tracker dell'iniziativa: GM", () => {
     expect(rows[1]!.getAttribute("aria-current")).toBeNull();
     expect(within(rows[0]!).getByText("Di turno")).toBeTruthy();
     expect(within(rows[2]!).getByText(SECRET_ENTRY)).toBeTruthy();
-    expect(within(rows[2]!).getByText("Nascosto ai giocatori")).toBeTruthy();
+    expect(within(rows[2]!).getByText("Nascosto")).toBeTruthy();
   });
 
   it("avanti, indietro e termina (con conferma) inviano i comandi di turno", async () => {
@@ -161,7 +161,7 @@ describe("tracker dell'iniziativa: GM", () => {
     const u = userEvent.setup();
     mount(gm);
     await openTab(u, "Iniziativa");
-    const bonus = await screen.findByLabelText("Bonus");
+    const bonus = await screen.findByLabelText("Bonus al d20");
     await u.clear(bonus);
     await u.type(bonus, "3");
     await u.click(screen.getByRole("radio", { name: "Vantaggio" }));
@@ -217,7 +217,7 @@ describe("tracker dell'iniziativa: giocatore", () => {
     expect(document.body.textContent).not.toContain(SECRET_ENTRY);
     expect(screen.queryByRole("button", { name: "Avanti" })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Sposta/ })).toBeNull();
-    expect(screen.queryByLabelText("Bonus")).toBeNull();
+    expect(screen.queryByLabelText("Bonus al d20")).toBeNull();
     expect(screen.queryByRole("tab", { name: "Bersagli" })).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Check, MoreHorizontal, Plus, Users } from "lucide-react";
 import type { CampaignView, SceneView, TokenGroup } from "@lanterna/shared";
 import { Button, IconButton, Menu, SearchField, Sheet, TextField, useToast } from "../ui";
@@ -45,6 +45,7 @@ export function TargetsPanel({ view, scene, selected, onSelect, onAction }: Targ
   const [query, setQuery] = useState("");
   const [groupSheet, setGroupSheet] = useState<{ mode: "create" } | { mode: "rename"; group: TokenGroup } | null>(null);
   const [groupName, setGroupName] = useState("");
+  const nameField = useRef<HTMLInputElement>(null);
   const tokens = useMemo(() => view.tokens.filter((t) => t.sceneId === scene.id), [view.tokens, scene.id]);
   const factions = useMemo(() => factionsOf(tokens, scene.id), [tokens, scene.id]);
   const shown = useMemo(() => filterTokens(tokens, query), [tokens, query]);
@@ -167,7 +168,7 @@ export function TargetsPanel({ view, scene, selected, onSelect, onAction }: Targ
         </ul>
       </section>
 
-      <Sheet open={groupSheet !== null} onOpenChange={(o) => !o && setGroupSheet(null)} title={groupSheet?.mode === "rename" ? "Rinomina il gruppo" : "Nuovo gruppo"}>
+      <Sheet open={groupSheet !== null} onOpenChange={(o) => !o && setGroupSheet(null)} title={groupSheet?.mode === "rename" ? "Rinomina il gruppo" : "Nuovo gruppo"} initialFocus={nameField}>
         <form
           className="c-form"
           noValidate
@@ -176,7 +177,7 @@ export function TargetsPanel({ view, scene, selected, onSelect, onAction }: Targ
             void saveGroup();
           }}
         >
-          <TextField label="Nome del gruppo" value={groupName} onChange={(e) => setGroupName(e.target.value)} autoComplete="off" autoFocus />
+          <TextField ref={nameField} label="Nome del gruppo" value={groupName} onChange={(e) => setGroupName(e.target.value)} autoComplete="off" />
           {groupSheet?.mode === "create" ? <p className="t-caption1 a-muted c-hint">Contiene i {selected.length} token selezionati.</p> : null}
           <div className="c-form__actions">
             <Button variant="gray" onClick={() => setGroupSheet(null)}>

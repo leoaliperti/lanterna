@@ -65,9 +65,9 @@ Angoli continui (squircle): `corner-shape: squircle` e' abilitato dove supportat
 ## Componenti
 
 Controlli: `Button` (filled, tinted, gray, plain, destructive; sm/md/lg; `loading`), `IconButton`, `TextField`, `SecureField`, `SearchField`, `SegmentedControl`, `Toggle`, `Slider`, `Stepper`, `Picker`.
-Navigazione e struttura: `NavigationBar` (titolo grande che si comprime allo scorrimento), `Toolbar`, `Sidebar`, `Tabs`, `List`/`ListRow`, `Card`, `Material`.
-Sovrapposizioni: `Sheet`, `Popover`, `Menu`, `ContextMenu`, `Alert`, `Tooltip`.
-Feedback e dati: `ToastProvider` + `useToast()`, `Banner`, `Badge`, `Avatar`, `Spinner`, `ProgressView`.
+Navigazione e struttura: `NavigationBar` (titolo grande che si comprime allo scorrimento), `Toolbar`, `Sidebar`, `Tabs` (con piu' di 5 schede tutte con icona diventano compatte: solo icone, nome nel titolo e in una didascalia), `List`/`ListRow`, `Card`, `Material`.
+Sovrapposizioni: `Sheet` (con `initialFocus` per partire da un campo), `Popover`, `Menu`, `ContextMenu`, `PointMenu` (menu aperto da codice in un punto, es. tasto destro su un token della mappa), `Alert`, `Tooltip`.
+Feedback e dati: `ToastProvider` + `useToast()` (con `action` per un'azione breve come "Annulla"), `Banner`, `Badge`, `Avatar`, `Spinner`, `ProgressView`.
 
 Convenzioni dell'API: componenti controllabili o non (`value`/`defaultValue`/`onValueChange`, `open`/`onOpenChange`); testi per gli screen reader in italiano; nessuno stato globale tranne `ToastProvider`. Classi CSS con prefisso `l-` (componenti) e `t-` (tipografia).
 

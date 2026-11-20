@@ -110,8 +110,7 @@ export function InitiativePanel({ view, scene, selected }: InitiativePanelProps)
       </p>
 
       {isGm ? (
-        <>
-          <div className="c-tracker__bar" role="group" aria-label="Turni">
+        <div className="c-tracker__bar" role="group" aria-label="Turni">
             {!started ? (
               <Button size="sm" icon={<Play size={16} />} disabled={count === 0} onClick={() => void run({ type: "combat.start", sceneId, sort: sortAfter })}>
                 Avvia
@@ -133,8 +132,21 @@ export function InitiativePanel({ view, scene, selected }: InitiativePanelProps)
               Ordina per iniziativa
             </Button>
           </div>
+      ) : null}
 
-          <section className="c-tracker__section" aria-label="Aggiungere partecipanti">
+      {combat && count > 0 ? (
+        <Order combat={combat} isGm={isGm} sceneId={sceneId} onRoll={(id) => void roll([id])} />
+      ) : (
+        <p className="t-subhead a-muted c-tracker__empty">
+          {isGm ? "Aggiungi i token del combattimento: le iniziative si tirano o si scrivono a mano." : "Nessun combattimento in corso."}
+        </p>
+      )}
+
+      {isGm ? (
+        <>
+          <details className="c-disclosure" open={!started || count === 0}>
+            <summary className="c-disclosure__summary t-subhead">Aggiungi partecipanti</summary>
+            <div className="c-tracker__section">
             <div className="c-tracker__bar">
               <Button size="sm" variant="tinted" icon={<UserPlus size={16} />} disabled={selectedAddable.length === 0} onClick={() => void addTokens(selectedAddable.map((t) => t.id))}>
                 {selectedAddable.length > 0 ? `Aggiungi i selezionati (${selectedAddable.length})` : "Aggiungi i selezionati"}
@@ -163,11 +175,14 @@ export function InitiativePanel({ view, scene, selected }: InitiativePanelProps)
                 Aggiungi voce
               </Button>
             </form>
-          </section>
+          </div>
+          </details>
 
-          <section className="c-tracker__section" aria-label="Tiro dell'iniziativa">
+          <details className="c-disclosure" open={!started}>
+            <summary className="c-disclosure__summary t-subhead">Tira l&apos;iniziativa</summary>
+            <div className="c-tracker__section">
             <div className="c-tracker__roll">
-              <TextField label="Bonus" inputMode="numeric" value={bonus} onChange={(e) => setBonus(e.target.value)} autoComplete="off" />
+              <TextField label="Bonus al d20" inputMode="numeric" value={bonus} onChange={(e) => setBonus(e.target.value)} autoComplete="off" />
               <SegmentedControl
                 aria-label="Modo del tiro"
                 value={mode}
@@ -189,17 +204,10 @@ export function InitiativePanel({ view, scene, selected }: InitiativePanelProps)
               </Button>
             </div>
             <p className="t-caption1 a-muted c-hint">Il tiro (d20 più bonus) lo fa il server. Puoi anche scrivere il valore a mano accanto a ogni voce.</p>
-          </section>
+          </div>
+          </details>
         </>
       ) : null}
-
-      {combat && count > 0 ? (
-        <Order combat={combat} isGm={isGm} sceneId={sceneId} onRoll={(id) => void roll([id])} />
-      ) : (
-        <p className="t-subhead a-muted c-tracker__empty">
-          {isGm ? "Aggiungi i token del combattimento: le iniziative si tirano o si scrivono a mano." : "Nessun combattimento in corso."}
-        </p>
-      )}
 
       <Alert
         open={confirmEnd}
@@ -309,7 +317,7 @@ function Order({ combat, isGm, sceneId, onRoll }: OrderProps) {
                 <span className="t-caption1 a-muted c-row__sub">
                   {turn ? <Badge tone="tint">Di turno</Badge> : null}
                   {p.tokenId === null ? <span>Voce libera</span> : null}
-                  {isGm && p.hidden ? <Badge tone="gray">Nascosto ai giocatori</Badge> : null}
+                  {isGm && p.hidden ? <Badge tone="gray">Nascosto</Badge> : null}
                   {isGm && p.hideInitiative ? <Badge tone="gray">Valore nascosto</Badge> : null}
                 </span>
               </div>

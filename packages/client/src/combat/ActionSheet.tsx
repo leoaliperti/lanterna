@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CampaignView } from "@lanterna/shared";
 import { Button, Picker, SegmentedControl, Sheet, TextField, Toggle, useToast } from "../ui";
 import { useCommands } from "../realtime/RealtimeProvider";
@@ -46,6 +46,8 @@ export function ActionSheet({ view, cellSize, request, onClose }: ActionSheetPro
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const open = request !== null;
+  // Il focus parte dal primo campo (non dal pulsante "Fine"): si puo' scrivere subito il numero.
+  const firstField = useRef<HTMLInputElement>(null);
   const kind = request?.kind ?? draft.kind;
 
   // Si riparte da una bozza pulita a ogni apertura.
@@ -86,7 +88,7 @@ export function ActionSheet({ view, cellSize, request, onClose }: ActionSheetPro
   const title = `${ACTION_LABELS[kind]}: ${count === 1 ? "1 token" : `${count} token`}`;
 
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()} title={title}>
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()} title={title} initialFocus={firstField}>
       <form
         className="c-form"
         noValidate
@@ -97,13 +99,13 @@ export function ActionSheet({ view, cellSize, request, onClose }: ActionSheetPro
       >
         {kind === "damage" || kind === "heal" || kind === "tempHp" ? (
           <TextField
+            ref={firstField}
             label={kind === "damage" ? "Danni" : kind === "heal" ? "Punti ferita da curare" : "Punti ferita temporanei"}
             inputMode="numeric"
             value={draft.amount}
             onChange={(e) => set("amount", e.target.value)}
             error={amountError}
             autoComplete="off"
-            autoFocus
           />
         ) : null}
         {kind === "damage" ? <Toggle label="Colpo critico" checked={draft.critical} onCheckedChange={(v) => set("critical", v)} /> : null}
@@ -127,12 +129,12 @@ export function ActionSheet({ view, cellSize, request, onClose }: ActionSheetPro
         {kind === "effect" ? (
           <>
             <TextField
+              ref={firstField}
               label="Nome dell'effetto"
               value={draft.effect.name}
               onChange={(e) => set("effect", { ...draft.effect, name: e.target.value })}
               error={submitted ? (effectErrors.name ?? undefined) : undefined}
               autoComplete="off"
-                autoFocus
             />
             <div className="a-field-group">
               <span className="t-footnote a-muted">Condizione collegata</span>
@@ -181,7 +183,7 @@ export function ActionSheet({ view, cellSize, request, onClose }: ActionSheetPro
         {kind === "move" ? (
           <>
             <div className="a-form__pair">
-              <TextField label="Celle a destra (negativo = sinistra)" inputMode="decimal" value={draft.dx} onChange={(e) => set("dx", e.target.value)} autoComplete="off" />
+              <TextField ref={firstField} label="Celle a destra (negativo = sinistra)" inputMode="decimal" value={draft.dx} onChange={(e) => set("dx", e.target.value)} autoComplete="off" />
               <TextField label="Celle in basso (negativo = in alto)" inputMode="decimal" value={draft.dy} onChange={(e) => set("dy", e.target.value)} autoComplete="off" />
             </div>
             {moveError ? (

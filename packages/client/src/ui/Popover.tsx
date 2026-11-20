@@ -259,8 +259,26 @@ export function PointMenu({ position, items, label, onClose }: PointMenuProps) {
   const last = useRef(position);
   if (position) last.current = position;
   const shown = position ?? last.current;
-  useEscape(position !== null, onClose);
-  useOutsidePress([panel], position !== null, onClose);
+  const isOpen = position !== null;
+  useEscape(isOpen, onClose);
+  // Il menu si apre da un pointerdown (tasto destro sulla mappa): un listener sul document aggiunto durante quello
+  // stesso evento scatterebbe subito e lo richiuderebbe. Si attiva quindi dal turno successivo.
+  useEffect(() => {
+    if (!isOpen) return;
+    let armed = false;
+    const timer = setTimeout(() => {
+      armed = true;
+    }, 0);
+    const onDown = (e: PointerEvent) => {
+      if (!armed || panel.current?.contains(e.target as Node)) return;
+      onClose();
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("pointerdown", onDown);
+    };
+  }, [isOpen, onClose]);
   if (!mounted || !shown) return null;
   const x = Math.max(8, Math.min(shown.x, window.innerWidth - 232));
   const y = Math.max(8, Math.min(shown.y, window.innerHeight - (items.length * 44 + 16)));
