@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CloudFog, Eye, EyeOff, Layers, Map as MapIcon, MessageSquare, Pencil, Redo2, ScrollText, ShieldCheck, Undo2, Users, WifiOff } from "lucide-react";
+import { CloudFog, Eye, EyeOff, Layers, Library, Map as MapIcon, MessageSquare, Pencil, Redo2, ScrollText, ShieldCheck, Undo2, Users, WifiOff } from "lucide-react";
 import type { CampaignView, FogShape, TokenView, WallPatch } from "@lanterna/shared";
 import type { SessionUser } from "../api/client";
 import { MapCanvas, type MapCanvasHandle, type Point } from "../map";
@@ -8,6 +8,7 @@ import { wallAddCommand, wallRemoveCommand, wallUpdateCommand } from "../fog/wal
 import { Button, IconButton, Material, Spinner } from "../ui";
 import { EmptyState } from "../screens/EmptyState";
 import { SheetWorkspace, SheetsPanel, SheetsProvider } from "../sheets";
+import { LibraryPanel } from "../library/LibraryPanel";
 import { useCommands, useRealtimeState } from "../realtime/RealtimeProvider";
 import { ChatLive, ChatPanel, ChatProvider, DiceOverlay, useChat, useChatShortcuts, useChatStore } from "../chat";
 import { fogOfScene, sceneToShow, tokensOfScene, toMapFog, toMapScene, toMapWalls } from "./adapter";
@@ -190,6 +191,12 @@ function LiveTable({ user, view, actions }: LiveProps) {
       label: "Schede",
       icon: <ScrollText size={16} />,
       content: <SheetsPanel onOpened={closeSheet} />
+    },
+    {
+      id: "library",
+      label: "Libreria",
+      icon: <Library size={16} />,
+      content: <LibraryPanel view={view} scene={scene} tokens={sceneTokens} onAdded={closeSheet} />
     },
     ...(perms.isGm && scene
       ? [

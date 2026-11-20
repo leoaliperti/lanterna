@@ -3,6 +3,7 @@ import { Map as MapIcon, Sparkles } from "lucide-react";
 import { Banner, Button, Spinner, TextField } from "../ui";
 import { userErrorMessage } from "../api/client";
 import { RealtimeProvider } from "../realtime/RealtimeProvider";
+import { useHashParam } from "../router/hashRouter";
 import { useSession } from "../session/SessionProvider";
 import { Table } from "../table/Table";
 import { TableFrame } from "../table/TableFrame";
@@ -55,11 +56,13 @@ function CreateFirstCampaign({ onCreate }: { onCreate: (name: string) => Promise
 export function TableScreen() {
   const { user, logout } = useSession();
   const { state, reload, create } = useCampaigns();
+  const wanted = useHashParam("campaign");
 
   if (!user) return null;
 
   if (state.status === "ready" && state.campaigns[0]) {
-    const campaign = state.campaigns[0];
+    // `#/?campaign=<id>` apre una campagna precisa (es. quella appena importata); senza, la prima.
+    const campaign = state.campaigns.find((c) => c.id === wanted) ?? state.campaigns[0];
     return (
       <RealtimeProvider key={campaign.id} campaignId={campaign.id} onSessionEnded={() => void logout().catch(() => undefined)}>
         <Table user={user} campaignName={campaign.name} />
