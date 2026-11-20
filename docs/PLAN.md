@@ -1,6 +1,6 @@
 # Piano di Lanterna
 
-Stato: M0 completata; M1 backend (auth, ruoli, gestione utenti) in revisione, manca la UI di login e amministrazione. M2/M3 lato server (WebSocket, persistenza SQLite, REST campagne, upload) in revisione; mancano canvas e client WebSocket. Gestore pacchetti: npm workspaces (pnpm non è installato e non serviva).
+Stato: M0 completata; M1 backend (auth, ruoli, gestione utenti) in revisione, manca la UI di login e amministrazione. M2/M3 lato server (WebSocket, persistenza SQLite, REST campagne, upload) in revisione; mancano canvas e client WebSocket. M4 lato server (chat con whisper, tiri con esito sul server, tiri segreti, cronologia e log di sessione) in revisione; mancano chat e dadi nel client. Gestore pacchetti: npm workspaces (pnpm non è installato e non serviva).
 
 ## Decisioni prese
 
@@ -22,6 +22,7 @@ Stato: M0 completata; M1 backend (auth, ruoli, gestione utenti) in revisione, ma
 | WebSocket sul server | `ws` direttamente sull'evento `upgrade` di Fastify (niente `@fastify/websocket`): rifiuto 401/403 esplicito prima dell'handshake. |
 | Persistenza campagne | Scene e token come JSON validato con Zod in lettura; registro eventi salvato per i delta dopo un riavvio. |
 | Miniature delle mappe | Rimandate: `sharp` richiede binari nativi e script d'installazione (bloccati da npm 11). |
+| Whisper e tiri segreti | Whisper visibili solo ad autore e destinatario: il GM non vede i whisper altrui. Il giocatore sussurra (e tira in whisper) solo al GM; solo il GM fa tiri segreti (`gm`). L'esportazione del log per l'admin è completa. |
 | Audio | Fuori ambito iniziale (si usa Discord). |
 | MVP | Lista dell'autore, più caricamento mappa e salvataggio automatico. |
 

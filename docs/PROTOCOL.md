@@ -34,8 +34,9 @@ Un messaggio JSON per frame, massimo 64 KiB, decodificato con `parseClientMessag
 | `hello` | `protocolVersion`, `campaignId`, `lastVersion \| null`, `epoch \| null` | primo messaggio e a ogni riconnessione |
 | `command` | `requestId`, `command` | vedi comandi sotto |
 | `undo` / `redo` | `requestId` | annulla/ripeti per utente |
-| `chat.send` | `requestId`, `text`, `whisperTo?` | segnaposto M4 |
-| `roll.request` | `requestId`, `formula`, `secret?` | segnaposto M4, esito deciso dal server |
+| `chat.send` | `requestId`, `text`, `whisperTo?` | chat; vedi "Chat e dadi" |
+| `roll.request` | `requestId`, `formula`, `visibility`, `whisperTo?`, `label?` | tiro, esito deciso dal server |
+| `history.request` | `requestId`, `before` (id voce \| null), `limit?` | pagina di cronologia più vecchia |
 | `ping` | | |
 
 ### Comandi
@@ -63,8 +64,10 @@ Campi di `token.update`: `name`, `imageUrl`, `size`, `rotation`, `ownerUserId`, 
 | `snapshot` | `protocolVersion`, `epoch`, `version`, `view` | `view = viewFor(state, utente)` |
 | `delta` | `epoch`, `fromVersion`, `toVersion`, `events[]` | eventi già filtrati per l'utente |
 | `ack` | `requestId`, `version` | comando applicato |
-| `error` | `requestId \| null`, `code`, `message` | `FORBIDDEN`, `INVALID`, `CONFLICT`, `NOT_FOUND` |
-| `chat.message`, `roll.result` | | segnaposto M4 |
+| `error` | `requestId \| null`, `code`, `message`, `reason?` | `FORBIDDEN`, `INVALID`, `CONFLICT`, `NOT_FOUND`, `RATE_LIMITED` |
+| `chat.message` | `requestId \| null`, `entry` (`ChatEntry`) | messaggio di chat già filtrato |
+| `roll.result` | `requestId \| null`, `entry` (`RollEntry`) | esito di un tiro già filtrato |
+| `history` | `requestId \| null`, `entries[]`, `hasMore` | cronologia filtrata (dopo `hello` e su richiesta) |
 | `pong` | | |
 
 Eventi dentro un `delta`: `token.created {token}`, `token.updated {tokenId, changes}`, `token.deleted {tokenId}`, `scene.created {scene}`, `scene.updated {sceneId, changes}`, `scene.deleted {sceneId}`, `scene.activated {sceneId, scene, tokens}` (il giocatore sostituisce scena e token con quelli ricevuti).
@@ -75,6 +78,8 @@ Codici d'errore:
 - `INVALID`: forma o valori non validi.
 - `CONFLICT`: id già usato; annulla/ripeti su campi cambiati nel frattempo da altri.
 - `NOT_FOUND`: inesistente **o invisibile** per l'utente. Un token nascosto e uno che non esiste danno lo stesso errore con lo stesso messaggio. I messaggi d'errore sono fissi e non contengono mai id o dati.
+- `RATE_LIMITED`: troppi messaggi di chat o tiri (solo chat e dadi, mai dai comandi).
+- `reason` (facoltativo): per una formula non valida, il codice del parser dei dadi (`TROPPI_DADI`, `SINTASSI_NON_VALIDA`, ...); `message` è il messaggio italiano del parser.
 
 Ordine dei controlli nel riduttore: forma (Zod) → solo-GM → ricerca tra gli oggetti visibili all'attore → proprietà e campi → vincoli sullo stato.
 
@@ -150,7 +155,7 @@ Codice in `packages/server/src`: `realtime/` (WebSocket e stanze), `campaigns/` 
 - **Rate limit per connessione:** secchiello di gettoni (`WS_MESSAGES_PER_SECOND` = 30 di media, raffica `WS_MESSAGE_BURST` = 60). Oltre: messaggio scartato con `error INVALID "troppi messaggi"`; insistendo (4 × raffica scartati di fila) chiusura 1008.
 - **Keep-alive:** ping del server ogni `WS_HEARTBEAT_MS` (30 s, sotto i ~100 s di inattività di Cloudflare); la connessione che non ha risposto al ping precedente viene terminata. Allo stesso giro si ricontrolla la sessione nel database: logout, reset password o scadenza chiudono il socket (4401) entro un intervallo. Il client può anche mandare `ping` applicativi (`pong`).
 - **Client lenti:** oltre 16 MiB in coda d'invio la connessione viene terminata.
-- `chat.send` e `roll.request` rispondono `error INVALID "non ancora disponibile"` fino a M4.
+- Dopo la risposta a ogni `hello` (snapshot o delta) il server invia `history` con le ultime voci di chat e tiri visibili all'utente (vedi "Chat e dadi").
 
 Codici di chiusura: 1001 arresto del server, 1008 rate limit, 1009 messaggio troppo grande, 4400 versione del protocollo, 4401 sessione terminata, 4403 permessi cambiati, 4404 campagna non trovata o non membro, 4408 `hello` mancante. Con 4401/4403/4404 il client non deve riconnettersi da solo in loop (4401: torna al login).
 
@@ -201,6 +206,7 @@ Tutte le rotte verificano sessione e ruolo lato server (`requireSession`, `requi
 | `DELETE /campaigns/:id/members/:userId` | admin | 204, 404, 409 se è l'ultimo GM della campagna (controllo atomico in SQL) |
 | `POST /uploads/map`, `POST /uploads/token` | admin | multipart con un solo file |
 | `GET /assets/:uuid.:ext` | autenticato | file caricato |
+| `GET /campaigns/:id/log` `?format=json\|text&since=<ms>` | admin: tutto; giocatore membro: solo ciò che vedeva | log di sessione (vedi "Chat e dadi") |
 
 Lo schema ammette più campagne per istanza (oggi se ne usa una).
 
@@ -223,6 +229,70 @@ npm test -w @lanterna/server      # unitari e integrazione (client WebSocket rea
 
 Prova a mano (con `websocat` o simili), dopo il login nel browser: copiare il cookie `lanterna.session_token` e connettersi a `ws://localhost:3000/ws` con header `Origin: http://localhost:3000` e `Cookie`, poi inviare `{"type":"hello","protocolVersion":1,"campaignId":"<id>","lastVersion":null,"epoch":null}`. I test d'integrazione (`src/realtime/realtime.test.ts`) aprono GM e due giocatori sulla stessa porta e cercano le stringhe segrete nel traffico ricevuto.
 
+## Chat e dadi (M4)
+
+Tipi e schemi in `packages/shared/src/protocol/chat.ts`; server in `packages/server/src/chat/` (costruzione delle voci, SQLite, esportazione) e `realtime/hub.ts` (invio filtrato, cronologia, rate limit).
+
+### Voci del log
+
+Chat e tiri sono **voci** con campi comuni: `id` (UUID), `authorId`, `authorName` (nome al momento dell'invio), `at` (ms, orologio del server), `visibility`, `whisperTo` (`userId` o `null`).
+
+- `ChatEntry` (`kind: "message"`): `text`.
+- `RollEntry` (`kind: "roll"`): `label` (o `null`), `formula` canonica (`2d6+3`, `1d20 adv`), `advantage`, `terms` (per ogni termine i dadi `{ face, value, kept }`: `face` = facce, `value` = esito, `kept` = conta nel totale), `total`, `detail` (`2d6+3 → [4, 5] + 3 = 12`, i dadi scartati tra parentesi), `critical` / `criticalFailure` (solo se la formula ha un unico d20: vale il d20 deciso, anche con vantaggio).
+
+`chat.message { requestId, entry }` e `roll.result { requestId, entry }`: il `requestId` è valorizzato solo sulla connessione che ha fatto la richiesta (è la conferma); a tutti gli altri arriva `null`. Non c'è un `ack` separato.
+
+### Visibilità e permessi (decisioni)
+
+| `visibility` | Chi la vede | Chi può usarla |
+|---|---|---|
+| `public` | tutti i membri | tutti |
+| `gm` (tiro segreto) | tutti i GM della campagna | **solo il GM**: un giocatore riceve `FORBIDDEN` |
+| `whisper` | **solo autore e destinatario** | GM verso chiunque; **giocatore solo verso un GM** (verso un altro giocatore `FORBIDDEN`) |
+
+- Il GM **non** vede i whisper altrui: vede quelli che manda e quelli indirizzati a lui. Con un solo GM (il caso normale) tutti i whisper dei giocatori passano da lui comunque; con più GM, un whisper giocatore→GM A non arriva al GM B. L'unica eccezione è l'esportazione dell'admin (log completo, vedi sotto).
+- Un giocatore non può fare tiri segreti, ma può tirare in `whisper` al GM: lo vedono solo lui e quel GM.
+- Chat: `whisperTo` assente = pubblico. Tiro: `whisperTo` obbligatorio con `whisper` e vietato con le altre visibilità (`INVALID`).
+- Destinatario non membro della campagna: `NOT_FOUND`; se stessi: `INVALID`.
+- Ordine dei controlli per un tiro: visibilità (`FORBIDDEN` prima di tutto) → destinatario → formula → tiro.
+- La regola è una sola, `canSeeEntry(entry, { userId, role })`, usata per l'invio live; la stessa condizione in SQL filtra cronologia ed esportazione (e ogni riga riletta viene ricontrollata con `canSeeEntry`). Il ruolo è quello **attuale**: un giocatore promosso GM vede anche i tiri segreti passati.
+- Nessuna fuga: una voce invisibile non genera **nessun** frame per chi non la vede (né id, né formula, né totale). I test cercano formule, totali, etichette e testi privati nei byte ricevuti dagli altri client.
+
+### Tiri: esito solo sul server
+
+Il client manda solo `formula` (stringa, al massimo 1000 caratteri nel protocollo; il parser poi applica i suoi limiti: 200 caratteri, 100 dadi in totale, da 2 a 1000 facce, 20 termini). Il server la valida con `parseFormula` e la tira con `roll` del pacchetto condiviso passando `crypto.randomInt` (`server/src/dice/crypto-rng.ts`). Campi in più (es. `total`) sono `INVALID`: il client non sceglie mai l'esito. L'RNG si può iniettare solo da `buildApp({ rng })` nei test; `main.ts` non lo passa, e un test verifica che l'app senza opzioni usi `crypto.randomInt` (anche intercettando `node:crypto`).
+
+Formula non valida: `error { code: "INVALID", message: <messaggio italiano del parser>, reason: <codice del parser> }`, per esempio `9999d9999` → `DADI_FUORI_LIMITE` ("Un gruppo di dadi può avere da 1 a 100 dadi con da 2 a 1000 facce."). Vantaggio/svantaggio: `d20 adv`, `1d20+5 dis` (vedi il parser).
+
+### Testo semplice
+
+Il testo della chat (massimo `MAX_CHAT_TEXT_LENGTH` = 2000 caratteri) e le etichette dei tiri (100, su una riga) sono **testo semplice, mai HTML**. Il server non fa escaping (`<b>` resta `<b>`): il client deve mostrarlo come testo (nodi di testo React, `textContent`), mai con `innerHTML`/`dangerouslySetInnerHTML`. `sanitizeChatText` toglie caratteri di controllo, override e isolamenti bidirezionali (spoofing), spazi a larghezza zero, BOM e surrogati isolati; normalizza in NFC, unifica gli a capo e ne lascia al massimo una riga vuota di fila. Un testo vuoto dopo la sanificazione è `INVALID "messaggio vuoto"`.
+
+### Cronologia
+
+- Dopo ogni `hello` il server invia `history { requestId: null, entries, hasMore }` con le ultime `CHAT_HISTORY_LIMIT` (default 50, massimo 500) voci visibili all'utente, dalla più vecchia. Anche dopo una riconnessione: il client **sostituisce** la sua lista (o la unisce per `id`: una voce arrivata live poco prima può comparire anche nella cronologia).
+- `history.request { before, limit? }`: le `limit` (default e massimo 100) voci visibili più vecchie della voce `before` (il suo `id`), o le ultime se `before` è `null`. Il cursore è l'`id` della prima voce che il client ha; un id inesistente o invisibile all'utente dà lo stesso `NOT_FOUND`.
+- L'ordine è quello di salvataggio (`seq` interno, mai inviato).
+
+### Persistenza (migrazione `0002_chat`)
+
+Tabella `chat_entry`: `seq` (autoincremento, ordine), `id`, `campaign_id` (cascata), `kind`, `author_id`, `visibility`, `whisper_to`, `at`, `data` = voce completa in JSON (rivalidata con `LogEntrySchema` in lettura; righe non valide scartate). Autore e destinatario non sono chiavi esterne: il log resta anche se un utente viene eliminato. Come per i comandi, la voce si salva **prima** di essere inviata; se il salvataggio fallisce, `CONFLICT` e nessun invio. Chat e tiri passano dalla stessa coda della stanza dei comandi.
+
+### Esportazione: `GET /campaigns/:id/log`
+
+- Admin: log **completo** della campagna (`scope: "full"`), whisper altrui compresi (è l'amministratore dell'istanza).
+- Giocatore membro: solo le voci che poteva vedere (`scope: "visible"`), con il ruolo attuale. Non membro o campagna inesistente: 404 (stessa risposta). Anonimo: 401.
+- JSON (`SessionLogExport` in `shared/src/api.ts`) o `?format=text` (testo semplice, `Content-Disposition: attachment`; le righe successive di un messaggio sono rientrate, così un messaggio non può fingere un'altra voce). `?since=<ms>` per le voci da un istante in poi. `Cache-Control: no-store`.
+
+### Rate limit
+
+Per utente (su tutte le sue connessioni), secchiello di gettoni separato per messaggi e tiri: `CHAT_MESSAGES_PER_MINUTE` (30) con raffica `CHAT_MESSAGE_BURST` (10), `ROLLS_PER_MINUTE` (30) con raffica `ROLL_BURST` (10). Oltre: `error RATE_LIMITED`, nulla viene salvato né inviato. Il limite generale per connessione (`WS_MESSAGES_PER_SECOND`) resta valido anche per `history.request`.
+
+### Cosa resta intuibile
+
+- **Tempi**: chi non vede un tiro segreto non riceve nulla, ma il GM che tira in segreto ritarda di poco i messaggi successivi nella coda della stanza (trascurabile).
+- **Rate limit** e **ruolo attuale**: i limiti sono in memoria (si azzerano al riavvio); un cambio di ruolo cambia la cronologia visibile anche all'indietro.
+
 ## Limiti noti
 
 - Niente comando di riordino (z-order): un token ricreato da annulla torna in cima.
@@ -231,5 +301,5 @@ Prova a mano (con `websocat` o simili), dopo il login nel browser: copiare il co
 - Upload: nessuna miniatura o versione ridimensionata. Servirebbe decodificare l'immagine: `sharp` ha binari nativi e script d'installazione (bloccati da npm 11), e un decodificatore in puro JS per mappe fino a 100 Mpx userebbe centinaia di MB di RAM. Il formato si verifica dall'intestazione, non decodificando tutti i pixel: un file con intestazione valida e dati corrotti viene accettato (il browser semplicemente non lo mostra; con `nosniff` e la CSP non può essere eseguito). I metadati (EXIF, posizione GPS) non vengono rimossi.
 - I file caricati sono visibili a ogni utente autenticato che conosce l'URL (UUID non indovinabile), non solo ai membri della campagna; l'immagine di un token nascosto non viene inviata ai giocatori, ma l'URL non è revocabile.
 - Il logout chiude il WebSocket solo al keep-alive successivo (al più `WS_HEARTBEAT_MS`).
-- Chat e tiri sono solo schemi segnaposto; filtri di whisper e tiri segreti arriveranno con M4.
+- Chat e tiri: niente modifica né cancellazione dei messaggi; niente whisper fra giocatori o a più destinatari; il client (chat, dadi 3D) non è ancora collegato. L'animazione 3D sincronizzata userà `terms[].dice` di `roll.result`.
 - Nebbia di guerra (M6) non ancora modellata.
