@@ -332,7 +332,7 @@ Per utente (su tutte le sue connessioni), secchiello di gettoni separato per mes
 - I file caricati sono visibili a ogni utente autenticato che conosce l'URL (UUID non indovinabile), non solo ai membri della campagna (eccezione dal M6: le mappe di scene con nebbia, servite ai giocatori solo a tessere); l'immagine di un token nascosto non viene inviata ai giocatori, ma l'URL non è revocabile.
 - Il logout chiude il WebSocket solo al keep-alive successivo (al più `WS_HEARTBEAT_MS`).
 - Chat e tiri: niente modifica né cancellazione dei messaggi; niente whisper fra giocatori o a più destinatari; il client anima i dadi sui valori di `terms[].dice` di `roll.result` solo localmente (ogni client anima i tiri che riceve, non c'è un'animazione condivisa temporizzata).
-- Nebbia di guerra (M6): logica e server pronti, UI del client da fare; limiti in [docs/FOG.md](FOG.md).
+- Nebbia di guerra (M6): logica, server e UI del client pronti; limiti in [docs/FOG.md](FOG.md).
 
 ## Produzione (M5): prefisso /api
 

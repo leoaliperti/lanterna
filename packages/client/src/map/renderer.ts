@@ -2,6 +2,7 @@
 import "pixi.js/unsafe-eval";
 import { Application, CanvasSource, Container, Graphics, ImageSource, Sprite, Text, Texture } from "pixi.js";
 import { parseCssColor } from "./color";
+import { FogLayer } from "./fogLayer";
 import type { MapController } from "./controller";
 import { isTokenShown, rectsIntersect, tokenRadius, visibleRect } from "./geometry";
 import { type BackgroundPlan, MAX_LOADED_TILES, needsDetail, planBackground, tileRect, tilesToEvict, visibleTiles } from "./tiles";
@@ -103,6 +104,7 @@ export class PixiMapView {
   private gridKey = "";
   private maxTexture = 4096;
 
+  private fogLayer: FogLayer;
   private cleanup: (() => void)[] = [];
   private invalidateHook: () => void = () => {};
 
@@ -115,6 +117,12 @@ export class PixiMapView {
     this.theme = readTheme(host);
     this.rulerText = new Text({ text: "", style: { fontFamily: "system-ui, sans-serif", fontSize: 13, fontWeight: "600", fill: this.theme.onTint } });
     this.rulerText.anchor.set(0.5);
+    this.fogLayer = new FogLayer({
+      theme: () => this.theme,
+      reducedMotion: () => this.reducedMotion,
+      maxTexture: () => this.maxTexture,
+      redraw: () => this.requestRender()
+    });
   }
 
   /** Crea l'applicazione PixiJS sul canvas. Rifiuta se non c'e' WebGL. */
@@ -143,7 +151,11 @@ export class PixiMapView {
     const { app, world } = this;
     app.stage.eventMode = "none"; // gli eventi sono gestiti dal DOM (input.ts), niente hit test di Pixi
     world.isRenderGroup = true;
-    world.addChild(this.bgLayer, this.gridGfx, this.cellsGfx, this.tokenLayer, this.selectionGfx);
+    // Ordine: sfondo, tessere (giocatore), griglia, aiuto di vista, velo della nebbia, muri, anteprime, token.
+    world.addChild(
+      this.bgLayer, this.fogLayer.tilesLayer, this.gridGfx, this.fogLayer.sightGfx, this.fogLayer.veilLayer, this.fogLayer.wallsGfx,
+      this.cellsGfx, this.fogLayer.previewGfx, this.tokenLayer, this.selectionGfx
+    );
     this.bgLayer.addChild(this.bgFill);
     this.overlay.addChild(this.marqueeGfx, this.rulerGfx, this.rulerText, this.handlesGfx);
     app.stage.addChild(world, this.overlay);
@@ -183,6 +195,7 @@ export class PixiMapView {
     this.rulerText.style.fill = this.theme.onTint;
     for (const v of this.views.values()) v.sig = ""; // forza il ridisegno dei token
     this.gridKey = "";
+    this.fogLayer.invalidate();
     this.drawBgFill();
     if (this.c.scene) this.syncTokens(this.c.scene);
     this.requestRender();
@@ -194,6 +207,7 @@ export class PixiMapView {
   update(scene: MapScene) {
     if (this.disposed) return;
     this.syncBackground(scene);
+    this.fogLayer.sync(scene);
     this.syncTokens(scene);
     this.requestRender();
   }
@@ -227,6 +241,7 @@ export class PixiMapView {
     for (const v of [...this.views.values()]) this.destroyView(v);
     this.views.clear();
     this.clearBackground();
+    this.fogLayer.dispose();
     for (const e of this.textures.values()) void e.texture.then((t) => t?.destroy(true));
     this.textures.clear();
     this.app.destroy({ removeView: false }, { children: true, texture: false });
@@ -263,6 +278,7 @@ export class PixiMapView {
     const key = `${bg.url}|${bg.width}|${bg.height}`;
     if (key !== this.bgKey) {
       this.bgKey = key;
+      this.fogLayer.reset();
       this.clearBackground();
       this.drawBgFill();
       const mine = this.bgToken;
@@ -597,6 +613,7 @@ export class PixiMapView {
     this.gridGfx.visible = scene.grid.visible !== false && cell * s >= GRID_MIN_SCREEN_CELL;
 
     const pending = this.updateTiles(area, s, now);
+    if (this.fogLayer.frame(dt, s, c)) animating = true;
 
     // Token: posizione (con transizione), culling, decorazioni.
     const pad = cell * DECOR_PAD_CELLS;

@@ -2,7 +2,9 @@ import { type Ref, useEffect, useImperativeHandle, useMemo, useRef, useState } f
 import { Maximize, Minus, Plus, Ruler } from "lucide-react";
 import { Banner, IconButton, Material } from "../ui";
 import "./MapCanvas.css";
-import { MapController, type Tool } from "./controller";
+import { MapController, type Tool, type ToolState } from "./controller";
+import type { WallMode } from "./drawTools";
+import type { FogBrush, FogMode } from "../fog/fogLogic";
 import { bindCanvasInput } from "./input";
 import type { PixiMapView } from "./renderer";
 import type { MapHandlers, MapScene, Point, Viewport } from "./types";
@@ -14,6 +16,13 @@ export interface MapCanvasHandle {
   zoomBy(factor: number): void;
   /** Centra lo schermo su un punto di mappa (pixel di mappa). */
   centerOn(point: Point): void;
+  /** Strumenti GM: selezione, righello, nebbia, muri. */
+  setTool(tool: Tool): void;
+  setFogBrush(brush: FogBrush): void;
+  setFogMode(mode: FogMode): void;
+  setWallMode(mode: WallMode): void;
+  /** Chiude il poligono della nebbia in costruzione. */
+  closePolygon(): void;
 }
 
 export interface MapCanvasProps extends MapScene, MapHandlers {
@@ -23,6 +32,8 @@ export interface MapCanvasProps extends MapScene, MapHandlers {
   label?: string;
   /** Viewport iniziale; se manca la mappa viene adattata allo schermo. */
   defaultViewport?: Viewport;
+  /** Lo strumento attivo, il pennello o il modo sono cambiati (anche da tastiera). */
+  onToolStateChange?: (state: ToolState) => void;
 }
 
 type Status = "loading" | "ready" | "unavailable";
@@ -33,8 +44,9 @@ type Status = "loading" | "ready" | "unavailable";
  */
 export function MapCanvas({
   ref, className, label = "Mappa di gioco", defaultViewport,
-  background, grid, scale, tokens, role, movableTokenIds, rulerMode,
-  onMoveToken, onResizeToken, onRotateToken, onSelectionChange, onViewportChange
+  background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight,
+  onMoveToken, onResizeToken, onRotateToken, onSelectionChange, onViewportChange,
+  onFogShape, onWallAdd, onWallUpdate, onWallRemove, onWallSelect, onToolStateChange
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -50,16 +62,18 @@ export function MapCanvas({
   const [zoom, setZoom] = useState(() => Math.round((defaultViewport?.scale ?? 1) * 100));
 
   const scene = useMemo<MapScene>(
-    () => ({ background, grid, scale, tokens, role, movableTokenIds, rulerMode }),
-    [background, grid, scale, tokens, role, movableTokenIds, rulerMode]
+    () => ({ background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight }),
+    [background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight]
   );
+  const toolStateRef = useRef(onToolStateChange);
+  toolStateRef.current = onToolStateChange;
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
 
   // Le callback piu' recenti, senza ricreare nulla.
   useEffect(() => {
     controller.handlers = {
-      onMoveToken, onResizeToken, onRotateToken, onSelectionChange,
+      onMoveToken, onResizeToken, onRotateToken, onSelectionChange, onFogShape, onWallAdd, onWallUpdate, onWallRemove, onWallSelect,
       onViewportChange: (vp) => {
         setZoom(Math.round(vp.scale * 100));
         onViewportChange?.(vp);
@@ -72,6 +86,14 @@ export function MapCanvas({
     () => ({
       fit: () => controller.fit(),
       zoomBy: (f) => controller.zoomBy(f),
+      setTool: (t) => controller.setTool(t),
+      setFogBrush: (b) => controller.setFogBrush(b),
+      setFogMode: (m) => controller.setFogMode(m),
+      setWallMode: (m) => controller.setWallMode(m),
+      closePolygon: () => {
+        controller.draw.closePolygon();
+        controller.onToolState(controller.toolState);
+      },
       centerOn: (p) => {
         const vp = controller.viewport;
         controller.setViewport({ ...vp, x: controller.size.width / 2 - p.x * vp.scale, y: controller.size.height / 2 - p.y * vp.scale });
@@ -114,6 +136,7 @@ export function MapCanvas({
       if (readoutRef.current) readoutRef.current.textContent = text ? `Distanza: ${text}` : "";
     };
     controller.onTool = setTool;
+    controller.onToolState = (st) => toolStateRef.current?.(st);
     const onLost = (e: Event) => {
       e.preventDefault();
       setStatus("unavailable");
@@ -157,11 +180,15 @@ export function MapCanvas({
       controller.onCursor = () => {};
       controller.onRuler = () => {};
       controller.onTool = () => {};
+      controller.onToolState = () => {};
     };
   }, [controller]);
 
   const unavailable = status === "unavailable";
-  const gmNote = role === "gm" ? " Come GM puoi anche ruotare e ridimensionare i token selezionati." : "";
+  const gmNote =
+    role === "gm"
+      ? " Come GM puoi anche ruotare e ridimensionare i token selezionati. N nebbia (1 rettangolo, 2 cerchio, 3 poligono, 4 celle, X rivela o copri, Invio chiude il poligono), W muri (1 disegna, 2 porta, 3 modifica, 4 elimina), V torna alla selezione."
+      : "";
   const description = `Trascina per spostare i token, rotella o pizzico per lo zoom, tasto centrale o due dita per scorrere. Frecce, più e meno, zero per adattare, R per il righello.${gmNote}`;
   useEffect(() => {
     canvasRef.current?.setAttribute("aria-label", label);

@@ -1,6 +1,6 @@
 # Nebbia di guerra (M6)
 
-Stato: logica condivisa e server completi; **la UI del client è da fare** (vedi "Cosa deve fare il client").
+Stato: logica condivisa, server e UI del client completi (vedi "Il client").
 
 Decisioni dell'utente: la nebbia è **manuale**, in mano al GM, con **maschera per giocatore**. Il GM rivela e ricopre per tutti, per un gruppo o per un solo giocatore. Il calcolo automatico della vista dei token (raggio, luce/buio, muri) è **solo un aiuto visivo** e non scopre mai la nebbia. Il GM vede sempre tutto (la nebbia gli si mostra in trasparenza).
 
@@ -112,11 +112,12 @@ Misure (`vision.test.ts`, mediana di 10 ricalcoli completi, MacBook, Node 22):
 
 Con raggio illimitato conviene ricalcolare solo i token che si muovono (o limitare il raggio).
 
-## Cosa deve fare il client (da implementare)
+## Il client (`packages/client`)
 
-1. **Tipi**: `CampaignView.fogs`/`walls` e i nuovi eventi sono già gestiti da `applyServerEvent` (`packages/shared/src/protocol/client.ts`).
-2. **Sfondo per i giocatori** con nebbia: `scene.map` è `null`; usare `fog.tiles` (`size`, `cols`, `rows`, `key`). Calcolare le tessere visibili con `tileCoverage(fog.mask, fog, col, row, scene.width, scene.height) !== "none"` e caricare solo quelle da `/api/campaigns/<campaignId>/scenes/<sceneId>/tiles/<col>/<row>` (con il cookie: stesse regole di `assetUrl`). Disporle a `(col·size, row·size)` con dimensione `min(size, width − col·size)` × `min(size, height − row·size)` px della scena. A ogni `fog.updated` ricalcolare: ricaricare le tessere la cui copertura (`tileCoverageKey`) è cambiata (aggiungere `?k=<chiave>` all'URL per scavalcare la cache del browser, il server lo ignora) e togliere quelle diventate `none`. Se cambia `tiles.key` ricaricarle tutte.
-3. **Disegno della nebbia**: sopra la mappa, celle coperte (`!isCellRevealed(mask, c, r)`) opache per il giocatore; per il GM in trasparenza, con selettore "vista di: tutti / giocatore X" (maschera `players[i].mask` o `mask` = tutti).
-4. **Strumenti GM**: pennello/rettangolo/cerchio/poligono che inviano `fog.reveal`/`fog.cover` con `target` (tutti, gruppo, uno); "rivela tutto"/"copri tutto"; attiva/disattiva con stato iniziale; luce ambientale; disegno di muri e porte (`wall.add/update/remove`, apri/chiudi porta). Annulla/ripeti funziona già.
-5. **Aiuto visivo**: `computeSight` per i token propri (giocatore) o selezionati (GM) e `computeLights`, disegnati come velo/contorno **senza toccare la nebbia**. Il giocatore ha solo i pezzi di muro rivelati: la sua linea di vista "attraversa" i muri che non conosce, quindi va mostrata solo dentro le celle rivelate.
-6. **Editor del token** (GM): campo `vision` (raggio, scurovisione, luce intensa/fioca).
+- **Logica pura** (`src/fog`): `fogLogic.ts` (conversioni punto/cella, forme del pennello, `CellPath`, comandi `fog.reveal/cover/revealAll/coverAll`, `viewMask`, `availableTiles`/`diffTiles`/`tileUrl`), `wallLogic.ts` (aggancio, ricerca del muro, comandi), `sight.ts` (`SightEngine`: ricalcolo selettivo della vista con budget di 6 ms per passata, tratteggio).
+- **Canvas** (`map/fogLayer.ts`, `map/drawTools.ts`): velo = UNA texture con un pixel per cella ingrandito; il bordo morbido sta solo sul lato rivelato (interpolazione, poi le celle coperte si ridisegnano nette), quindi non scopre nulla. Aggiornamento in dissolvenza di 220 ms (istantaneo con `prefers-reduced-motion`). Giocatore: velo opaco con la propria maschera e sfondo a tessere (solo `availableTiles`; 404 = resta nero; l'URL porta `?k=<chiave di copertura>`, l'ETag fa il resto); GM: mappa intera e velo al 55% della maschera scelta in "vista come". Ordine dei livelli: sfondo, tessere, griglia, vista dei token, velo, muri, anteprime, token.
+- **Strumenti GM**: barra sopra la mappa (`table/FogToolbar.tsx`) e scheda "Nebbia" (`FogPanel.tsx`: attiva con stato iniziale, destinatari a chip, rivela/copri tutto con conferma per "copri", vista come, luce, disattiva). Pennelli rettangolo, cerchio, poligono, celle con anteprima prima del rilascio; un clic = una cella subito; Alt = senza aggancio. Muri e porte: disegno (trascinamento o clic-clic a catena), porta, modifica degli estremi, elimina; un clic su una porta la apre/chiude anche con la selezione. Annulla/ripeti passano dai comandi esistenti.
+- **Scorciatoie** (mappa a fuoco, GM): `V` selezione, `N` nebbia (`1` rettangolo, `2` cerchio, `3` poligono, `4` celle, `X` rivela/copri, Invio chiude il poligono, Backspace toglie un vertice), `W` muri (`1` muro, `2` porta, `3` modifica, `4` elimina, Canc elimina il selezionato), Esc annulla poi esce.
+- **Vista dei token**: contorno tratteggiato tenue e luci, calcolati con `computeVisibility`; GM tutti i token con `vision`, giocatore solo i propri (gli altri hanno `vision: null`). Non modificano mai la nebbia; il giocatore la vede sotto il velo, quindi solo nelle celle rivelate. Raggio/luce nell'editor token.
+- **Test**: `src/fog/*.test.ts`, `src/map/drawTools.test.ts`, `src/table/fogUi.test.tsx`, `e2e/fog.e2e.test.ts` (server reale: tessere coperte = 404, nessun token sotto la nebbia nel traffico, rivelazione a un solo giocatore).
+- **Limiti noti**: il velo ha una texture per scena (cap 4096 px e 16 Mpx, quindi su mappe enormi i pixel per cella scendono); le tessere dei giocatori restano in memoria finche' sono rivelate; nessun pennello a spessore variabile; le luci altrui non arrivano al giocatore.

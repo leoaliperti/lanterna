@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Eye, EyeOff, Layers, Map as MapIcon, MessageSquare, Pencil, Redo2, ScrollText, ShieldCheck, Undo2, Users, WifiOff } from "lucide-react";
-import type { CampaignView, TokenView } from "@lanterna/shared";
+import { CloudFog, Eye, EyeOff, Layers, Map as MapIcon, MessageSquare, Pencil, Redo2, ScrollText, ShieldCheck, Undo2, Users, WifiOff } from "lucide-react";
+import type { CampaignView, FogShape, TokenView, WallPatch } from "@lanterna/shared";
 import type { SessionUser } from "../api/client";
-import { MapCanvas, type MapCanvasHandle } from "../map";
+import { MapCanvas, type MapCanvasHandle, type Point } from "../map";
+import { fogShapeCommand, fogTarget, type FogMode } from "../fog/fogLogic";
+import { wallAddCommand, wallRemoveCommand, wallUpdateCommand } from "../fog/wallLogic";
 import { Button, IconButton, Material, Spinner } from "../ui";
 import { EmptyState } from "../screens/EmptyState";
 import { SheetWorkspace, SheetsPanel, SheetsProvider } from "../sheets";
 import { useCommands, useRealtimeState } from "../realtime/RealtimeProvider";
 import { ChatLive, ChatPanel, ChatProvider, DiceOverlay, useChat, useChatShortcuts, useChatStore } from "../chat";
-import { sceneToShow, tokensOfScene, toMapScene } from "./adapter";
+import { fogOfScene, sceneToShow, tokensOfScene, toMapFog, toMapScene, toMapWalls } from "./adapter";
 import { ConnectionBanner, ConnectionDot } from "./ConnectionStatus";
+import { useFogControls, validTargets } from "./fogControls";
+import { FogPanel } from "./FogPanel";
+import { FogToolbar } from "./FogToolbar";
+import { useSight } from "./useSight";
 import { permissionsFor } from "./permissions";
 import { SceneForm } from "./SceneForm";
 import { ScenePanel } from "./ScenePanel";
@@ -92,7 +98,23 @@ function LiveTable({ user, view, actions }: LiveProps) {
   // Il GM guarda la scena che sceglie; senza scelta (e senza scena in gioco) la prima.
   const wanted = viewedId ?? (view.activeSceneId ? null : (view.scenes[0]?.id ?? null));
   const scene = sceneToShow(view, wanted);
-  const mapScene = useMemo(() => (scene ? toMapScene(view, scene) : null), [view, scene]);
+  const controls = useFogControls();
+  const players = useMemo(() => view.members.filter((m) => m.role === "player"), [view.members]);
+  const fogView = scene ? fogOfScene(view, scene.id) : null;
+  const wallTool = controls.tool.tool === "wall";
+  const mapFog = useMemo(
+    () => (scene ? toMapFog(view, scene, { viewAs: controls.viewAs, showVeil: controls.veil }) : null),
+    // La nebbia cambia solo con `fogs`, la scena o le scelte del GM: non a ogni movimento di token.
+    [view.fogs, view.campaignId, view.viewer.role, scene, controls.viewAs, controls.veil]
+  );
+  const mapWalls = useMemo(() => (scene ? toMapWalls(view.walls, scene.id) : []), [view.walls, scene]);
+  const sight = useSight(view, scene, controls.sight);
+  const mapScene = useMemo(
+    () => (scene ? toMapScene(view, scene, { fog: mapFog, walls: mapWalls, wallsVisible: perms.isGm ? controls.walls || wallTool : true, sight }) : null),
+    [view, scene, mapFog, mapWalls, controls.walls, wallTool, perms.isGm, sight]
+  );
+  const hasVisionToken = useMemo(() => (scene ? view.tokens.some((t) => t.sceneId === scene.id && t.vision) : false), [view.tokens, scene]);
+  const selectedWall = useMemo(() => mapWalls.find((w) => w.id === controls.selectedWall) ?? null, [mapWalls, controls.selectedWall]);
   const sceneTokens = useMemo(() => (scene ? tokensOfScene(view, scene.id) : []), [view, scene]);
 
   // Cambio scena o dimensioni: la mappa si adatta di nuovo allo schermo.
@@ -107,6 +129,26 @@ function LiveTable({ user, view, actions }: LiveProps) {
     (id: string, deg: number) => void run({ type: "token.update", tokenId: id, patch: { rotation: ((deg % 360) + 360) % 360 } }),
     [run]
   );
+
+  // Strumenti della nebbia e dei muri: solo comandi, la nebbia vera la decide il server.
+  const sceneId = scene?.id ?? null;
+  const targetIds = validTargets(controls.target, players.map((p) => p.userId));
+  const targetKey = targetIds.join(",");
+  const onFogShape = useCallback(
+    (shape: FogShape, mode: FogMode) => {
+      if (sceneId) void run(fogShapeCommand(mode, sceneId, shape, fogTarget(targetKey ? targetKey.split(",") : [])));
+    },
+    [run, sceneId, targetKey]
+  );
+  const onWallAdd = useCallback(
+    (a: Point, b: Point, door: boolean) => {
+      const cmd = sceneId ? wallAddCommand(crypto.randomUUID(), sceneId, a, b, door) : null;
+      if (cmd) void run(cmd);
+    },
+    [run, sceneId]
+  );
+  const onWallUpdate = useCallback((id: string, patch: WallPatch) => void run(wallUpdateCommand(id, patch)), [run]);
+  const onWallRemove = useCallback((id: string) => void run(wallRemoveCommand(id)), [run]);
 
   const selectedToken = selected.length === 1 ? (view.tokens.find((t) => t.id === selected[0]) ?? null) : null;
 
@@ -149,6 +191,16 @@ function LiveTable({ user, view, actions }: LiveProps) {
       icon: <ScrollText size={16} />,
       content: <SheetsPanel onOpened={closeSheet} />
     },
+    ...(perms.isGm && scene
+      ? [
+          {
+            id: "fog",
+            label: "Nebbia",
+            icon: <CloudFog size={16} />,
+            content: <FogPanel view={view} scene={scene} controls={controls} />
+          }
+        ]
+      : []),
     ...(perms.canManageScenes
       ? [
           {
@@ -186,6 +238,23 @@ function LiveTable({ user, view, actions }: LiveProps) {
             onResizeToken={perms.isGm ? onResizeToken : undefined}
             onRotateToken={perms.isGm ? onRotateToken : undefined}
             onSelectionChange={setSelected}
+            onFogShape={perms.isGm ? onFogShape : undefined}
+            onWallAdd={perms.isGm ? onWallAdd : undefined}
+            onWallUpdate={perms.isGm ? onWallUpdate : undefined}
+            onWallRemove={perms.isGm ? onWallRemove : undefined}
+            onWallSelect={controls.setSelectedWall}
+            onToolStateChange={controls.setTool}
+          />
+          <FogToolbar
+            canvas={mapRef}
+            controls={controls}
+            isGm={perms.isGm}
+            hasFog={fogView !== null}
+            players={players}
+            selectedWall={selectedWall}
+            hasVisionToken={hasVisionToken}
+            onWallPatch={onWallUpdate}
+            onWallRemove={onWallRemove}
           />
           {perms.isGm && !scene.map ? (
             <Material thickness="regular" className="a-map__hint">

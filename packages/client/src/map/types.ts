@@ -1,3 +1,6 @@
+import type { FogMask, FogShape, WallPatch } from "@lanterna/shared";
+import type { FogMode } from "../fog/fogLogic";
+
 /** Tipi pubblici del canvas della mappa. Tutte le coordinate di mappa sono in pixel dell'immagine di sfondo. */
 
 export interface Point {
@@ -92,6 +95,48 @@ export interface MapToken {
 
 export type MapRole = "gm" | "player";
 
+/** Tessera della mappa servita dal server (solo giocatori, scene con nebbia). */
+export interface MapTile {
+  /** `col,row` */
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Cambia quando cambia la copertura: la tessera si ricarica. */
+  key: string;
+  url: string;
+}
+
+/** Nebbia da disegnare. Il canvas non decide nulla: mostra la maschera che il padre gli passa. */
+export interface MapFog {
+  sceneId: string;
+  /** Griglia della nebbia (indipendente da quella della scena). */
+  geometry: { cellSize: number; offsetX: number; offsetY: number };
+  /** Maschera da disegnare: quella del giocatore, oppure per il GM quella che sta controllando. `null` = nessun velo. */
+  mask: FogMask | null;
+  /** Giocatore: velo opaco. GM: velo in trasparenza. */
+  opaque: boolean;
+  /** Tessere da mostrare come sfondo (giocatore). Vuoto per il GM, che ha la mappa intera. */
+  tiles: readonly MapTile[];
+}
+
+/** Muro o porta: il GM riceve un solo segmento, il giocatore i pezzi nelle celle rivelate. */
+export interface MapWall {
+  id: string;
+  door: boolean;
+  open: boolean;
+  /** `x1, y1, x2, y2, ...` */
+  segments: readonly number[];
+}
+
+/** Aiuto visivo: area vista da un token (non modifica la nebbia). */
+export interface MapSight {
+  tokenId: string;
+  polygon: readonly number[];
+  light: { bright: readonly number[]; dim: readonly number[] } | null;
+}
+
 export type RulerMode = "euclidean" | "grid";
 
 /** Parte "dati" delle props: tutto cio' che descrive la scena. */
@@ -103,6 +148,13 @@ export interface MapScene {
   role: MapRole;
   /** Token che l'utente corrente puo' spostare (il server rifiuta comunque gli altri). */
   movableTokenIds: readonly string[];
+  /** Nebbia di guerra (assente = scena senza nebbia). */
+  fog?: MapFog | null;
+  walls?: readonly MapWall[];
+  /** Mostra i muri (il GM puo' nasconderli). Default true. */
+  wallsVisible?: boolean;
+  /** Aiuto visivo della vista dei token. Assente = nascosto. */
+  sight?: readonly MapSight[];
   /** Misura del righello: Euclidea (default) o a griglia (diagonali = cella, come in 5e). */
   rulerMode?: RulerMode;
 }
@@ -116,4 +168,13 @@ export interface MapHandlers {
   onRotateToken?: (id: string, rotation: number) => void;
   onSelectionChange?: (ids: readonly string[]) => void;
   onViewportChange?: (viewport: Viewport) => void;
+  /** Solo GM: il pennello della nebbia e' stato rilasciato. */
+  onFogShape?: (shape: FogShape, mode: FogMode) => void;
+  /** Solo GM: nuovo muro o porta (estremi gia' agganciati). */
+  onWallAdd?: (a: Point, b: Point, door: boolean) => void;
+  /** Solo GM: modifica di un muro (estremo spostato, porta aperta/chiusa). */
+  onWallUpdate?: (id: string, patch: WallPatch) => void;
+  onWallRemove?: (id: string) => void;
+  /** Muro selezionato nello strumento muri (`null` = nessuno). */
+  onWallSelect?: (id: string | null) => void;
 }
