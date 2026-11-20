@@ -1,3 +1,5 @@
+// Pixi 8 senza questo import richiede 'unsafe-eval' nella CSP di produzione.
+import "pixi.js/unsafe-eval";
 import { Application, CanvasSource, Container, Graphics, ImageSource, Sprite, Text, Texture } from "pixi.js";
 import { parseCssColor } from "./color";
 import type { MapController } from "./controller";
