@@ -192,6 +192,26 @@ export const chatEntry = sqliteTable(
   (t) => [index("chat_entry_campaign_seq_idx").on(t.campaignId, t.seq)],
 );
 
+/**
+ * Contenuti di gioco importati nell'istanza (M5): mostri, oggetti, incantesimi, ... Mai nel repo.
+ * `data` è JSON arbitrario ma validato in ingresso (profondità, dimensione, niente HTML).
+ * `key` = SHA-256 di (kind, nome minuscolo, source, campagna): rende l'importazione idempotente.
+ */
+export const content = sqliteTable(
+  "content",
+  {
+    id: text("id").primaryKey(),
+    key: text("key").notNull().unique(),
+    kind: text("kind").$type<"monster" | "item" | "spell" | "class" | "species" | "note" | "altro">().notNull(),
+    name: text("name").notNull(),
+    data: text("data").notNull(),
+    source: text("source").notNull().default(""),
+    campaignId: text("campaign_id").references(() => campaign.id, { onDelete: "cascade" }),
+    ...timestamps,
+  },
+  (t) => [index("content_kind_name_idx").on(t.kind, t.name), index("content_campaign_idx").on(t.campaignId)],
+);
+
 export const schema = {
   user,
   session,
@@ -204,4 +224,5 @@ export const schema = {
   campaignEvent,
   asset,
   chatEntry,
+  content,
 };

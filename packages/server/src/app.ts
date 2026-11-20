@@ -11,6 +11,7 @@ import { openDatabase, type Database } from "./db/client.js";
 import { originGuard } from "./security.js";
 import { campaignRoutes } from "./campaigns/routes.js";
 import { chatRoutes } from "./chat/routes.js";
+import { contentRoutes } from "./content/routes.js";
 import { randomInt as cryptoRandomInt } from "./dice/crypto-rng.js";
 import { Hub, CLOSE } from "./realtime/hub.js";
 import { attachRealtime } from "./realtime/server.js";
@@ -90,6 +91,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       await campaignRoutes(api, hub);
       await chatRoutes(api, hub);
       await uploadRoutes(api, config);
+      await contentRoutes(api, config);
     },
     { prefix: config.apiPrefix },
   );

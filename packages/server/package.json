@@ -12,7 +12,8 @@
     "db:generate": "drizzle-kit generate",
     "create-admin": "tsx src/scripts/create-admin.ts",
     "backup": "node dist/scripts/backup.js",
-    "restore": "node dist/scripts/restore.js"
+    "restore": "node dist/scripts/restore.js",
+    "import-content": "node dist/scripts/import-content.js"
   },
   "dependencies": {
     "@fastify/compress": "^9.3.0",
