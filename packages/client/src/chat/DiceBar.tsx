@@ -99,7 +99,6 @@ export function DiceBar({ isGm, targets }: DiceBarProps) {
             key={s}
             type="button"
             className="a-dice__die"
-            disabled={busy}
             aria-label={`Tira un d${s}${s === 20 && composer.advantage !== "normal" ? (composer.advantage === "advantage" ? " con vantaggio" : " con svantaggio") : ""}`}
             onClick={() => void run(`1d${s}`, { advantage: s === 20 })}
           >

@@ -12,50 +12,15 @@ import { createTable } from "../../server/src/test/campaign";
 import { listen } from "../../server/src/test/ws";
 import { RealtimeClient, type SocketLike } from "../src/realtime/RealtimeClient";
 
+import { clients, closeConnections, connect, sockets, until } from "./helpers";
+
 let ctx: TestContext | undefined;
-const sockets: WebSocket[] = [];
-const clients: RealtimeClient[] = [];
 
 afterEach(async () => {
-  for (const c of clients.splice(0)) c.stop();
-  for (const s of sockets.splice(0)) s.terminate();
+  closeConnections();
   await ctx?.close();
   ctx = undefined;
 });
-
-interface Player {
-  client: RealtimeClient;
-  traffic: string[];
-  sockets: WebSocket[];
-}
-
-function connect(port: number, campaignId: string, cookie: string): Player {
-  const traffic: string[] = [];
-  const mine: WebSocket[] = [];
-  const client = new RealtimeClient({
-    campaignId,
-    url: `ws://127.0.0.1:${port}/ws`,
-    backoff: { baseMs: 20, maxMs: 60 },
-    createSocket: (url) => {
-      const ws = new WebSocket(url, { headers: { cookie, origin: ORIGIN } });
-      ws.on("message", (d) => traffic.push(d.toString("utf8")));
-      sockets.push(ws);
-      mine.push(ws);
-      return ws as unknown as SocketLike;
-    }
-  });
-  clients.push(client);
-  client.start();
-  return { client, traffic, sockets: mine };
-}
-
-async function until(cond: () => boolean, what: string, ms = 5000): Promise<void> {
-  const end = Date.now() + ms;
-  while (!cond()) {
-    if (Date.now() > end) throw new Error(`timeout: ${what}`);
-    await new Promise((r) => setTimeout(r, 10));
-  }
-}
 
 const scene = (id: string): Scene => ({
   id,
