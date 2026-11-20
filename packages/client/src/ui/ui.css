@@ -123,7 +123,7 @@
 .l-popover { position: absolute; z-index: var(--z-popover); min-width: 12rem; max-width: min(22rem, calc(100vw - 2rem)); border-radius: var(--radius-lg); border: 0.5px solid var(--hairline); box-shadow: var(--shadow-lg); padding: var(--space-3); opacity: 0; transform: scale(0.95); transition: transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); }
 .l-popover--menu { padding: var(--space-1); min-width: 13.5rem; }
 /* Il popover sta quasi sempre dentro la barra, che ha già un backdrop-filter: lì il suo non sfoca nulla e il contenuto sotto traspare nitido. Resta pieno. */
-.l-popover.l-material { background: var(--material-opaque); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.l-popover.l-material { color: var(--label); background: var(--material-opaque); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .l-popover[data-state="open"] { opacity: 1; transform: scale(1); }
 .l-popover[data-state="closed"] { transition-duration: 100ms; }
 .l-popover[data-placement^="bottom"] { top: calc(100% + 6px); }
@@ -140,7 +140,7 @@
 .l-popover--fixed { position: fixed; transform-origin: top left; }
 
 .l-menu { display: flex; flex-direction: column; }
-.l-menu__item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: var(--hit-min); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm); background: none; text-align: left; font-size: var(--text-body); cursor: pointer; }
+.l-menu__item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: var(--hit-min); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm); background: none; color: var(--label); text-align: left; font-size: var(--text-body); cursor: pointer; }
 .l-menu__item:focus-visible { outline: none; background: var(--tint-solid); color: #fff; }
 .l-menu__item:active { background: var(--fill-tertiary); }
 .l-menu__item--destructive { color: var(--red); }
@@ -215,6 +215,8 @@
 .l-banner__text { flex: 1; min-width: 0; }
 .l-banner__title { margin: 0; font-size: var(--text-subhead); font-weight: 600; }
 .l-banner__body { margin: 2px 0 0; font-size: var(--text-footnote); color: var(--label-secondary); }
+/* Banner senza titolo: il messaggio è l'unica informazione, quindi testo pieno e leggibile (anche su sfondo rosso). */
+.l-banner__body:first-child { margin: 0; font-size: var(--text-subhead); color: var(--label); }
 
 /* ---------- Lista inset grouped ---------- */
 .l-listgroup { margin: 0 0 var(--space-6); }

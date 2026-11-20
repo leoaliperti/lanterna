@@ -103,4 +103,8 @@
 .a-chip:disabled { opacity: 0.5; }
 
 /* Creazione della prima campagna */
-.a-onboard { display: grid; gap: var(--space-4); width: min(100%, 24rem); margin: 0 auto; }
+.a-onboard { display: grid; gap: var(--space-4); width: min(100%, 24rem); margin: 0 auto; padding: var(--space-6); border-radius: var(--radius-xl); background: var(--bg-grouped-secondary); box-shadow: var(--shadow-md); }
+.a-onboard .a-empty { padding: 0; }
+/* Il selettore colore non deve occupare tutta la riga. */
+.a-form .l-field__box:has(input[type="color"]) { width: 5rem; }
+.a-form .l-field__input[type="color"] { padding: var(--space-1) 0; cursor: pointer; }

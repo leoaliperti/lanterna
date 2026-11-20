@@ -59,7 +59,7 @@
   box-shadow: 0 0.5px 0 var(--separator);
   border-radius: 0;
 }
-.a-topbar__title { display: grid; min-width: 0; line-height: 1.15; }
+.a-topbar__title { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; line-height: 1.15; }
 .a-topbar__campaign { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .a-topbar__actions { display: flex; align-items: center; gap: var(--space-1); }
 
