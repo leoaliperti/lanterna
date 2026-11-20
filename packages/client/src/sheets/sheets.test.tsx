@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PROTOCOL_VERSION, blankDoc, snapshotOf, viewFor, type Actor, type SheetDoc, type SheetRecord, type SheetSummary } from "@lanterna/shared";
+import { PROTOCOL_VERSION, blankDoc, snapshotOf, viewFor, type Actor, type SheetDoc, type SheetRecord } from "@lanterna/shared";
 import type { SessionUser } from "../api/client";
 import { FakeSocket } from "../realtime/fakeSocket";
 import { RealtimeClient } from "../realtime/RealtimeClient";
