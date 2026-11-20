@@ -3,6 +3,8 @@ import {
   normalizeDegrees, normalizeRect, resolveDropPosition, screenToMap, sizeFromHandle, snapAngle, snapAxis, tokenRadius,
   tokensInRect, zoomAt
 } from "./geometry";
+import { DrawTools, type WallMode } from "./drawTools";
+import type { FogBrush, FogMode } from "../fog/fogLogic";
 import type { MapHandlers, MapScene, MapToken, Point, Rect, Size, Viewport } from "./types";
 
 /**
@@ -24,7 +26,15 @@ export interface PointerInput {
   alt?: boolean;
 }
 
-export type Tool = "select" | "ruler";
+export type Tool = "select" | "ruler" | "fog" | "wall";
+
+/** Stato degli strumenti GM, per la barra fuori dal canvas. */
+export interface ToolState {
+  tool: Tool;
+  fogBrush: FogBrush;
+  fogMode: FogMode;
+  wallMode: WallMode;
+}
 
 export interface RulerState {
   a: Point;
@@ -51,6 +61,8 @@ type Gesture =
   | { kind: "ruler"; id: number }
   | { kind: "rotate"; id: number; tokenId: string }
   | { kind: "resize"; id: number; tokenId: string }
+  | { kind: "draw"; id: number; tool: "fog" | "wall" }
+  | { kind: "doorTap"; id: number; wallId: string; start: Point }
   | { kind: "pinch" };
 
 export class MapController {
@@ -59,6 +71,8 @@ export class MapController {
   onCursor: (cursor: string) => void = () => {};
   onRuler: (text: string | null) => void = () => {};
   onTool: (tool: Tool) => void = () => {};
+  /** Cambia qualcosa negli strumenti GM (strumento, pennello, modo): la barra si aggiorna. */
+  onToolState: (state: ToolState) => void = () => {};
 
   scene: MapScene | null = null;
   size: Size = { width: 0, height: 0 };
@@ -74,6 +88,14 @@ export class MapController {
   /** Rettangolo di selezione in coordinate schermo. */
   marquee: Rect | null = null;
   ruler: RulerState | null = null;
+
+  /** Pennelli della nebbia e muri (solo GM). */
+  readonly draw = new DrawTools({
+    scene: () => this.scene,
+    scale: () => this.viewport.scale,
+    handlers: () => this.handlers,
+    invalidate: () => this.invalidate()
+  });
 
   private pointers = new Map<number, Point>();
   private gesture: Gesture | null = null;
@@ -115,6 +137,8 @@ export class MapController {
       const id = g.kind === "token" ? g.grabbed : g.tokenId;
       if (!this.tokensById.has(id) || (g.kind !== "token" && scene.role !== "gm")) this.cancelGesture();
     }
+    this.draw.sync();
+    if ((this.tool === "fog" && !scene.fog) || ((this.tool === "fog" || this.tool === "wall") && scene.role !== "gm")) this.setTool("select");
     this.invalidate();
   }
 
@@ -124,11 +148,36 @@ export class MapController {
     this.invalidate();
   }
 
+  get toolState(): ToolState {
+    return { tool: this.tool, fogBrush: this.draw.fogBrush, fogMode: this.draw.fogMode, wallMode: this.draw.wallMode };
+  }
+
+  setFogBrush(brush: FogBrush) {
+    this.draw.setFogBrush(brush);
+    this.onToolState(this.toolState);
+  }
+
+  setFogMode(mode: FogMode) {
+    this.draw.setFogMode(mode);
+    this.onToolState(this.toolState);
+  }
+
+  setWallMode(mode: WallMode) {
+    this.draw.setWallMode(mode);
+    this.onToolState(this.toolState);
+  }
+
   setTool(tool: Tool) {
+    if ((tool === "fog" || tool === "wall") && (this.scene?.role !== "gm" || (tool === "fog" && !this.scene.fog))) return;
     if (this.tool === tool) return;
     this.tool = tool;
     this.onTool(tool);
-    if (tool === "select") this.clearRuler();
+    this.onToolState(this.toolState);
+    if (tool !== "fog" && tool !== "wall") {
+      this.draw.cancel();
+      this.draw.select(null);
+    } else this.draw.cancel();
+    if (tool !== "ruler") this.clearRuler();
     this.updateCursor();
     this.invalidate();
   }
@@ -230,7 +279,10 @@ export class MapController {
       this.gesture = { kind: "pan", id: e.id, x: e.x, y: e.y, moved: false, clearOnTap: false };
     } else if (e.button === 0) {
       const m = this.toMap(p);
-      if (this.tool === "ruler") {
+      if ((this.tool === "fog" || this.tool === "wall") && this.scene.role === "gm") {
+        if (this.draw.begin(this.tool, e, m)) this.gesture = { kind: "draw", id: e.id, tool: this.tool };
+        else if (touchLike) this.gesture = { kind: "pan", id: e.id, x: e.x, y: e.y, moved: false, clearOnTap: false };
+      } else if (this.tool === "ruler") {
         this.gesture = { kind: "ruler", id: e.id };
         const a = this.rulerPoint(m);
         this.setRuler(a, a);
@@ -248,6 +300,9 @@ export class MapController {
             this.emitSelection();
           }
           this.gesture = { kind: "token", id: e.id, start: p, grabbed: hit.id, wasSelected, additive, started: false, origins: new Map() };
+        } else if (this.scene.role === "gm" && this.scene.wallsVisible !== false && this.draw.doorAt(m)) {
+          // Un clic su una porta la apre o la chiude (anche con lo strumento di selezione).
+          this.gesture = { kind: "doorTap", id: e.id, wallId: this.draw.doorAt(m)!.id, start: p };
         } else if (touchLike) {
           this.gesture = { kind: "pan", id: e.id, x: e.x, y: e.y, moved: false, clearOnTap: true };
         } else {
@@ -265,6 +320,10 @@ export class MapController {
     const p = { x: e.x, y: e.y };
     if (prev) this.pointers.set(e.id, p);
     const g = this.gesture;
+    if (!g && this.scene && this.scene.role === "gm" && (this.tool === "fog" || this.tool === "wall")) {
+      this.draw.move(this.tool, e, this.toMap(p));
+      return;
+    }
     if (!g || !this.scene) return;
 
     if (g.kind === "pinch") {
@@ -283,6 +342,11 @@ export class MapController {
     if (g.id !== e.id) return;
 
     switch (g.kind) {
+      case "draw":
+        this.draw.move(g.tool, e, this.toMap(p));
+        break;
+      case "doorTap":
+        break;
       case "pan": {
         const dx = e.x - g.x;
         const dy = e.y - g.y;
@@ -365,6 +429,13 @@ export class MapController {
     this.gesture = null;
 
     switch (g.kind) {
+      case "draw":
+        this.draw.end(g.tool, e, this.toMap({ x: e.x, y: e.y }));
+        this.onToolState(this.toolState);
+        break;
+      case "doorTap":
+        if (Math.hypot(e.x - g.start.x, e.y - g.start.y) < DRAG_THRESHOLD_TOUCH) this.draw.toggleDoor(g.wallId);
+        break;
       case "token":
         if (g.started) {
           for (const [id, pos] of this.preview) {
@@ -433,6 +504,22 @@ export class MapController {
   /** Ritorna true se il tasto e' stato gestito (il chiamante fa preventDefault). */
   keyDown(key: string, shift = false): boolean {
     if (!this.scene) return false;
+    if (this.scene.role === "gm") {
+      if ((this.tool === "fog" || this.tool === "wall") && this.draw.key(this.tool, key)) {
+        this.onToolState(this.toolState);
+        return true;
+      }
+      const toggle = (t: Tool) => {
+        this.setTool(this.tool === t ? "select" : t);
+        return true;
+      };
+      if (key === "v" || key === "V") {
+        this.setTool("select");
+        return true;
+      }
+      if (key === "n" || key === "N") return this.scene.fog ? toggle("fog") : false;
+      if (key === "w" || key === "W") return toggle("wall");
+    }
     switch (key) {
       case " ":
         this.spaceDown = true;
@@ -454,6 +541,12 @@ export class MapController {
         this.setTool(this.tool === "ruler" ? "select" : "ruler");
         return true;
       case "Escape": {
+        if (this.tool === "fog" || this.tool === "wall") {
+          if (!this.draw.cancel()) this.setTool("select");
+          this.onToolState(this.toolState);
+          this.invalidate();
+          return true;
+        }
         const had = this.gesture || this.ruler || this.selection.size;
         if (this.gesture) this.cancelGesture();
         this.clearRuler();
@@ -542,6 +635,7 @@ export class MapController {
 
   private cancelGesture() {
     const wasRuler = this.gesture?.kind === "ruler";
+    if (this.gesture?.kind === "draw") this.draw.abortGesture();
     this.gesture = null;
     this.clearTransient();
     if (wasRuler) this.clearRuler();
@@ -564,7 +658,7 @@ export class MapController {
     if (g?.kind === "pan" || g?.kind === "pinch") c = "grabbing";
     else if (g?.kind === "token" && g.started) c = "grabbing";
     else if (this.spaceDown) c = "grab";
-    else if (this.tool === "ruler") c = "crosshair";
+    else if (this.tool === "ruler" || this.tool === "fog" || this.tool === "wall") c = "crosshair";
     this.onCursor(c);
   }
 }

@@ -9,6 +9,7 @@ export interface MapTheme {
   red: number;
   green: number;
   orange: number;
+  yellow: number;
   gray: number;
   /** Sfondo della mappa mentre l'immagine carica. */
   surface: number;
@@ -17,11 +18,11 @@ export interface MapTheme {
 }
 
 const FALLBACK: MapTheme = {
-  tint: 0x007aff, onTint: 0xffffff, label: 0x000000, red: 0xd70015, green: 0x248a3d, orange: 0xc93400, gray: 0x8e8e93, surface: 0xd1d1d6, scrim: 0x1c1c1e
+  tint: 0x007aff, onTint: 0xffffff, label: 0x000000, red: 0xd70015, green: 0x248a3d, orange: 0xc93400, yellow: 0xffd60a, gray: 0x8e8e93, surface: 0xd1d1d6, scrim: 0x1c1c1e
 };
 
 const VARS: Record<keyof MapTheme, string> = {
-  tint: "--tint", onTint: "--on-tint", label: "--label", red: "--red", green: "--green", orange: "--orange", gray: "--gray", surface: "--bg-tertiary", scrim: "--bg-grouped-secondary"
+  tint: "--tint", onTint: "--on-tint", label: "--label", red: "--red", green: "--green", orange: "--orange", yellow: "--yellow", gray: "--gray", surface: "--bg-tertiary", scrim: "--bg-grouped-secondary"
 };
 
 /**
