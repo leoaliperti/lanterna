@@ -14,6 +14,8 @@ export function commandErrorToast(failure: Pick<Failure, "code" | "message">): T
       return { title: "Qualcosa e' cambiato", message: "Lo stato del tavolo e' cambiato nel frattempo: controlla e riprova.", tone: "warning" };
     case "NOT_FOUND":
       return { title: "Non trovato", message: "L'elemento non esiste piu' o non e' disponibile.", tone: "warning" };
+    case "RATE_LIMITED":
+      return { title: "Troppo in fretta", message: "Hai inviato troppe richieste ravvicinate. Aspetta qualche secondo.", tone: "warning" };
     case "OFFLINE":
       return { title: "Sei offline", message: "Il comando non e' stato inviato. Riprova appena torni online.", tone: "warning" };
     case "TIMEOUT":
