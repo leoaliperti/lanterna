@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bench:map": "tsx src/map/bench/logic-bench.ts"
   },
   "dependencies": {
     "@lanterna/shared": "*",

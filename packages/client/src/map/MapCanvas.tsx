@@ -36,7 +36,7 @@ export function MapCanvas({
   background, grid, scale, tokens, role, movableTokenIds, rulerMode,
   onMoveToken, onResizeToken, onRotateToken, onSelectionChange, onViewportChange
 }: MapCanvasProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const readoutRef = useRef<HTMLParagraphElement>(null);
   const viewRef = useRef<PixiMapView | null>(null);
@@ -88,13 +88,20 @@ export function MapCanvas({
 
   // Ciclo di vita: WebGL, resa, input, ridimensionamento.
   useEffect(() => {
-    const canvas = canvasRef.current;
     const host = hostRef.current;
-    if (!canvas || !host) return;
+    if (!host) return;
     if (!isWebGLAvailable()) {
       setStatus("unavailable");
       return;
     }
+    // Un canvas nuovo a ogni montaggio: distruggere PixiJS fa perdere il contesto WebGL, e un canvas
+    // con contesto perso non e' riutilizzabile (succede con il doppio montaggio di StrictMode).
+    const canvas = document.createElement("canvas");
+    canvas.className = "lanterna-map__canvas";
+    canvas.tabIndex = 0;
+    canvas.setAttribute("role", "application");
+    host.prepend(canvas);
+    canvasRef.current = canvas;
     let cancelled = false;
     let observer: ResizeObserver | null = null;
     let unbind: (() => void) | null = null;
@@ -122,6 +129,7 @@ export function MapCanvas({
         }
         view = v;
         viewRef.current = v;
+        v.attach();
         unbind = bindCanvasInput(canvas, controller);
         const fit = () => v.resize(host.clientWidth, host.clientHeight);
         fit();
@@ -144,7 +152,8 @@ export function MapCanvas({
       unbind?.();
       view?.dispose();
       viewRef.current = null;
-      controller.onInvalidate = () => {};
+      canvas.remove();
+      canvasRef.current = null;
       controller.onCursor = () => {};
       controller.onRuler = () => {};
       controller.onTool = () => {};
@@ -153,19 +162,16 @@ export function MapCanvas({
 
   const unavailable = status === "unavailable";
   const gmNote = role === "gm" ? " Come GM puoi anche ruotare e ridimensionare i token selezionati." : "";
+  const description = `Trascina per spostare i token, rotella o pizzico per lo zoom, tasto centrale o due dita per scorrere. Frecce, più e meno, zero per adattare, R per il righello.${gmNote}`;
+  useEffect(() => {
+    canvasRef.current?.setAttribute("aria-label", label);
+    canvasRef.current?.setAttribute("aria-description", description);
+  }, [label, description, status]);
   const unit = scene.scale.unitLabel;
 
   return (
     <div className={["lanterna-map", className].filter(Boolean).join(" ")} data-status={status}>
       <div ref={hostRef} className="lanterna-map__stage" hidden={unavailable}>
-        <canvas
-          ref={canvasRef}
-          className="lanterna-map__canvas"
-          tabIndex={0}
-          role="application"
-          aria-label={label}
-          aria-description={`Trascina per spostare i token, rotella o pizzico per lo zoom, tasto centrale o due dita per scorrere. Frecce, più e meno, zero per adattare, R per il righello.${gmNote}`}
-        />
         <div className="lanterna-map__controls" role="toolbar" aria-label="Controlli della mappa" aria-orientation="vertical">
           <Material thickness="regular" className="lanterna-map__group">
             <IconButton label="Ingrandisci" icon={<Plus size={20} />} onClick={() => controller.zoomBy(1.25)} />

@@ -102,6 +102,7 @@ export class PixiMapView {
   private maxTexture = 4096;
 
   private cleanup: (() => void)[] = [];
+  private invalidateHook: () => void = () => {};
 
   private constructor(
     app: Application,
@@ -167,7 +168,12 @@ export class PixiMapView {
       mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"], subtree: true });
       this.cleanup.push(() => mo.disconnect());
     }
-    this.c.onInvalidate = () => this.requestRender();
+  }
+
+  /** Collega la vista al controller. Separato da create(): con il doppio montaggio di StrictMode una vista gia' scartata non deve rubare il gancio. */
+  attach() {
+    this.invalidateHook = () => this.requestRender();
+    this.c.onInvalidate = this.invalidateHook;
   }
 
   private applyTheme() {
@@ -214,7 +220,8 @@ export class PixiMapView {
     this.disposed = true;
     if (this.raf) cancelAnimationFrame(this.raf);
     this.cleanup.forEach((f) => f());
-    this.c.onInvalidate = () => {};
+    // Solo se il gancio e' ancora il nostro: un'altra vista potrebbe essersi collegata nel frattempo (StrictMode).
+    if (this.c.onInvalidate === this.invalidateHook) this.c.onInvalidate = () => {};
     for (const v of [...this.views.values()]) this.destroyView(v);
     this.views.clear();
     this.clearBackground();
@@ -566,6 +573,7 @@ export class PixiMapView {
   private frame = (now: number) => {
     this.raf = 0;
     if (this.disposed) return;
+    const t0 = performance.now();
     const c = this.c;
     const scene = c.scene;
     const dt = this.lastFrame ? Math.min(64, now - this.lastFrame) : 16;
@@ -625,6 +633,11 @@ export class PixiMapView {
     this.drawOverlay(s);
 
     this.app.renderer.render(this.app.stage);
+    if (import.meta.env.DEV) {
+      // Tempo CPU del frame (logica + invio dei comandi alla GPU), per il benchmark in pagina.
+      const g = globalThis as unknown as { __mapFrameMs?: number[] };
+      (g.__mapFrameMs ??= []).push(performance.now() - t0);
+    }
     if (animating || pending) this.requestRender();
   };
 
