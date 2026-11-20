@@ -4,6 +4,15 @@ import { ErrorCodeSchema } from "../state/errors.js";
 import { ServerEventSchema } from "../state/filter.js";
 import { IdSchema } from "../state/schema.js";
 import { CampaignViewSchema } from "../state/view.js";
+import {
+  ChatMessageSchema,
+  ChatSendSchema,
+  DiceErrorCodeSchema,
+  HistoryMessageSchema,
+  HistoryRequestSchema,
+  RollRequestSchema,
+  RollResultSchema,
+} from "./chat.js";
 
 /**
  * Protocollo WebSocket di Lanterna, versione 1. Messaggi JSON, uno per frame.
@@ -47,24 +56,6 @@ export const RedoMessageSchema = z.strictObject({
   requestId: RequestIdSchema,
 });
 
-/** Segnaposto M4: chat con whisper. */
-export const ChatSendSchema = z.strictObject({
-  type: z.literal("chat.send"),
-  requestId: RequestIdSchema,
-  text: z.string().min(1).max(4000),
-  /** Destinatari del whisper; assente = tutti. */
-  whisperTo: z.array(IdSchema).max(32).optional(),
-});
-
-/** Segnaposto M4: richiesta di tiro. L'esito lo decide il server. */
-export const RollRequestSchema = z.strictObject({
-  type: z.literal("roll.request"),
-  requestId: RequestIdSchema,
-  formula: z.string().min(1).max(200),
-  /** Tiro segreto: visibile solo al GM (e a chi tira). */
-  secret: z.boolean().optional(),
-});
-
 export const PingSchema = z.strictObject({ type: z.literal("ping") });
 
 export const ClientMessageSchema = z.discriminatedUnion("type", [
@@ -74,6 +65,7 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
   RedoMessageSchema,
   ChatSendSchema,
   RollRequestSchema,
+  HistoryRequestSchema,
   PingSchema,
 ]);
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
@@ -117,27 +109,8 @@ export const ErrorMessageSchema = z.strictObject({
   requestId: RequestIdSchema.nullable(),
   code: ErrorCodeSchema,
   message: z.string(),
-});
-
-/** Segnaposto M4. */
-export const ChatMessageSchema = z.strictObject({
-  type: z.literal("chat.message"),
-  id: IdSchema,
-  fromUserId: IdSchema,
-  text: z.string(),
-  whisperTo: z.array(IdSchema).optional(),
-  at: z.number().int(),
-});
-
-/** Segnaposto M4: risultato di un tiro calcolato sul server. */
-export const RollResultSchema = z.strictObject({
-  type: z.literal("roll.result"),
-  id: IdSchema,
-  byUserId: IdSchema,
-  formula: z.string(),
-  total: z.number().int(),
-  secret: z.boolean(),
-  at: z.number().int(),
+  /** Dettaglio facoltativo: per una formula non valida, il codice del parser dei dadi. */
+  reason: DiceErrorCodeSchema.optional(),
 });
 
 export const PongSchema = z.strictObject({ type: z.literal("pong") });
@@ -149,6 +122,7 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   ErrorMessageSchema,
   ChatMessageSchema,
   RollResultSchema,
+  HistoryMessageSchema,
   PongSchema,
 ]);
 export type ServerMessage = z.infer<typeof ServerMessageSchema>;

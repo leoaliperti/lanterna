@@ -33,15 +33,19 @@ describe("parseClientMessage", () => {
     );
     expect(r.ok).toBe(true);
   });
-  it("accetta hello, undo, redo, ping e i segnaposto chat/tiro", () => {
+  it("accetta hello, undo, redo, ping, chat, tiri e cronologia", () => {
     for (const m of [
       { type: "hello", protocolVersion: PROTOCOL_VERSION, campaignId: "c", lastVersion: null, epoch: null },
       { type: "hello", protocolVersion: PROTOCOL_VERSION, campaignId: "c", lastVersion: 7, epoch: "e" },
       { type: "undo", requestId: "r" },
       { type: "redo", requestId: "r" },
       { type: "ping" },
-      { type: "chat.send", requestId: "r", text: "ciao", whisperTo: ["p2"] },
-      { type: "roll.request", requestId: "r", formula: "2d6+3", secret: true },
+      { type: "chat.send", requestId: "r", text: "ciao" },
+      { type: "chat.send", requestId: "r", text: "ciao", whisperTo: "gm" },
+      { type: "roll.request", requestId: "r", formula: "2d6+3", visibility: "public" },
+      { type: "roll.request", requestId: "r", formula: "d20 adv", visibility: "whisper", whisperTo: "gm", label: "Furtività" },
+      { type: "history.request", requestId: "r", before: null },
+      { type: "history.request", requestId: "r", before: "e1", limit: 20 },
     ]) {
       expect(parseClientMessage(JSON.stringify(m)).ok, JSON.stringify(m)).toBe(true);
     }
