@@ -36,7 +36,7 @@ Ogni libreria o snippet copiato va elencato qui con licenza e fonte.
 
 Il design system del client (`packages/client/src/ui`) e' scritto da zero in CSS puro e React, senza librerie di animazione ne' primitive esterne; segue le Human Interface Guidelines di Apple come ispirazione, senza includere font, icone o asset Apple (si usa lo stack di sistema `-apple-system, system-ui`). Dettagli in [`docs/DESIGN.md`](docs/DESIGN.md); la gallery e' su `#/ui` in sviluppo.
 
-Le schermate del client (login, tavolo, gestione utenti) usano solo i componenti del design system. Il router e' un piccolo router a hash scritto da zero (`packages/client/src/router`): nessuna libreria aggiunta.
+Le schermate del client (login, tavolo, gestione utenti) usano solo i componenti del design system. Il tempo reale usa il `WebSocket` del browser e lo stato condiviso di `packages/shared`: nessuna libreria di stato aggiunta (solo `useSyncExternalStore`). `ws` e `@types/ws` sono dev-dependency del client solo per il test di integrazione (`packages/client/e2e`). Il router e' un piccolo router a hash scritto da zero (`packages/client/src/router`): nessuna libreria aggiunta.
 
 Non viene copiato codice da Owlbear Rodeo Legacy (licenza non commerciale).
 

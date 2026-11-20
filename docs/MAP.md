@@ -1,6 +1,6 @@
 # Canvas della mappa
 
-Il canvas vive in `packages/client/src/map` ed e' costruito con PixiJS (MIT, versione fissata). E' un componente React **controllato dalle props**: non usa la rete e non modifica mai i dati. Un adattatore allo stato condiviso (WebSocket) verra' scritto a parte.
+Il canvas vive in `packages/client/src/map` ed e' costruito con PixiJS (MIT, versione fissata). E' un componente React **controllato dalle props**: non usa la rete e non modifica mai i dati. L'adattatore allo stato condiviso (WebSocket) e' a parte: `packages/client/src/table/adapter.ts` (`toMapScene`), vedi "Client in tempo reale" in `docs/PROTOCOL.md`.
 
 Pagina di prova (solo sviluppo): `npm run dev`, poi `http://localhost:5173/#/map`. Con `#/map?bench` parte un test di carico (300 token, pan e zoom continui); `&big` usa la mappa 8000x6000. La mappa e i token sono generati proceduralmente.
 
