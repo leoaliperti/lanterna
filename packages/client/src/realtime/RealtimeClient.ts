@@ -4,6 +4,7 @@ import {
   applyDelta,
   type CampaignView,
   type Command,
+  type EntryVisibility,
   type ErrorCode,
   type ServerMessage
 } from "@lanterna/shared";
@@ -33,7 +34,21 @@ export interface RealtimeState {
 
 export type CommandResult =
   | { ok: true; version: number }
-  | { ok: false; code: ErrorCode | "OFFLINE" | "TIMEOUT"; message: string };
+  | {
+      ok: false;
+      code: ErrorCode | "OFFLINE" | "TIMEOUT";
+      message: string;
+      /** Codice del parser dei dadi, presente quando la formula non e' valida. */
+      reason?: string;
+    };
+
+/** Richiesta di un tiro: il client manda solo la formula, l'esito lo decide il server. */
+export interface RollOptions {
+  formula: string;
+  visibility: EntryVisibility;
+  whisperTo?: string;
+  label?: string;
+}
 
 export type RealtimeEvent =
   /** Errore non legato a una richiesta (messaggio illeggibile, rate limit). */
@@ -305,12 +320,19 @@ export class RealtimeClient {
         this.settle(msg.requestId, { ok: true, version: msg.version });
         return;
       case "error":
-        if (msg.requestId && this.settle(msg.requestId, { ok: false, code: msg.code, message: msg.message })) return;
+        if (msg.requestId && this.settle(msg.requestId, { ok: false, code: msg.code, message: msg.message, reason: msg.reason })) return;
         this.emit({ type: "error", code: msg.code, message: msg.message });
         return;
       case "pong":
         if (this.pongTimer) clearTimeout(this.pongTimer);
         this.pongTimer = null;
+        return;
+      case "chat.message":
+      case "roll.result":
+      case "history":
+        // Con `requestId` e' la conferma della richiesta fatta da questa connessione.
+        if (msg.requestId) this.settle(msg.requestId, { ok: true, version: this.state.view?.version ?? 0 });
+        this.emit({ type: "message", message: msg });
         return;
       default:
         this.emit({ type: "message", message: msg });
@@ -427,6 +449,29 @@ export class RealtimeClient {
 
   redo(): Promise<CommandResult> {
     return this.request((requestId) => ({ type: "redo", requestId }));
+  }
+
+  /** Messaggio di chat (testo semplice). `whisperTo` = userId del destinatario. */
+  sendChat(text: string, whisperTo?: string): Promise<CommandResult> {
+    return this.request((requestId) => ({ type: "chat.send", requestId, text, ...(whisperTo ? { whisperTo } : {}) }));
+  }
+
+  /** Chiede un tiro. L'esito arriva come `roll.result` dal server: qui non si calcola nulla. */
+  sendRoll(options: RollOptions): Promise<CommandResult> {
+    const { formula, visibility, whisperTo, label } = options;
+    return this.request((requestId) => ({
+      type: "roll.request",
+      requestId,
+      formula,
+      visibility,
+      ...(whisperTo ? { whisperTo } : {}),
+      ...(label ? { label } : {})
+    }));
+  }
+
+  /** Pagina di cronologia piu' vecchia della voce `before` (id). La pagina arriva come evento `history`. */
+  requestHistory(before: string | null, limit?: number): Promise<CommandResult> {
+    return this.request((requestId) => ({ type: "history.request", requestId, before, ...(limit ? { limit } : {}) }));
   }
 
   private settle(requestId: string, result: CommandResult): boolean {
