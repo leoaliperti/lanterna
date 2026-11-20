@@ -134,7 +134,7 @@ export function MapDemo() {
         p95Ms: Math.round((sorted[Math.floor(sorted.length * 0.95)] ?? 0) * 10) / 10,
         maxMs: Math.round((sorted[sorted.length - 1] ?? 0) * 10) / 10,
         tokens: tokens.length,
-        note: "Misurato nel browser corrente: con GPU reale e' rappresentativo, con rendering software (SwiftShader) e' solo un limite inferiore."
+        note: "Misurato nel browser corrente: con GPU reale è rappresentativo, con rendering software (SwiftShader) è solo un limite inferiore."
       };
       (window as unknown as { __mapBench?: BenchResult }).__mapBench = result;
       setBench(result);

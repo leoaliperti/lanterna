@@ -169,8 +169,8 @@ export function SceneForm({ open, onOpenChange, scene, onCreated }: SceneFormPro
         </div>
         <TextField label="Colore della griglia" type="color" value={draft.color} onChange={(e) => set("color", e.target.value)} />
         <div className="a-field-group">
-          <span className="t-footnote a-muted" id="grid-opacity">Opacita': {Math.round(draft.opacity * 100)}%</span>
-          <Slider aria-label="Opacita' della griglia" value={draft.opacity} onValueChange={(v) => set("opacity", v)} min={0} max={1} step={0.05} />
+          <span className="t-footnote a-muted" id="grid-opacity">Opacità: {Math.round(draft.opacity * 100)}%</span>
+          <Slider aria-label="Opacità della griglia" value={draft.opacity} onValueChange={(v) => set("opacity", v)} min={0} max={1} step={0.05} />
         </div>
         <Toggle label="Mostra la griglia" checked={draft.visible} onCheckedChange={(v) => set("visible", v)} />
         <Toggle label="Aggancia i token alla cella" checked={draft.snap} onCheckedChange={(v) => set("snap", v)} />
@@ -178,7 +178,7 @@ export function SceneForm({ open, onOpenChange, scene, onCreated }: SceneFormPro
         <h3 className="t-headline a-form__section">Scala</h3>
         <div className="a-form__pair">
           <NumberField label="Una cella vale" value={draft.unitsPerCell} onValueChange={(v) => set("unitsPerCell", v)} step={0.5} error={show(errors.units)} />
-          <TextField label="Unita'" value={draft.unit} onChange={(e) => set("unit", e.target.value)} error={show(errors.unit) ?? undefined} autoComplete="off" />
+          <TextField label="Unità" value={draft.unit} onChange={(e) => set("unit", e.target.value)} error={show(errors.unit) ?? undefined} autoComplete="off" />
         </div>
 
         <div className="a-form__actions">

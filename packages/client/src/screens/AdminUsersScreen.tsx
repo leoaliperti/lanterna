@@ -62,7 +62,7 @@ export function AdminUsersScreen() {
     try {
       const updated = await updateUserRole(target.id, role);
       setUsers((list) => list?.map((u) => (u.id === updated.id ? { ...u, role: updated.role } : u)) ?? list);
-      toast.show({ title: `${target.name} ora e' ${role === "admin" ? "admin" : "giocatore"}`, tone: "success" });
+      toast.show({ title: `${target.name} ora è ${role === "admin" ? "admin" : "giocatore"}`, tone: "success" });
     } catch (err) {
       setActionError(userErrorMessage(err));
     }
@@ -162,7 +162,7 @@ export function AdminUsersScreen() {
         <CreateUserForm
           onCreated={(created) => {
             setUsers((list) => (list ? [...list, created] : [created]));
-            toast.show({ title: "Utente creato", message: `${created.name} puo' accedere con la password che hai scelto.`, tone: "success" });
+            toast.show({ title: "Utente creato", message: `${created.name} può accedere con la password che hai scelto.`, tone: "success" });
             setCreateOpen(false);
           }}
         />
@@ -184,7 +184,7 @@ export function AdminUsersScreen() {
         open={deleteFor !== null}
         onOpenChange={(o) => !o && setDeleteFor(null)}
         title={deleteFor ? `Eliminare ${deleteFor.name}?` : "Eliminare?"}
-        message="L'account verra' rimosso e non potra' piu' accedere. L'azione non si puo' annullare."
+        message="L'account verrà rimosso e non potrà più accedere. L'azione non si può annullare."
         actions={[
           {
             label: "Elimina",
@@ -257,7 +257,7 @@ function CreateUserForm({ onCreated }: { onCreated: (user: PublicUser) => void }
       <div className="a-field-group">
         <p className="l-field__label">Ruolo</p>
         <SegmentedControl aria-label="Ruolo" options={ROLE_OPTIONS} value={role} onValueChange={setRole} />
-        <p className="t-footnote a-muted">{role === "admin" ? "L'admin e' il GM: gestisce utenti e tavolo." : "Il giocatore muove solo il proprio token."}</p>
+        <p className="t-footnote a-muted">{role === "admin" ? "L'admin è il GM: gestisce utenti e tavolo." : "Il giocatore muove solo il proprio token."}</p>
       </div>
       <Button type="submit" size="lg" fullWidth loading={busy}>
         Crea utente

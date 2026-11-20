@@ -17,7 +17,7 @@
 }
 
 /* Form */
-.a-form { display: grid; gap: var(--space-4); }
+.a-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
 .a-field-group { display: grid; gap: var(--space-2); }
 
 /* ---------- Login ---------- */
@@ -101,6 +101,8 @@
 /* ---------- Stato vuoto ---------- */
 .a-empty { display: grid; justify-items: center; gap: var(--space-2); max-width: 20rem; margin: 0 auto; padding: var(--space-8) var(--space-4); text-align: center; }
 .a-empty p { margin: 0; }
+/* Sulla mappa a puntini lo stato vuoto sta su una scheda piena: il testo non si mescola ai puntini. */
+.a-map > .a-empty { gap: var(--space-3); padding: var(--space-8) var(--space-6); border-radius: var(--radius-xl); background: var(--bg-grouped-secondary); box-shadow: var(--shadow-md); }
 .a-empty__icon { display: grid; place-items: center; width: 4.5rem; height: 4.5rem; margin-bottom: var(--space-2); border-radius: var(--radius-lg); background: var(--fill-tertiary); color: var(--label-secondary); }
 
 /* ---------- Pagina (gestione utenti) ---------- */
@@ -110,5 +112,7 @@
   margin: 0 auto;
   padding: var(--space-2) max(var(--space-4), var(--safe-right)) max(var(--space-8), var(--safe-bottom)) max(var(--space-4), var(--safe-left));
 }
+/* Su schermi larghi la barra e il titolo grande si allineano alla colonna dei contenuti. */
+.a-page .l-navbar__row, .a-page .l-navlarge { max-width: 44rem; margin-inline: auto; }
 .a-page__intro { margin-bottom: var(--space-5) !important; }
 .a-row-actions { display: inline-flex; align-items: center; gap: var(--space-1); }

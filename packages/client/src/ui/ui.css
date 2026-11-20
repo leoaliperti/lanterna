@@ -122,6 +122,8 @@
 
 .l-popover { position: absolute; z-index: var(--z-popover); min-width: 12rem; max-width: min(22rem, calc(100vw - 2rem)); border-radius: var(--radius-lg); border: 0.5px solid var(--hairline); box-shadow: var(--shadow-lg); padding: var(--space-3); opacity: 0; transform: scale(0.95); transition: transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); }
 .l-popover--menu { padding: var(--space-1); min-width: 13.5rem; }
+/* Il popover sta quasi sempre dentro la barra, che ha già un backdrop-filter: lì il suo non sfoca nulla e il contenuto sotto traspare nitido. Resta pieno. */
+.l-popover.l-material { background: var(--material-opaque); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .l-popover[data-state="open"] { opacity: 1; transform: scale(1); }
 .l-popover[data-state="closed"] { transition-duration: 100ms; }
 .l-popover[data-placement^="bottom"] { top: calc(100% + 6px); }

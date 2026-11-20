@@ -102,7 +102,7 @@ export class ChatStore {
 
   private onLive(entry: ChatLogEntry, isRoll: boolean): void {
     const next = applyLiveEntry(this.state, entry);
-    if (next === this.state) return; // gia' nota (dedup per id)
+    if (next === this.state) return; // già nota (dedup per id)
     const mine = entry.authorId === this.selfId;
     const notice = !mine && !this.state.panelVisible;
     this.set({

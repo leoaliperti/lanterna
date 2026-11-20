@@ -11,9 +11,9 @@ export function validateImageFile(file: Pick<File, "type" | "size" | "name">): F
   if (!(ACCEPTED_IMAGE_TYPES as readonly string[]).includes(file.type)) {
     return { ok: false, message: "Formato non supportato: usa un'immagine PNG, JPEG o WebP." };
   }
-  if (file.size === 0) return { ok: false, message: "Il file e' vuoto." };
+  if (file.size === 0) return { ok: false, message: "Il file è vuoto." };
   if (file.size > MAX_UPLOAD_BYTES) {
-    return { ok: false, message: `Il file pesa troppo (${formatBytes(file.size)}): il limite e' ${formatBytes(MAX_UPLOAD_BYTES)}.` };
+    return { ok: false, message: `Il file pesa troppo (${formatBytes(file.size)}): il limite è ${formatBytes(MAX_UPLOAD_BYTES)}.` };
   }
   return { ok: true };
 }

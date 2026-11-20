@@ -68,7 +68,7 @@ export async function request<T>(method: string, path: string, opts: RequestOpti
   if (!response.ok) {
     if (response.status === 401 && !opts.anonymous) unauthorizedHandler?.();
     const body = (data ?? {}) as Partial<ApiError> & { message?: string; code?: string };
-    const message = body.error ?? body.message ?? "Qualcosa e' andato storto. Riprova.";
+    const message = body.error ?? body.message ?? "Qualcosa è andato storto. Riprova.";
     throw new ApiRequestError(response.status, message, body.code);
   }
   return data as T;
@@ -154,9 +154,9 @@ export async function uploadImage(kind: UploadKind, file: File): Promise<UploadR
 export function uploadErrorMessage(err: unknown): string {
   if (err instanceof ApiRequestError) {
     if (err.status === 0) return err.message;
-    if (err.status === 413) return "L'immagine e' troppo grande (peso o dimensioni in pixel). Riduci l'immagine e riprova.";
+    if (err.status === 413) return "L'immagine è troppo grande (peso o dimensioni in pixel). Riduci l'immagine e riprova.";
     if (err.status === 415) return "Formato non supportato: usa un'immagine PNG, JPEG o WebP.";
-    if (err.status === 403) return "Solo il GM puo' caricare immagini.";
+    if (err.status === 403) return "Solo il GM può caricare immagini.";
     if (err.status === 429) return "Troppi caricamenti. Attendi un minuto e riprova.";
     if (err.status >= 500) return "Il server ha avuto un problema. Riprova fra poco.";
     return err.message;
@@ -184,13 +184,13 @@ export function userErrorMessage(err: unknown): string {
     if (err.status >= 500) return "Il server ha avuto un problema. Riprova fra poco.";
     return err.message;
   }
-  return "Qualcosa e' andato storto. Riprova.";
+  return "Qualcosa è andato storto. Riprova.";
 }
 
 export function passwordErrorMessage(err: unknown): string {
   if (err instanceof ApiRequestError) {
     if (err.status === 0 || err.status === 429 || err.status >= 500) return userErrorMessage(err);
-    if (err.status === 400 || err.status === 401) return "La password attuale non e' corretta, oppure la nuova non rispetta i requisiti.";
+    if (err.status === 400 || err.status === 401) return "La password attuale non è corretta, oppure la nuova non rispetta i requisiti.";
   }
   return userErrorMessage(err);
 }

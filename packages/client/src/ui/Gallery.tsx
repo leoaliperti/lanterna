@@ -150,14 +150,14 @@ function Showcase() {
               <Stepper label="giocatori" value={n} onValueChange={setN} min={1} max={8} />
             </div>
             <div className="g-row g-between">
-              <span>Unita' di misura</span>
-              <Picker label="Unita'" defaultValue="ft" options={[{ value: "ft", label: "Piedi" }, { value: "m", label: "Metri" }, { value: "sq", label: "Caselle" }]} />
+              <span>Unità di misura</span>
+              <Picker label="Unità" defaultValue="ft" options={[{ value: "ft", label: "Piedi" }, { value: "m", label: "Metri" }, { value: "sq", label: "Caselle" }]} />
             </div>
           </div>
         </Section>
 
         <Section title="Liste (inset grouped)">
-          <List header="Sessione" footer="Solo il GM puo' modificare questi valori.">
+          <List header="Sessione" footer="Solo il GM può modificare questi valori.">
             <ListRow leading={<MapIcon size={20} />} title="Mappa" subtitle="La Cripta Dimenticata" chevron onPress={() => undefined} />
             <ListRow leading={<Users size={20} />} title="Giocatori" trailing={<Badge>4</Badge>} chevron onPress={() => undefined} />
             <ListRow leading={<MessageSquare size={20} />} title="Chat" trailing="Attiva" />

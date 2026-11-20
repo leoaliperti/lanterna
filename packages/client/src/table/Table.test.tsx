@@ -158,7 +158,7 @@ describe("tavolo del GM", () => {
     await u.clear(within(dialog).getByLabelText("Attuali"));
     await u.type(within(dialog).getByLabelText("Attuali"), "50");
     await u.click(within(dialog).getByRole("button", { name: "Aggiungi" }));
-    expect(await within(dialog).findByText(/non puo' superare il massimo/)).toBeTruthy();
+    expect(await within(dialog).findByText(/non può superare il massimo/)).toBeTruthy();
     expect(sentOf("command")).toHaveLength(0);
   });
 
