@@ -18,7 +18,9 @@ import {
   type SceneView,
   type TokenView,
   type WallView,
+  projectCombat,
 } from "./view.js";
+import { CombatViewSchema, GroupSchema } from "./combat.js";
 
 /**
  * Eventi per un singolo utente (server -> client). Derivano SEMPRE dalle
@@ -57,6 +59,41 @@ export const ServerEventSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("wall.created"), wall: WallViewSchema }),
   z.strictObject({ type: z.literal("wall.updated"), wall: WallViewSchema }),
   z.strictObject({ type: z.literal("wall.deleted"), wallId: z.string() }),
+  /** Combattimento di una scena sostituito per intero (`null` = non c'è più o non lo vedi). */
+  z.strictObject({ type: z.literal("combat.updated"), sceneId: z.string(), combat: CombatViewSchema.nullable() }),
+  /** Gruppi di token: solo GM. */
+  z.strictObject({ type: z.literal("group.created"), group: GroupSchema }),
+  z.strictObject({ type: z.literal("group.updated"), group: GroupSchema }),
+  z.strictObject({ type: z.literal("group.deleted"), groupId: z.string() }),
+  /**
+   * Avvisi (M7), solo ai diretti interessati (GM e proprietario del token): non cambiano la vista, il client
+   * decide come mostrarli (es. una riga discreta nel tracker, un lampo sul token).
+   */
+  z.strictObject({
+    type: z.literal("combat.turn"),
+    sceneId: z.string(),
+    round: z.number().int(),
+    participantId: z.string(),
+    tokenId: z.string().nullable(),
+  }),
+  z.strictObject({
+    type: z.literal("effect.expiring"),
+    sceneId: z.string(),
+    round: z.number().int(),
+    tokenId: z.string(),
+    effectId: z.string(),
+    name: z.string(),
+    remaining: z.number().int(),
+  }),
+  z.strictObject({
+    type: z.literal("effect.expired"),
+    sceneId: z.string(),
+    round: z.number().int(),
+    tokenId: z.string(),
+    effectId: z.string(),
+    name: z.string(),
+    reason: z.enum(["elapsed", "combatEnded"]),
+  }),
 ]);
 export type ServerEvent = z.infer<typeof ServerEventSchema>;
 
@@ -134,6 +171,40 @@ function fogEvents(sceneId: string, b: FogView | null, a: FogView | null): Serve
  */
 export function filterEventFor(change: StateChange, viewer: Actor): ServerEvent[] {
   switch (change.type) {
+    case "combat": {
+      const b = projectCombat(change.before, change.tokensBefore, viewer, change.activeBefore, change.fogBefore);
+      const a = projectCombat(change.after, change.tokensAfter, viewer, change.activeAfter, change.fogAfter);
+      return deepEqual(a, b) ? [] : [{ type: "combat.updated", sceneId: change.sceneId, combat: a }];
+    }
+    case "group": {
+      if (!isGm(viewer)) return [];
+      const { before, after } = change;
+      if (!before && after) return [{ type: "group.created", group: after }];
+      if (before && !after) return [{ type: "group.deleted", groupId: before.id }];
+      return after && !deepEqual(before, after) ? [{ type: "group.updated", group: after }] : [];
+    }
+    case "notice": {
+      const n = change.notice;
+      // Destinatari: il GM e, se il token è suo e lo vede, il proprietario. Gli avvisi segreti solo al GM.
+      const gm = isGm(viewer);
+      const t = change.token;
+      const owner =
+        !gm &&
+        t !== null &&
+        t.ownerUserId === viewer.userId &&
+        canSeeToken(t, viewer, change.activeSceneId, change.fog) &&
+        !(n.kind !== "turn" && n.secret);
+      if (!gm && !owner) return [];
+      switch (n.kind) {
+        case "turn":
+          return [{ type: "combat.turn", sceneId: n.sceneId, round: n.round, participantId: n.participantId, tokenId: n.tokenId }];
+        case "expiring":
+          return [{ type: "effect.expiring", sceneId: n.sceneId, round: n.round, tokenId: n.tokenId, effectId: n.effectId, name: n.name, remaining: n.remaining }];
+        case "expired":
+          return [{ type: "effect.expired", sceneId: n.sceneId, round: n.round, tokenId: n.tokenId, effectId: n.effectId, name: n.name, reason: n.reason }];
+      }
+      return [];
+    }
     case "token": {
       const fog = change.fog ?? null;
       return tokenEvents(

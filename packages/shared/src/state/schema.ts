@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CombatSchema, EffectsSchema, GroupSchema, type Combat } from "./combat.js";
 import { FogSchema, type Fog } from "./fog.js";
 import { IdSchema, LIMITS } from "./limits.js";
 import { WallSchema, type Wall } from "./walls.js";
@@ -133,6 +134,10 @@ export const TokenSchema = z.strictObject({
   gmNotes: z.string().max(LIMITS.notesMaxLength),
   /** Facoltativo (assente nelle campagne precedenti a M6): vista e luce per l'aiuto visivo. */
   vision: TokenVisionSchema.nullable().optional(),
+  /** Facoltativo (M7): fazione ("nemici", "squadra A", ...), solo per selezionare; visibile solo al GM. */
+  faction: z.string().trim().min(1).max(LIMITS.nameMaxLength).nullable().optional(),
+  /** Facoltativo (M7): effetti temporanei con durata. */
+  effects: EffectsSchema.optional(),
 });
 export type Token = z.infer<typeof TokenSchema>;
 
@@ -153,6 +158,10 @@ export const CampaignStateSchema = z.strictObject({
   fogs: z.array(FogSchema).max(LIMITS.maxScenes).optional(),
   /** Muri e porte (M6), di tutte le scene. Facoltativo come `fogs`. */
   walls: z.array(WallSchema).max(LIMITS.maxWalls).optional(),
+  /** Combattimenti (M7), al più uno per scena. Facoltativo. */
+  combats: z.array(CombatSchema).max(LIMITS.maxScenes).optional(),
+  /** Gruppi salvati di token (M7), solo GM. Facoltativo. */
+  groups: z.array(GroupSchema).max(LIMITS.maxGroups).optional(),
 });
 export type CampaignState = z.infer<typeof CampaignStateSchema>;
 
@@ -194,6 +203,11 @@ export function createCampaignState(
 /** Nebbia della scena, se attiva. */
 export function fogOf(state: Pick<CampaignState, "fogs">, sceneId: string): Fog | null {
   return state.fogs?.find((f) => f.sceneId === sceneId) ?? null;
+}
+
+/** Combattimento della scena, se c'è. */
+export function combatOf(state: Pick<CampaignState, "combats">, sceneId: string): Combat | null {
+  return state.combats?.find((c) => c.sceneId === sceneId) ?? null;
 }
 
 /** Muri della scena, nell'ordine dello stato. */

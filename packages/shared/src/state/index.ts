@@ -11,3 +11,6 @@ export * from "./filter.js";
 export * from "./reducer.js";
 export * from "./history.js";
 export * from "./invariants.js";
+export * from "./combat.js";
+export * from "./combat-ops.js";
+export * from "./shapes.js";

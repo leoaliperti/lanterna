@@ -5,7 +5,7 @@ import { deepEqual } from "./filter.js";
 import { applyCommand, applyCommands } from "./reducer.js";
 import type { Actor, CampaignState, Scene, Token } from "./schema.js";
 import { canSeeToken, isGm } from "./view.js";
-import { fogOf } from "./schema.js";
+import { combatOf, fogOf } from "./schema.js";
 import type { Wall } from "./walls.js";
 
 /**
@@ -111,7 +111,16 @@ function changedKeys<T extends object>(before: T | null, after: T | null): (keyo
  */
 function checkExpect(state: CampaignState, expect: StateChange[], actor: Actor): CommandError | null {
   for (const c of expect) {
-    if (c.type === "token") {
+    if (c.type === "notice") continue;
+    if (c.type === "combat") {
+      // Cambiamento solo di visibilità (il combattimento non è cambiato): non dice nulla su cosa ha lasciato l'azione.
+      if (deepEqual(c.before, c.after)) continue;
+      if (!deepEqual(combatOf(state, c.sceneId), c.after)) return { code: "CONFLICT", message: MESSAGES.stale };
+    } else if (c.type === "group") {
+      const id = (c.after ?? c.before)?.id;
+      const cur = (state.groups ?? []).find((g) => g.id === id) ?? null;
+      if (!deepEqual(cur, c.after)) return { code: "CONFLICT", message: MESSAGES.stale };
+    } else if (c.type === "token") {
       const id = (c.after ?? c.before)?.id;
       if (!id) continue;
       const cur: Token | undefined = state.tokens.find((t) => t.id === id);

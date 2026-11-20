@@ -28,7 +28,20 @@ import {
 } from "./fog.js";
 import { WallSchema } from "./walls.js";
 import type { WallPatch } from "./commands.js";
-import { fogOf, wallsOf } from "./schema.js";
+import { combatOf, fogOf, wallsOf } from "./schema.js";
+import {
+  done,
+  findScene,
+  findVisibleToken,
+  isMember,
+  replaceToken,
+  tokenChange,
+  type ApplyResult,
+  type Ok,
+} from "./reducer-util.js";
+import { Tick, applyCombatCommand, removeParticipant } from "./combat-reducer.js";
+import { damagePatch, healPatch, resolveTarget, tempHpPatch, withCondition, withoutCondition } from "./combat-ops.js";
+import { derivedEffectId, type Effect, type GroupAction } from "./combat.js";
 
 /**
  * Riduttore puro: `applyCommand(state, command, actor)`.
@@ -46,42 +59,10 @@ import { fogOf, wallsOf } from "./schema.js";
  * 5. vincoli che dipendono dallo stato (limiti mappa, id duplicati) -> INVALID / CONFLICT.
  */
 
-export type ApplyResult =
-  | { ok: true; state: CampaignState; changes: StateChange[]; inverse: Command[] }
-  | { ok: false; error: CommandError };
+export type { ApplyResult };
 
 /** Campi di un token che il proprietario (giocatore) può modificare con `token.update`. */
 export const PLAYER_EDITABLE_TOKEN_FIELDS: readonly (keyof TokenPatch)[] = ["conditions"];
-
-type Ok = Extract<ApplyResult, { ok: true }>;
-
-function done(state: CampaignState, next: CampaignState, changes: StateChange[], inverse: Command[]): Ok {
-  if (changes.length === 0) return { ok: true, state, changes: [], inverse: [] };
-  return { ok: true, state: { ...next, version: state.version + 1 }, changes, inverse };
-}
-
-function findScene(state: CampaignState, id: string): Scene | undefined {
-  return state.scenes.find((s) => s.id === id);
-}
-
-/** Cerca un token tra quelli che l'attore può vedere. */
-function findVisibleToken(state: CampaignState, id: string, actor: Actor): Token | undefined {
-  const t = state.tokens.find((x) => x.id === id);
-  return t && canSeeToken(t, actor, state.activeSceneId, fogOf(state, t.sceneId)) ? t : undefined;
-}
-
-function replaceToken(state: CampaignState, next: Token): CampaignState {
-  return { ...state, tokens: state.tokens.map((t) => (t.id === next.id ? next : t)) };
-}
-
-function isMember(state: CampaignState, userId: string): boolean {
-  return state.members.some((m) => m.userId === userId);
-}
-
-function tokenChange(state: CampaignState, before: Token | null, after: Token | null): StateChange {
-  const sceneId = (after ?? before)?.sceneId;
-  return { type: "token", before, after, activeSceneId: state.activeSceneId, fog: sceneId ? fogOf(state, sceneId) : null };
-}
 
 export function applyCommand(state: CampaignState, command: unknown, actor: Actor): ApplyResult {
   const parsed = CommandSchema.safeParse(command);
@@ -96,6 +77,8 @@ export function applyCommand(state: CampaignState, command: unknown, actor: Acto
 
 function apply(state: CampaignState, cmd: Command, actor: Actor): ApplyResult {
   const gm = isGm(actor);
+  const combat = applyCombatCommand(state, cmd, actor);
+  if (combat) return combat;
   switch (cmd.type) {
     case "token.move": {
       const token = findVisibleToken(state, cmd.tokenId, actor);
@@ -126,6 +109,9 @@ function apply(state: CampaignState, cmd: Command, actor: Actor): ApplyResult {
         return err("INVALID", MESSAGES.unknownOwner);
       }
       const next: Token = { ...t, rotation: normalizeRotation(t.rotation) };
+      if (next.faction === null) delete next.faction;
+      if (next.effects && next.effects.length === 0) delete next.effects;
+      if (!effectsAnchored(state, next)) return err("INVALID", MESSAGES.unknownTurnOf);
       return done(state, { ...state, tokens: [...state.tokens, next] }, [tokenChange(state, null, next)], [
         { type: "token.delete", tokenId: next.id },
       ]);
@@ -150,8 +136,13 @@ function apply(state: CampaignState, cmd: Command, actor: Actor): ApplyResult {
       for (const key of Object.keys(patch) as (keyof TokenPatch)[]) {
         const value = key === "rotation" ? normalizeRotation(patch.rotation as number) : patch[key];
         (next as Record<string, unknown>)[key] = value;
-        (old as Record<string, unknown>)[key] = key === "vision" ? (token.vision ?? null) : token[key];
+        (old as Record<string, unknown>)[key] =
+          key === "vision" || key === "faction" ? (token[key] ?? null) : key === "effects" ? (token.effects ?? []) : token[key];
       }
+      // Forma canonica: niente `faction` nullo né `effects` vuoto.
+      if (next.faction === null) delete next.faction;
+      if (next.effects && next.effects.length === 0) delete next.effects;
+      if (patch.effects && !effectsAnchored(state, next)) return err("INVALID", MESSAGES.unknownTurnOf);
       if (JSON.stringify(next) === JSON.stringify(token)) return done(state, state, [], []);
       return done(state, replaceToken(state, next), [tokenChange(state, token, next)], [
         { type: "token.update", tokenId: token.id, patch: old },
@@ -162,11 +153,12 @@ function apply(state: CampaignState, cmd: Command, actor: Actor): ApplyResult {
       if (!gm) return err("FORBIDDEN", MESSAGES.gmOnly);
       const token = state.tokens.find((t) => t.id === cmd.tokenId);
       if (!token) return err("NOT_FOUND", MESSAGES.tokenNotFound);
+      const cascade = deleteTokenCascade(state, token);
       return done(
         state,
-        { ...state, tokens: state.tokens.filter((t) => t.id !== token.id) },
-        [tokenChange(state, token, null)],
-        [{ type: "token.create", token }],
+        cascade.state,
+        [tokenChange(state, token, null), ...cascade.changes],
+        [{ type: "token.create", token }, ...cascade.inverse],
       );
     }
 
@@ -252,10 +244,17 @@ function apply(state: CampaignState, cmd: Command, actor: Actor): ApplyResult {
         changes.push(fogChange(s1, scene.id, fog, null));
         inverse.push({ type: "fog.restore", fog });
       }
+      const combat = combatOf(state, scene.id);
+      if (combat) inverse.push({ type: "combat.restore", sceneId: scene.id, combat });
+      const removedIds = new Set(removed.map((t) => t.id));
+      const touchedGroups = (state.groups ?? []).filter((g) => g.tokenIds.some((id) => removedIds.has(id)));
+      for (const g of touchedGroups) inverse.push({ type: "group.restore", groupId: g.id, group: g });
       if (wasActive) inverse.push({ type: "scene.activate", sceneId: scene.id });
       changes.push({ type: "scene", before: scene, after: null, activeSceneId: s1.activeSceneId, fog: null });
       s1 = {
         ...s1,
+        ...(state.combats ? { combats: state.combats.filter((c) => c.sceneId !== scene.id) } : {}),
+        ...(state.groups ? { groups: state.groups.map((g) => ({ ...g, tokenIds: g.tokenIds.filter((id) => !removedIds.has(id)) })) } : {}),
         scenes: s1.scenes.filter((s) => s.id !== scene.id),
         tokens: s1.tokens.filter((t) => t.sceneId !== scene.id),
         ...(state.fogs ? { fogs: state.fogs.filter((f) => f.sceneId !== scene.id) } : {}),
@@ -423,7 +422,102 @@ function apply(state: CampaignState, cmd: Command, actor: Actor): ApplyResult {
         [{ type: "wall.add", wall }],
       );
     }
+
+    // -----------------------------------------------------------------------
+    // Azioni di gruppo (M7)
+    // -----------------------------------------------------------------------
+
+    case "group.apply": {
+      // Il giocatore può solo muovere e cambiare le condizioni dei propri token: il resto è del GM.
+      if (!gm && !PLAYER_GROUP_ACTIONS.includes(cmd.action.kind)) return err("FORBIDDEN", MESSAGES.gmOnly);
+      const sel = resolveTarget(state, cmd.target, actor);
+      if (!sel.ok) return sel;
+      const subs: Command[] = [];
+      for (const id of sel.ids) {
+        const t = state.tokens.find((x) => x.id === id);
+        const sub = t ? expandAction(cmd.action, t) : null;
+        if (sub) subs.push(sub);
+      }
+      if (subs.length === 0) return done(state, state, [], []);
+      // Atomico: se un solo token non può subire l'azione, non cambia nulla.
+      return applyCommands(state, subs, actor);
+    }
+
+    default:
+      // I comandi di combattimento, effetti e gruppi sono già passati da `applyCombatCommand`.
+      return err("INVALID", MESSAGES.invalidCommand);
   }
+}
+
+const PLAYER_GROUP_ACTIONS: readonly GroupAction["kind"][] = ["move", "addCondition", "removeCondition"];
+
+/** Traduce un'azione di gruppo nel comando per un singolo token (o `null` se per lui non cambia nulla). */
+function expandAction(action: GroupAction, t: Token): Command | null {
+  const update = (patch: TokenPatch | null): Command | null => (patch ? { type: "token.update", tokenId: t.id, patch } : null);
+  switch (action.kind) {
+    case "damage":
+      return update(damagePatch(t, action.amount, action.critical));
+    case "heal":
+      return update(healPatch(t, action.amount));
+    case "tempHp":
+      return update(tempHpPatch(t, action.amount));
+    case "addCondition": {
+      const conditions = withCondition(t.conditions, action.condition);
+      return update(conditions === t.conditions ? null : { conditions });
+    }
+    case "removeCondition": {
+      const conditions = withoutCondition(t.conditions, action.conditionId);
+      return update(conditions === t.conditions ? null : { conditions });
+    }
+    case "addEffect": {
+      const id = derivedEffectId(action.effect.id, t.id);
+      if (t.effects?.some((e) => e.id === id)) return null;
+      return { type: "effect.add", tokenId: t.id, effect: { ...action.effect, id } };
+    }
+    case "move":
+      if (action.dx === 0 && action.dy === 0) return null;
+      return { type: "token.move", tokenId: t.id, x: t.x + action.dx, y: t.y + action.dy, snap: false };
+  }
+}
+
+/** Gli effetti del token sono ancorati a token esistenti della stessa scena (o a lui stesso)? */
+function effectsAnchored(state: CampaignState, token: Token): boolean {
+  return (token.effects ?? []).every(
+    (e) => e.turnOf === null || e.turnOf === token.id || state.tokens.some((t) => t.id === e.turnOf && t.sceneId === token.sceneId),
+  );
+}
+
+/**
+ * Cosa succede attorno a un token che sparisce: esce dal combattimento (il turno passa oltre se era il
+ * suo), esce dai gruppi, gli effetti degli altri token ancorati a lui passano a "il proprio turno".
+ * Restituisce lo stato SENZA il token, i cambiamenti degli altri token e l'inverso (da applicare dopo `token.create`).
+ */
+function deleteTokenCascade(state: CampaignState, token: Token): { state: CampaignState; changes: StateChange[]; inverse: Command[] } {
+  const tick = new Tick({ ...state, tokens: state.tokens.filter((t) => t.id !== token.id) });
+  const inverse: Command[] = [];
+  const combat = combatOf(state, token.sceneId);
+  const participant = combat?.participants.find((p) => p.tokenId === token.id);
+  if (combat && participant) {
+    inverse.push({ type: "combat.restore", sceneId: combat.sceneId, combat });
+    const next = removeParticipant(tick, combat, participant.id);
+    const others = (tick.state.combats ?? []).filter((c) => c.sceneId !== combat.sceneId);
+    tick.state = { ...tick.state, combats: next ? [...others, next] : others };
+  }
+  for (const t of tick.state.tokens) {
+    if (t.sceneId === token.sceneId && t.effects?.some((e) => e.turnOf === token.id)) {
+      tick.setToken({ ...t, effects: t.effects.map((e): Effect => (e.turnOf === token.id ? { ...e, turnOf: null } : e)) });
+    }
+  }
+  for (const g of state.groups ?? []) {
+    if (!g.tokenIds.includes(token.id)) continue;
+    inverse.push({ type: "group.restore", groupId: g.id, group: g });
+    tick.state = {
+      ...tick.state,
+      groups: (tick.state.groups ?? []).map((x) => (x.id === g.id ? { ...x, tokenIds: x.tokenIds.filter((id) => id !== token.id) } : x)),
+    };
+  }
+  const fin = tick.finish();
+  return { state: tick.state, changes: [...fin.changes, ...tick.notices], inverse: [...inverse, ...fin.inverse] };
 }
 
 function isPlayer(state: CampaignState, userId: string): boolean {
