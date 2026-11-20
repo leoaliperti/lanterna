@@ -4,7 +4,7 @@ import type { Duplex } from "node:stream";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { WebSocketServer, type RawData, type WebSocket } from "ws";
-import { MAX_CLIENT_MESSAGE_SIZE, parseClientMessage, type ServerMessage } from "@lanterna/shared";
+import { IdSchema, MAX_CLIENT_MESSAGE_SIZE, parseClientMessage, type ServerMessage } from "@lanterna/shared";
 import { getSessionFromUpgradeRequest } from "../auth/session.js";
 import type { AppConfig } from "../config.js";
 import { session as sessionTable } from "../db/schema.js";
@@ -32,6 +32,27 @@ function rejectUpgrade(socket: Duplex, status: number, message: string): void {
   );
 }
 
+export interface ViewOptions {
+  /** Utente di cui ricevere la vista (`null` = se stessi). Implica la sola lettura. */
+  viewAs: string | null;
+  readOnly: boolean;
+}
+
+/**
+ * Parametri facoltativi del percorso `/ws` (M9). `null` se non validi (=> 400 prima dell'handshake).
+ * - `viewAs=<userId>`: la connessione riceve esattamente ciò che riceve quell'utente (solo GM);
+ * - `readOnly=1`: nessun comando, chat o tiro da questa connessione (finestra del proiettore).
+ */
+export function parseViewOptions(params: URLSearchParams): ViewOptions | null {
+  const viewAs = params.getAll("viewAs");
+  const readOnly = params.getAll("readOnly");
+  if (viewAs.length > 1 || readOnly.length > 1) return null;
+  if (viewAs[0] !== undefined && !IdSchema.safeParse(viewAs[0]).success) return null;
+  if (readOnly[0] !== undefined && readOnly[0] !== "1" && readOnly[0] !== "0") return null;
+  const target = viewAs[0] ?? null;
+  return { viewAs: target, readOnly: target !== null || readOnly[0] === "1" };
+}
+
 /**
  * WebSocket su `ws` collegato direttamente all'evento `upgrade` del server HTTP di Fastify
  * (niente @fastify/websocket: così il rifiuto 401/403 avviene in modo esplicito PRIMA
@@ -55,33 +76,43 @@ export function attachRealtime(
 
   async function onUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): Promise<void> {
     socket.on("error", () => socket.destroy());
-    let pathname: string;
+    let url: URL;
     try {
-      pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+      url = new URL(req.url ?? "/", "http://localhost");
     } catch {
       return rejectUpgrade(socket, 400, "Richiesta non valida");
     }
-    if (pathname !== config.apiPrefix + WS_PATH) return rejectUpgrade(socket, 404, "Non trovato");
+    if (url.pathname !== config.apiPrefix + WS_PATH) return rejectUpgrade(socket, 404, "Non trovato");
+    // Finestre multiple (M9): `?viewAs=<userId>` (vista come un altro utente, solo GM) e `?readOnly=1`.
+    const options = parseViewOptions(url.searchParams);
+    if (!options) return rejectUpgrade(socket, 400, "Richiesta non valida");
     // Anti cross-site WebSocket hijacking: il browser manda sempre Origin; senza o diverso => 403.
     if (!isAllowedOrigin({ origin: req.headers.origin }, allowedOrigins)) {
       return rejectUpgrade(socket, 403, "Origine non ammessa");
     }
     const auth = await getSessionFromUpgradeRequest(app.auth, req).catch(() => null);
     if (!auth) return rejectUpgrade(socket, 401, "Non autenticato");
+    // Solo un GM (admin) guarda "come" un altro utente; se stessi è sempre ammesso. Il controllo vero,
+    // per campagna, si ripete all'`hello` (GM di QUELLA campagna, destinatario membro).
+    if (options.viewAs && options.viewAs !== auth.user.id && auth.user.role !== "admin") {
+      return rejectUpgrade(socket, 403, "Vista non consentita");
+    }
     if (hub.connectionsOf(auth.user.id) >= MAX_CONNECTIONS_PER_USER) {
       return rejectUpgrade(socket, 429, "Troppe connessioni");
     }
     if (socket.destroyed) return;
-    wss.handleUpgrade(req, socket, head, (ws) => onConnection(ws, auth.user.id, auth.session.id));
+    wss.handleUpgrade(req, socket, head, (ws) => onConnection(ws, auth.user.id, auth.session.id, options));
   }
 
-  function onConnection(ws: WebSocket, userId: string, sessionId: string): void {
+  function onConnection(ws: WebSocket, userId: string, sessionId: string, options: ViewOptions): void {
     let isAlive = true;
     let closed = false;
     const peer: Peer = {
       id: randomUUID(),
       userId,
       sessionId,
+      viewAs: options.viewAs,
+      readOnly: options.readOnly,
       actor: null,
       campaignId: null,
       lastSent: 0,

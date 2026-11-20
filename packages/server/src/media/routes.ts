@@ -147,7 +147,7 @@ export async function uploadRoutes(app: FastifyInstance, config: AppConfig, hub:
    * Ogni rifiuto (campagna o scena inesistente, non membro, tessera coperta o fuori mappa) dà lo
    * stesso 404: non si distingue una tessera coperta da una inesistente.
    */
-  app.get<{ Params: { campaignId: string; sceneId: string; col: string; row: string } }>(
+  app.get<{ Params: { campaignId: string; sceneId: string; col: string; row: string }; Querystring: { viewAs?: unknown } }>(
     "/campaigns/:campaignId/scenes/:sceneId/tiles/:col/:row",
     { onRequest: requireSession },
     async (request, reply) => {
@@ -155,7 +155,12 @@ export async function uploadRoutes(app: FastifyInstance, config: AppConfig, hub:
       const notFound = () => fail(reply, 404, "Non trovato");
       if (!IdSchema.safeParse(campaignId).success || !IdSchema.safeParse(sceneId).success) return notFound();
       if (!/^[0-9]{1,5}$/.test(col) || !/^[0-9]{1,5}$/.test(row)) return notFound();
-      const ctx = hub.tileContext(request.session!.user.id, campaignId, sceneId);
+      // M9: `?viewAs=<userId>` = la tessera esattamente come la riceve quel membro (vista giocatore del
+      // GM). Solo il GM della campagna: un giocatore che chiede la vista di un altro riceve 403.
+      const viewAs = request.query.viewAs;
+      if (viewAs !== undefined && (typeof viewAs !== "string" || !IdSchema.safeParse(viewAs).success)) return notFound();
+      const ctx = hub.tileContext(request.session!.user.id, campaignId, sceneId, viewAs ?? null);
+      if (ctx === "forbidden") return fail(reply, 403, "Vista non consentita");
       if (!ctx || !ctx.scene.map) return notFound();
       const assetRow = await app.database.db.query.asset.findFirst({ where: eq(asset.id, ctx.scene.map.assetId) });
       if (!assetRow) return notFound();

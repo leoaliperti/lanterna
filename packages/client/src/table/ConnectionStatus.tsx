@@ -26,7 +26,8 @@ export function ConnectionDot() {
 const FAILURE_TEXT: Record<FailureReason, string> = {
   session: "La sessione è scaduta. Accedi di nuovo.",
   "not-member": "Non fai più parte di questa campagna. Chiedi al GM di aggiungerti.",
-  protocol: "Questa versione dell'app non è più compatibile con il server. Ricarica la pagina."
+  protocol: "Questa versione dell'app non è più compatibile con il server. Ricarica la pagina.",
+  forbidden: "Questa vista non è più disponibile: il giocatore non fa più parte della campagna o non hai i permessi."
 };
 
 /** Avviso non invasivo sotto la barra quando la connessione non e' attiva. Nessun avviso mentre e' tutto a posto. */

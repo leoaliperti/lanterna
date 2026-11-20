@@ -1,6 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Archive, KeyRound, LogOut, PanelRight, Settings, Users } from "lucide-react";
-import { Avatar, IconButton, Menu, Sheet, Tabs, type MenuItemSpec, type TabItem } from "../ui";
+import { Archive, ExternalLink, KeyRound, LogOut, PanelRight, Settings, Users } from "lucide-react";
+import { Avatar, IconButton, Menu, Sheet, Tabs, useToast, type MenuItemSpec, type TabItem } from "../ui";
+import { openViewWindow } from "../windows/layout";
+import { POPUP_BLOCKED } from "../windows/WindowsMenu";
+import type { SecondaryRoute } from "../windows/routes";
+import "../windows/windows.css";
 import type { SessionUser } from "../api/client";
 import { useSession } from "../session/SessionProvider";
 import { navigate } from "../router/hashRouter";
@@ -40,6 +44,8 @@ export interface TableFrameProps {
   onVisibleTabChange?: (tab: string | null) => void;
   /** Nuovi elementi da segnalare sul pulsante del pannello quando e' chiuso. */
   panelBadge?: number;
+  /** Schede che si possono aprire in una finestra a parte (M9), per id della scheda. */
+  tabWindows?: Record<string, SecondaryRoute>;
   children: ReactNode;
 }
 
@@ -57,9 +63,11 @@ export function TableFrame({
   focusRequest,
   onVisibleTabChange,
   panelBadge = 0,
+  tabWindows,
   children
 }: TableFrameProps) {
   const { logout } = useSession();
+  const toast = useToast();
   const wide = useWide();
   const [panelOpen, setPanelOpen] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -103,8 +111,23 @@ export function TableFrame({
     { id: "logout", label: "Esci", icon: <LogOut size={18} />, destructive: true, onSelect: () => void doLogout() }
   ];
 
+  const popOut = currentTab ? tabWindows?.[currentTab] : undefined;
+  const popOutLabel = currentTab ? tabItems?.find((t) => t.id === currentTab)?.label : undefined;
   const sidePanel = tabs ? (
-    <Tabs aria-label="Pannello del tavolo" className="a-side__tabs" value={currentTab} onValueChange={setTab} tabs={tabItems ?? []} />
+    <>
+      {popOut ? (
+        <div className="a-side__head">
+          <IconButton
+            label={`Apri ${popOutLabel ?? "il pannello"} in una nuova finestra`}
+            icon={<ExternalLink size={18} />}
+            onClick={() => {
+              if (!openViewWindow(popOut)) toast.show(POPUP_BLOCKED);
+            }}
+          />
+        </div>
+      ) : null}
+      <Tabs aria-label="Pannello del tavolo" className="a-side__tabs" value={currentTab} onValueChange={setTab} tabs={tabItems ?? []} />
+    </>
   ) : null;
 
   return (

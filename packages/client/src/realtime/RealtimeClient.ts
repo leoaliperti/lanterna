@@ -24,7 +24,7 @@ import {
 export type ConnectionStatus = "connecting" | "connected" | "reconnecting" | "offline" | "failed";
 
 /** Perche' la connessione e' stata abbandonata (nessun nuovo tentativo automatico). */
-export type FailureReason = "session" | "not-member" | "protocol";
+export type FailureReason = "session" | "not-member" | "protocol" | "forbidden";
 
 export interface RealtimeState {
   status: ConnectionStatus;
@@ -115,6 +115,11 @@ export interface RealtimeOptions {
    * (il browser non distingue un 401 dell'upgrade da un'altra caduta) e si smette di riprovare.
    */
   verifySession?: () => Promise<boolean>;
+  /**
+   * Vista come un altro membro (M9): la chiusura 4403 (vista non consentita, membro uscito) e' definitiva
+   * invece di far riconnettere. Default `false`: per le connessioni normali 4403 = permessi cambiati, si riprova.
+   */
+  stopOnForbidden?: boolean;
 }
 
 const OPEN = 1;
@@ -139,6 +144,7 @@ const CLOSE_SESSION = 4401;
 const CLOSE_NOT_MEMBER = 4404;
 const CLOSE_PROTOCOL = 4400;
 const CLOSE_PING_TIMEOUT = 4000;
+const CLOSE_FORBIDDEN = 4403;
 
 type ResolvedOptions = Required<Omit<RealtimeOptions, "verifySession">> & Pick<RealtimeOptions, "verifySession">;
 
@@ -164,6 +170,7 @@ export class RealtimeClient {
       pingIntervalMs: 25_000,
       pongTimeoutMs: 10_000,
       commandTimeoutMs: 10_000,
+      stopOnForbidden: false,
       isOnline: () => (typeof navigator === "undefined" ? true : navigator.onLine !== false),
       ...options
     };
@@ -389,6 +396,7 @@ export class RealtimeClient {
     if (code === CLOSE_SESSION) return this.fail("session");
     if (code === CLOSE_NOT_MEMBER) return this.fail("not-member");
     if (code === CLOSE_PROTOCOL) return this.fail("protocol");
+    if (code === CLOSE_FORBIDDEN && this.opts.stopOnForbidden) return this.fail("forbidden");
     this.scheduleReconnect();
   }
 

@@ -78,7 +78,15 @@ export interface Peer {
   /** Dalla sessione cookie dell'upgrade: mai da un messaggio del client. */
   readonly userId: string;
   readonly sessionId: string;
-  /** Impostati dopo un `hello` valido. */
+  /**
+   * Finestre multiple (M9): utente di cui questa connessione riceve la vista (`null` = se stessa).
+   * Solo un GM della campagna può guardare come un altro membro; `actor` è allora quello del membro,
+   * così filtri, nebbia, chat ed effimeri sono esattamente quelli che riceve lui.
+   */
+  readonly viewAs: string | null;
+  /** Nessun comando, annulla, chat, tiro, iniziativa o effimero (vero sempre con `viewAs`). */
+  readonly readOnly: boolean;
+  /** Impostati dopo un `hello` valido. Con `viewAs` è l'attore del membro guardato, non di chi guarda. */
   actor: Actor | null;
   campaignId: string | null;
   /** Ultima versione inviata a questo client (snapshot o delta). */
@@ -103,6 +111,22 @@ interface Room {
   queue: Promise<void>;
   /** Forme effimere vive, per `autore:id`. */
   ephemerals: Map<string, LiveEphemeral>;
+}
+
+type ViewerResult = { ok: true; actor: Actor } | { ok: false; reason: "not-member" | "forbidden" | "target" };
+
+/**
+ * Attore con cui filtrare tutto ciò che riceve una connessione (M9). Senza `viewAs` (o con se stessi)
+ * è l'utente della sessione. Con `viewAs` chi guarda deve essere GM della campagna (`forbidden`
+ * altrimenti) e il guardato un suo membro (`target`): l'attore è quello del guardato.
+ */
+export function viewerActor(state: CampaignCore["state"], userId: string, viewAs: string | null): ViewerResult {
+  const real = resolveActor(state, userId);
+  if (!real) return { ok: false, reason: "not-member" };
+  if (viewAs === null || viewAs === userId) return { ok: true, actor: real };
+  if (!isGm(real)) return { ok: false, reason: "forbidden" };
+  const target = resolveActor(state, viewAs);
+  return target ? { ok: true, actor: target } : { ok: false, reason: "target" };
 }
 
 function errorMessage(requestId: string | null, code: ErrorMessage["code"], message: string): ErrorMessage {
@@ -180,17 +204,24 @@ export class Hub {
    * il chiamante risponde con lo stesso 404 in tutti i casi).
    * GM: `mask: null` (vede tutto). Giocatore: solo la scena attiva con nebbia, con la sua maschera.
    */
-  tileContext(userId: string, campaignId: string, sceneId: string): { scene: Scene; fog: Fog | null; mask: FogMask | null } | null {
+  tileContext(
+    userId: string,
+    campaignId: string,
+    sceneId: string,
+    /** M9: tessere come le riceve questo membro (solo un GM della campagna può chiederlo). */
+    viewAs: string | null = null,
+  ): { scene: Scene; fog: Fog | null; mask: FogMask | null } | null | "forbidden" {
     const state = this.rooms.get(campaignId)?.core.state;
     if (!state) return null;
-    const actor = resolveActor(state, userId);
-    if (!actor) return null;
+    const viewer = viewerActor(state, userId, viewAs);
+    if (!viewer.ok) return viewer.reason === "forbidden" ? "forbidden" : null;
+    const actor = viewer.actor;
     const scene = state.scenes.find((s) => s.id === sceneId);
     if (!scene || !scene.map) return null;
     const fog = fogOf(state, sceneId);
     if (isGm(actor)) return { scene, fog, mask: null };
     if (state.activeSceneId !== sceneId || !fog) return null;
-    return { scene, fog, mask: maskFor(fog, userId) };
+    return { scene, fog, mask: maskFor(fog, actor.userId) };
   }
 
   /**
@@ -251,13 +282,23 @@ export class Hub {
       return;
     }
     const room = this.rooms.get(msg.campaignId);
-    const actor = room ? resolveActor(room.core.state, peer.userId) : null;
-    if (!room || !actor) {
+    const viewer = room ? viewerActor(room.core.state, peer.userId, peer.viewAs) : null;
+    if (!room || !viewer || (!viewer.ok && viewer.reason === "not-member")) {
       // Campagna inesistente o utente non membro: stessa risposta.
       peer.send(errorMessage(null, "NOT_FOUND", "campagna non trovata"));
       peer.close(CLOSE.notFound, "campagna");
       return;
     }
+    if (!viewer.ok) {
+      // Vista come un altro utente (M9): solo il GM della campagna, e solo verso un suo membro.
+      // Il messaggio è fisso: non dice se l'utente guardato esiste.
+      if (peer.campaignId) this.rooms.get(peer.campaignId)?.peers.delete(peer);
+      peer.actor = null;
+      peer.send(errorMessage(null, "FORBIDDEN", "vista non consentita"));
+      peer.close(CLOSE.permissionsChanged, "vista non consentita");
+      return;
+    }
+    const actor = viewer.actor;
     if (peer.campaignId && peer.campaignId !== msg.campaignId) this.rooms.get(peer.campaignId)?.peers.delete(peer);
     peer.actor = actor;
     peer.campaignId = msg.campaignId;
@@ -291,8 +332,20 @@ export class Hub {
     return l;
   }
 
-  /** Stanza della connessione dopo `hello`, oppure errore già inviato. */
-  private roomOf(peer: Peer, requestId: string): Room | null {
+  /**
+   * Connessione in sola lettura (M9: vista come un altro utente o finestra del proiettore): ogni
+   * richiesta che cambierebbe qualcosa (comandi, annulla/ripeti, chat, tiri, iniziativa, effimeri)
+   * riceve `FORBIDDEN` prima di guardare lo stato. Nulla viene mai inviato "come" il membro guardato.
+   */
+  private rejectReadOnly(peer: Peer, requestId: string): boolean {
+    if (!peer.readOnly) return false;
+    peer.send(errorMessage(requestId, "FORBIDDEN", "connessione in sola lettura"));
+    return true;
+  }
+
+  /** Stanza della connessione dopo `hello`, oppure errore già inviato. `read`: richiesta di sola lettura. */
+  private roomOf(peer: Peer, requestId: string, read = false): Room | null {
+    if (!read && this.rejectReadOnly(peer, requestId)) return null;
     const room = peer.campaignId ? this.rooms.get(peer.campaignId) : undefined;
     if (!room || !peer.actor) {
       peer.send(errorMessage(requestId, "INVALID", "serve prima hello"));
@@ -354,7 +407,7 @@ export class Hub {
 
   /** Pagina di cronologia più vecchia di `before`, filtrata per l'utente. */
   history(peer: Peer, msg: HistoryRequest): Promise<void> {
-    const room = this.roomOf(peer, msg.requestId);
+    const room = this.roomOf(peer, msg.requestId, true);
     if (!room) return Promise.resolve();
     return this.enqueue(room, async () => {
       if (!peer.actor || !room.peers.has(peer)) return;
@@ -369,6 +422,7 @@ export class Hub {
 
   /** Comando / annulla / ripeti, con l'attore della connessione (mai dati del client). */
   submit(peer: Peer, input: DispatchInput): Promise<void> {
+    if (this.rejectReadOnly(peer, input.requestId)) return Promise.resolve();
     const room = peer.campaignId ? this.rooms.get(peer.campaignId) : undefined;
     if (!room || !peer.actor) {
       peer.send(errorMessage(input.requestId, "INVALID", "serve prima hello"));
@@ -548,7 +602,9 @@ export class Hub {
       await persistReset(this.db, state, epoch, touchedTokenIds, touchedFogSceneIds);
       room.core = { state, history: createHistory(), log: createEventLog(epoch, LOG_CAPACITY) };
       for (const p of [...room.peers]) {
-        const actor = resolveActor(state, p.userId);
+        // Con `viewAs` (M9) si ricontrolla anche che chi guarda sia ancora GM e il guardato ancora membro.
+        const viewer = viewerActor(state, p.userId, p.viewAs);
+        const actor = viewer.ok ? viewer.actor : null;
         if (!actor || !p.actor || actor.role !== p.actor.role) {
           room.peers.delete(p);
           p.actor = null;

@@ -155,7 +155,8 @@ Codice in `packages/server/src`: `realtime/` (WebSocket e stanze), `campaigns/` 
 
 - **Libreria:** `ws` usato direttamente (`noServer: true`) sull'evento `upgrade` del server HTTP di Fastify, senza `@fastify/websocket`: il rifiuto avviene in modo esplicito **prima** dell'handshake e il codice resta piccolo. `perMessageDeflate` è disattivato (niente bombe di decompressione).
 - **URL:** `ws(s)://<host>/ws`. In sviluppo il client passa dal proxy Vite come per il resto: `ws://localhost:5173/api/ws` (il proxy `/api` di `packages/client/vite.config.ts` deve avere `ws: true`).
-- **Prima dell'upgrade**, in quest'ordine: percorso diverso da `/ws` → 404; header `Origin` assente o non tra le origini ammesse (`BETTER_AUTH_URL` + `TRUSTED_ORIGINS`) → **403** (anti cross-site WebSocket hijacking; il Referer non basta); nessuna sessione valida nel cookie → **401**; più di 16 connessioni dello stesso utente → 429.
+- **Prima dell'upgrade**, in quest'ordine: percorso diverso da `/ws` → 404; parametri `viewAs`/`readOnly` non validi → 400; header `Origin` assente o non tra le origini ammesse (`BETTER_AUTH_URL` + `TRUSTED_ORIGINS`) → **403** (anti cross-site WebSocket hijacking; il Referer non basta); nessuna sessione valida nel cookie → **401**; `viewAs` di un altro utente da chi non è admin → **403**; più di 16 connessioni dello stesso utente → 429.
+- **Parametri facoltativi (M9, finestre multiple, vedi [docs/WINDOWS.md](WINDOWS.md))**: `?viewAs=<userId>` = la connessione riceve esattamente ciò che riceve quel membro (attore del membro per snapshot, delta, chat, cronologia, effimeri); solo il GM della campagna, controllato di nuovo all'`hello` (altrimenti `error FORBIDDEN "vista non consentita"` e chiusura 4403); implica la sola lettura. `?readOnly=1` = sola lettura per qualsiasi utente. In sola lettura comandi, annulla/ripeti, `chat.send`, `roll.request`, `initiative.roll`, `ephemeral.show/clear` ricevono `FORBIDDEN "connessione in sola lettura"`; restano `hello`, `ping`, `history.request`. Nessuna modifica ai messaggi del protocollo (`PROTOCOL_VERSION` invariata).
 - **Dopo l'apertura** il client ha `WS_HELLO_TIMEOUT_MS` (10 s) per inviare `hello`. Il server risponde con `planResync` (delta o snapshot) solo se l'utente è membro della campagna; altrimenti `error NOT_FOUND` (stesso messaggio per campagna inesistente) e chiusura 4404. Un secondo `hello` sulla stessa connessione è una risincronizzazione.
 - **Ogni messaggio** passa da `parseClientMessage`; frame binari, JSON non valido e campi sconosciuti danno `error INVALID` e il server continua. Frame oltre 64 KiB: chiusura 1009 (limite `maxPayload` di `ws`).
 - **Attore:** sempre `resolveActor(stato, userId della sessione)`. Il client non può indicare utente né ruolo: un campo in più nel messaggio è `INVALID` (schemi strict).
@@ -164,7 +165,7 @@ Codice in `packages/server/src`: `realtime/` (WebSocket e stanze), `campaigns/` 
 - **Client lenti:** oltre 16 MiB in coda d'invio la connessione viene terminata.
 - Dopo la risposta a ogni `hello` (snapshot o delta) il server invia `history` con le ultime voci di chat e tiri visibili all'utente (vedi "Chat e dadi").
 
-Codici di chiusura: 1001 arresto del server, 1008 rate limit, 1009 messaggio troppo grande, 4400 versione del protocollo, 4401 sessione terminata, 4403 permessi cambiati, 4404 campagna non trovata o non membro, 4408 `hello` mancante. Con 4401/4403/4404 il client non deve riconnettersi da solo in loop (4401: torna al login).
+Codici di chiusura: 1001 arresto del server, 1008 rate limit, 1009 messaggio troppo grande, 4400 versione del protocollo, 4401 sessione terminata, 4403 permessi cambiati (o, con `viewAs`, vista non consentita / membro guardato uscito: definitivo per il client della vista), 4404 campagna non trovata o non membro, 4408 `hello` mancante. Con 4401/4403/4404 il client non deve riconnettersi da solo in loop (4401: torna al login).
 
 ### Stanze, ordine e salvataggio
 
@@ -215,7 +216,7 @@ Tutte le rotte verificano sessione e ruolo lato server (`requireSession`, `requi
 | `DELETE /campaigns/:id/members/:userId` | admin | 204, 404, 409 se è l'ultimo GM della campagna (controllo atomico in SQL) |
 | `POST /uploads/map`, `POST /uploads/token` | admin | multipart con un solo file |
 | `GET /assets/:uuid.:ext` | autenticato | file caricato; 404 ai giocatori per una mappa usata da una scena con nebbia (M6) |
-| `GET /campaigns/:id/scenes/:sceneId/tiles/:col/:row` | GM; giocatore membro, scena attiva con nebbia, tessera almeno in parte rivelata | tessera della mappa mascherata per l'utente; ogni rifiuto = stesso 404 (vedi [docs/FOG.md](FOG.md)) |
+| `GET /campaigns/:id/scenes/:sceneId/tiles/:col/:row` | GM; giocatore membro, scena attiva con nebbia, tessera almeno in parte rivelata | tessera della mappa mascherata per l'utente; ogni rifiuto = stesso 404 (vedi [docs/FOG.md](FOG.md)). M9: `?viewAs=<userId>` = la tessera come la riceve quel membro, solo GM della campagna (giocatore verso un altro: 403; verso se stesso: come senza parametro) |
 | `GET /campaigns/:id/log` `?format=json\|text&since=<ms>` | admin: tutto; giocatore membro: solo ciò che vedeva | log di sessione (vedi "Chat e dadi") |
 
 Lo schema ammette più campagne per istanza (oggi se ne usa una).

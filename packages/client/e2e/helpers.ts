@@ -16,12 +16,14 @@ export interface Player {
   sockets: WebSocket[];
 }
 
-export function connect(port: number, campaignId: string, cookie: string): Player {
+/** `query`: parametri del percorso /ws (M9: `?viewAs=<userId>`, `?readOnly=1`). */
+export function connect(port: number, campaignId: string, cookie: string, query = ""): Player {
   const traffic: string[] = [];
   const mine: WebSocket[] = [];
   const client = new RealtimeClient({
     campaignId,
-    url: `ws://127.0.0.1:${port}/ws`,
+    url: `ws://127.0.0.1:${port}/ws${query}`,
+    stopOnForbidden: query.includes("viewAs="),
     backoff: { baseMs: 20, maxMs: 60 },
     createSocket: (url) => {
       const ws = new WebSocket(url, { headers: { cookie, origin: ORIGIN } });

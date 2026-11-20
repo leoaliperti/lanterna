@@ -307,6 +307,16 @@ export function diffTiles<T extends { id: string; key: string }>(loaded: Readonl
 }
 
 /** URL di una tessera: stessa regola di `assetUrl` (cookie di sessione, sotto /api). */
-export function tileUrl(apiBase: string, campaignId: string, sceneId: string, col: number, row: number, coverageKey: string): string {
-  return `${apiBase}/campaigns/${encodeURIComponent(campaignId)}/scenes/${encodeURIComponent(sceneId)}/tiles/${col}/${row}?k=${encodeURIComponent(coverageKey)}`;
+export function tileUrl(
+  apiBase: string,
+  campaignId: string,
+  sceneId: string,
+  col: number,
+  row: number,
+  coverageKey: string,
+  /** Vista giocatore del GM (M9): la tessera come la riceve questo membro. */
+  viewAs: string | null = null
+): string {
+  const as = viewAs ? `&viewAs=${encodeURIComponent(viewAs)}` : "";
+  return `${apiBase}/campaigns/${encodeURIComponent(campaignId)}/scenes/${encodeURIComponent(sceneId)}/tiles/${col}/${row}?k=${encodeURIComponent(coverageKey)}${as}`;
 }

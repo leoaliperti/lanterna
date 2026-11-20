@@ -4,7 +4,7 @@ import { getSession } from "../api/client";
 import { useToast } from "../ui";
 import { commandErrorToast } from "./errors";
 import { RealtimeClient, type RealtimeState } from "./RealtimeClient";
-import { wsUrl } from "./urls";
+import { wsUrl, type WsViewOptions } from "./urls";
 
 const ClientContext = createContext<RealtimeClient | null>(null);
 
@@ -15,17 +15,20 @@ export interface RealtimeProviderProps {
   onSessionEnded?: () => void;
   /** Per i test: un client gia' pronto al posto di quello reale. */
   client?: RealtimeClient;
+  /** Finestre multiple (M9): vista come un altro membro (solo GM) o sola lettura. Letti solo al montaggio. */
+  connection?: WsViewOptions;
 }
 
 /** Crea il client WebSocket della campagna, lo avvia e lo ferma allo smontaggio. */
-export function RealtimeProvider({ campaignId, children, onSessionEnded, client: injected }: RealtimeProviderProps) {
+export function RealtimeProvider({ campaignId, children, onSessionEnded, client: injected, connection }: RealtimeProviderProps) {
   const toast = useToast();
   const [client] = useState(
     () =>
       injected ??
       new RealtimeClient({
         campaignId,
-        url: wsUrl(),
+        url: wsUrl(window.location, connection),
+        stopOnForbidden: Boolean(connection?.viewAs),
         verifySession: async () => (await getSession().catch(() => ({ id: "?" }))) !== null
       })
   );
