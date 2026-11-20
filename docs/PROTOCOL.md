@@ -312,3 +312,7 @@ Per utente (su tutte le sue connessioni), secchiello di gettoni separato per mes
 - Il logout chiude il WebSocket solo al keep-alive successivo (al più `WS_HEARTBEAT_MS`).
 - Chat e tiri: niente modifica né cancellazione dei messaggi; niente whisper fra giocatori o a più destinatari; il client (chat, dadi 3D) non è ancora collegato. L'animazione 3D sincronizzata userà `terms[].dice` di `roll.result`.
 - Nebbia di guerra (M6) non ancora modellata.
+
+## Produzione (M5): prefisso /api
+
+In produzione tutte le rotte HTTP e il WebSocket stanno sotto `API_PREFIX` (default `/api`): il WebSocket e `/api/ws`, REST e `/api/campaigns` ecc. In sviluppo e nei test il prefisso e vuoto (il proxy Vite riscrive `/api/x` in `/x`). L url restituito dagli upload (`/assets/<uuid>.<ext>`) e relativo alla radice dell API: il client lo richiede come `/api/assets/...`. Dettagli in `docs/DEPLOY.md`; contenuti importati (`/content`) in `docs/CONTENT.md`.

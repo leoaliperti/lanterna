@@ -24,11 +24,14 @@ Gestore pacchetti: npm (workspace in `packages/shared`, `server`, `client`). Nod
 npm install         # installa le dipendenze
 npm run dev         # sviluppo: server (porta 3000) + client Vite con proxy /api
 npm run build       # build di shared, server e client
-npm start           # avvio in produzione (server compilato)
+npm start           # produzione: server compilato che serve anche il client, tutto su una porta (API sotto /api)
 npm test            # test unitari e di integrazione (Vitest)
 npm run lint        # ESLint + typecheck
 npm run create-admin -w @lanterna/server   # crea il primo admin/GM (idempotente)
 npm run db:generate -w @lanterna/server    # genera una migrazione dopo aver cambiato src/db/schema.ts
+npm run backup -w @lanterna/server         # copia consistente di DB + uploads in BACKUP_DIR (ultime BACKUP_KEEP)
+npm run restore -w @lanterna/server -- <cartella-backup|file.db> [--yes]   # server FERMO
+npm run import-content -w @lanterna/server -- <file.json|cartella>        # contenuti di gioco (docs/CONTENT.md)
 ```
 
 Le migrazioni (in `packages/server/drizzle/`) si applicano da sole all'avvio del server e di `create-admin`. Previsti: test end-to-end con Playwright (M2). Configurazione: copia `.env.example` in `.env` (nella radice).
@@ -63,6 +66,16 @@ Dettagli in `docs/PROTOCOL.md` (sezione "Chat e dadi"). Tipi condivisi in `packa
 - **REST**: `GET /campaigns/:id/log` (admin tutto, giocatore membro solo ciò che vedeva, altri 404), JSON o `?format=text`.
 - **Rate limit** per utente: `CHAT_MESSAGES_PER_MINUTE`/`CHAT_MESSAGE_BURST`, `ROLLS_PER_MINUTE`/`ROLL_BURST`.
 - **Test**: `src/chat/chat.test.ts` (GM + 2 giocatori su WebSocket reali, ricerca di formule, totali e testi privati nel traffico) e `src/chat/crypto-roll.test.ts` (l'app di produzione chiama `crypto.randomInt`). Il client deve mostrare il testo come testo, mai come HTML.
+
+## Produzione, operazioni e contenuti (M5, server)
+
+Guide: `docs/DEPLOY.md` (deploy, Cloudflare Tunnel, backup, aggiornamenti, checklist), `docs/CONTENT.md` (formato di importazione).
+
+- **Una porta, un processo** (`src/web.ts`): con `NODE_ENV=production` il server serve `packages/client/dist` con `@fastify/static` (ripiego SPA su `index.html`, `assets/` con hash `immutable`, il resto `no-cache`) e comprime con `@fastify/compress`. **Tutta l'API sta sotto `config.apiPrefix`** (`/api` in produzione, vuoto in sviluppo e nei test: il proxy Vite `/api` → radice e i test esistenti restano invariati). Le rotte si registrano dentro il plugin con quel prefisso (`app.ts`), mai sull'app radice; `auth/routes.ts` e `realtime/server.ts` ne tengono conto (WebSocket `/api/ws`). Test in `src/web.test.ts`.
+- **CSP**: pagina (`pageCsp`: solo `'self'`, `worker-src blob:`, nessuna CDN, `unsafe-eval` solo con `CSP_ALLOW_UNSAFE_EVAL`); API `default-src 'none'`. In produzione il server non parte con: segreto corto, URL non https (salvo `ALLOW_INSECURE_HTTP=true` per prove locali), `TRUST_PROXY=true`, DB in memoria, client non compilato (`config.test.ts`).
+- **Backup** (`src/ops/backup.ts`): `VACUUM INTO` (mai copiare il file mentre è scritto), cartelle `lanterna-AAAAMMGG-OOMMSS`, rotazione, ripristino che verifica la sorgente (intestazione SQLite, `integrity_check`, tabella `user`) e sposta i dati attuali in `.prima-del-ripristino-<data>`. Gli script `backup`/`restore`/`import-content` girano da `dist` (serve `npm run build`).
+- **Contenuti** (`src/content/`, tabella `content`, migrazione `0003_content`): documenti JSON tipizzati, validati con Zod (niente HTML, limiti di dimensione e profondità), importazione idempotente e transazionale. `POST /content/import` e `DELETE /content/:id` solo admin; `GET /content` e `/content/:id` per ogni utente, ma il giocatore vede solo i tipi di `CONTENT_PLAYER_KINDS` (default `item,spell`; `monster` e `note` mai), il resto 404. `.gitignore` ancora `/content/` e `/imports/` alla radice (un `content/` generico escluderebbe `src/content`).
+- **Hardening**: `src/hardening.test.ts` controlla che git non tracci file privati e che `.env.example` documenti ogni variabile letta dal server (aggiungi lì le nuove). `npm audit --omit=dev` deve restare a 0: un `overrides` in `package.json` porta l'esbuild di drizzle-kit a una versione corretta.
 
 ## Regole non negoziabili
 

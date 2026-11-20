@@ -31,6 +31,8 @@ Ogni libreria o snippet copiato va elencato qui con licenza e fonte.
 | @libsql/client | MIT | https://github.com/tursodatabase/libsql-client-ts | driver SQLite senza compilazione nativa |
 | @fastify/rate-limit | MIT | https://github.com/fastify/fastify-rate-limit | rate limit su login e creazione utenti |
 | @fastify/helmet | MIT | https://github.com/fastify/fastify-helmet | header di sicurezza HTTP |
+| @fastify/static | MIT | https://github.com/fastify/fastify-static | il server serve il client compilato in produzione (`packages/server/src/web.ts`) |
+| @fastify/compress | MIT | https://github.com/fastify/fastify-compress | compressione gzip/brotli delle risposte |
 | ws | MIT | https://github.com/websockets/ws | server WebSocket (`packages/server/src/realtime`) e client nei test |
 | @fastify/multipart (con @fastify/busboy) | MIT | https://github.com/fastify/fastify-multipart | upload di mappe e immagini dei token |
 
@@ -45,6 +47,18 @@ Non viene copiato codice da Owlbear Rodeo Legacy (licenza non commerciale).
 This work includes material from the System Reference Document 5.2 ("SRD 5.2") by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd. The SRD 5.2 is licensed under the Creative Commons Attribution 4.0 International License, available at https://creativecommons.org/licenses/by/4.0/legalcode.
 
 Il motore di regole (`packages/shared/src/rules5e`) implementa solo meccaniche (formule, tabelle numeriche, identificatori generici). Classi, specie, incantesimi, mostri e armature arrivano da contenuti importati dall'utente e iniettati a runtime.
+
+## Deploy
+
+Guida completa (Node 22+, `.env` di produzione, `systemd`/`launchd`, Cloudflare Tunnel con WebSocket, Cloudflare Access opzionale, backup e ripristino, aggiornamenti, checklist di sicurezza) in [`docs/DEPLOY.md`](docs/DEPLOY.md). In breve:
+
+```
+npm ci && npm run build
+NODE_ENV=production npm start   # client + API su una sola porta (API sotto /api, WebSocket /api/ws)
+npm run backup -w @lanterna/server
+```
+
+Dockerfile e docker-compose.yml opzionali nella radice. L'importazione dei contenuti di gioco è in [`docs/CONTENT.md`](docs/CONTENT.md).
 
 ## Sviluppo
 
