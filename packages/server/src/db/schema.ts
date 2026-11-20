@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import type { UserRole } from "@lanterna/shared";
 
 // Tabelle richieste da Better Auth (user, session, account, verification) più il campo `role`.
@@ -73,4 +73,109 @@ export const verification = sqliteTable(
   (t) => [index("verification_identifier_idx").on(t.identifier)],
 );
 
-export const schema = { user, session, account, verification };
+// ---------------------------------------------------------------------------
+// Campagne (M2/M3). Scene e token sono salvati come JSON (`data`) e validati
+// con gli schemi Zod di @lanterna/shared a ogni lettura: il modello vive in un
+// solo posto e il database non può introdurre campi o valori non ammessi.
+// ---------------------------------------------------------------------------
+
+export const campaign = sqliteTable("campaign", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  /** Versione dello stato: cresce di 1 per ogni comando applicato. */
+  version: integer("version").notNull().default(0),
+  /** Linea dello stato: cambia quando lo stato viene riscritto fuori dai comandi (membri, ripristino). */
+  epoch: text("epoch").notNull(),
+  activeSceneId: text("active_scene_id"),
+  createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+  ...timestamps,
+});
+
+/** Membri di una campagna. Il ruolo nella campagna è quello dell'account (admin = GM). */
+export const campaignMember = sqliteTable(
+  "campaign_member",
+  {
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => campaign.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [primaryKey({ columns: [t.campaignId, t.userId] }), index("campaign_member_user_idx").on(t.userId)],
+);
+
+export const scene = sqliteTable(
+  "scene",
+  {
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => campaign.id, { onDelete: "cascade" }),
+    id: text("id").notNull(),
+    /** Ordine di creazione (crescente). */
+    sort: integer("sort").notNull(),
+    /** `Scene` completa in JSON, validata con `SceneSchema` in lettura. */
+    data: text("data").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.campaignId, t.id] })],
+);
+
+export const token = sqliteTable(
+  "token",
+  {
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => campaign.id, { onDelete: "cascade" }),
+    id: text("id").notNull(),
+    sceneId: text("scene_id").notNull(),
+    /** Ordine di disegno (z-order), crescente. */
+    sort: integer("sort").notNull(),
+    /** `Token` completo in JSON, validato con `TokenSchema` in lettura. */
+    data: text("data").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.campaignId, t.id] }),
+    index("token_scene_idx").on(t.campaignId, t.sceneId),
+  ],
+);
+
+/** Registro dei cambiamenti per versione (riconnessione con delta anche dopo un riavvio). */
+export const campaignEvent = sqliteTable(
+  "campaign_event",
+  {
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => campaign.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    /** `StateChange[]` in JSON (contiene dati segreti: mai inviato così ai client). */
+    changes: text("changes").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.campaignId, t.version] })],
+);
+
+/** File caricati (mappe e immagini dei token). Il file sta in `UPLOAD_DIR/<id>.<ext>`. */
+export const asset = sqliteTable("asset", {
+  id: text("id").primaryKey(),
+  kind: text("kind").$type<"map" | "token">().notNull(),
+  mime: text("mime").$type<"image/png" | "image/jpeg" | "image/webp">().notNull(),
+  ext: text("ext").notNull(),
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
+  bytes: integer("bytes").notNull(),
+  uploadedBy: text("uploaded_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt: timestamps.createdAt,
+});
+
+export const schema = {
+  user,
+  session,
+  account,
+  verification,
+  campaign,
+  campaignMember,
+  scene,
+  token,
+  campaignEvent,
+  asset,
+};
