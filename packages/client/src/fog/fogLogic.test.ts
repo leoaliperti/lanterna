@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LIMITS, type FogMask } from "@lanterna/shared";
+import { LIMITS, type FogMask, type FogShape } from "@lanterna/shared";
 import {
   CellPath, availableTiles, cellAt, cellBox, cellCenter, cellInScene, cellsAlongSegment, circleShape, coveredBitmap, describeTarget, diffTiles,
   fogAllCommand, fogShapeCommand, fogTarget, polygonShape, previewRuns, rectShape, revealedCount, snapToCenter, snapToCorner, tileUrl, viewMask
@@ -83,7 +83,7 @@ describe("destinatari e comandi", () => {
     expect(fogTarget(["a", "b"])).toEqual({ kind: "players", userIds: ["a", "b"] });
   });
   it("forma -> fog.reveal / fog.cover, e tutto -> revealAll / coverAll", () => {
-    const shape = { kind: "cells", cells: [1, 1] } as const;
+    const shape: FogShape = { kind: "cells", cells: [1, 1] };
     expect(fogShapeCommand("reveal", "s", shape, fogTarget(["a"]))).toEqual({ type: "fog.reveal", sceneId: "s", shape, target: { kind: "players", userIds: ["a"] } });
     expect(fogShapeCommand("cover", "s", shape, fogTarget([])).type).toBe("fog.cover");
     expect(fogAllCommand("reveal", "s", fogTarget([]))).toEqual({ type: "fog.revealAll", sceneId: "s", target: { kind: "all" } });
