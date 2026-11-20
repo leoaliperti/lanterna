@@ -5,6 +5,7 @@ import { ChatPanel, ChatProvider, DiceOverlay } from "../chat";
 import { SheetWorkspace, SheetsPanel, SheetsProvider } from "../sheets";
 import { RealtimeProvider, useRealtimeState } from "../realtime/RealtimeProvider";
 import { useSession } from "../session/SessionProvider";
+import { useHashParam } from "../router/hashRouter";
 import { EmptyState } from "../screens/EmptyState";
 import { Table } from "../table/Table";
 import { useCampaigns } from "../table/useCampaigns";
@@ -22,6 +23,7 @@ import "./windows.css";
 export function ViewScreen({ route }: { route: SecondaryRoute }) {
   const { user, logout } = useSession();
   const { state, reload } = useCampaigns();
+  const wanted = useHashParam("campaign");
   useRememberWindowGeometry(route);
 
   if (!user) return null;
@@ -46,7 +48,8 @@ export function ViewScreen({ route }: { route: SecondaryRoute }) {
       </div>
     );
   }
-  const campaign = state.campaigns[0];
+  // `?campaign=<id>` come per il tavolo: la stessa campagna della finestra di partenza; senza, la prima.
+  const campaign = state.campaigns.find((c) => c.id === wanted) ?? state.campaigns[0];
   if (!campaign) {
     return (
       <div className="w-view__center">

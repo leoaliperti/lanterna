@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { hashParam } from "../router/hashRouter";
 import { formatViewRoute, type SecondaryRoute } from "./routes";
 
 /**
@@ -115,9 +116,13 @@ export function windowName(route: SecondaryRoute): string {
   return `lanterna${formatViewRoute(route).replace(/[^A-Za-z0-9_-]/g, "-")}`;
 }
 
-/** URL della vista nella stessa app (stessa origine: stesso cookie di sessione). */
-export function viewHref(route: SecondaryRoute, loc: Pick<Location, "pathname" | "search"> = window.location): string {
-  return `${loc.pathname}${loc.search}#${formatViewRoute(route)}`;
+/**
+ * URL della vista nella stessa app (stessa origine: stesso cookie di sessione). `campaignId`: la campagna
+ * aperta nella finestra di partenza (`#/...?campaign=<id>`), cosi' la nuova finestra apre la stessa.
+ */
+export function viewHref(route: SecondaryRoute, loc: Pick<Location, "pathname" | "search"> = window.location, campaignId: string | null = null): string {
+  const query = campaignId ? `?campaign=${encodeURIComponent(campaignId)}` : "";
+  return `${loc.pathname}${loc.search}#${formatViewRoute(route)}${query}`;
 }
 
 /**
@@ -127,7 +132,7 @@ export function viewHref(route: SecondaryRoute, loc: Pick<Location, "pathname" |
 export function openViewWindow(route: SecondaryRoute): boolean {
   const saved = readLayout().geometry[layoutKey(route)];
   const features = windowFeatures(route, saved, window.screen as unknown as ScreenArea);
-  const win = window.open(viewHref(route), windowName(route), features);
+  const win = window.open(viewHref(route, window.location, hashParam("campaign")), windowName(route), features);
   if (!win) return false;
   try {
     win.focus();

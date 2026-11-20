@@ -83,6 +83,7 @@ describe("disposizione delle finestre", () => {
     expect(windowName({ kind: "player", userId: "u1" })).toBe("lanterna-view-player-u1");
     expect(windowName({ kind: "map" })).not.toBe(windowName({ kind: "chat" }));
     expect(viewHref({ kind: "scene", sceneId: "s2" }, { pathname: "/", search: "" })).toBe("/#/view/scene/s2");
+    expect(viewHref({ kind: "chat" }, { pathname: "/", search: "" }, "c 1")).toBe("/#/view/chat?campaign=c%201");
   });
 });
 
