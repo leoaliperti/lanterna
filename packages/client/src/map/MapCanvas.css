@@ -76,4 +76,5 @@
 
 /* Strumenti di misura: un secondo gruppo accanto ai controlli, sulla sinistra */
 .lanterna-map__controls { display: flex; align-items: flex-end; flex-direction: row-reverse; gap: var(--space-2); }
-.lanterna-map__measures { flex-direction: column; }
+.lanterna-map__measures { flex-direction: column; gap: var(--space-1); max-width: calc(100vw - 6rem); }
+.lanterna-map__row { display: flex; }

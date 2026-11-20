@@ -40,7 +40,8 @@ describe("avvisi del combattimento", () => {
     expect(presentAlert(expiring, tokens)).toMatchObject({ toast: { tone: "warning" }, pulse: { kind: "warn" } });
     expect(presentAlert(expired, tokens).pulse?.kind).toBe("expired");
     expect(presentAlert({ ...expired, reason: "combatEnded" }, tokens).toast.message).toContain("combattimento");
-    expect(presentAlert({ ...turn(1), tokenId: null }, tokens, "Trappola").pulse).toBeNull();
+    const free: CombatAlert = { type: "combat.turn", sceneId: "s1", round: 1, participantId: "p3", tokenId: null };
+    expect(presentAlert(free, tokens, "Trappola").pulse).toBeNull();
   });
 });
 

@@ -1,6 +1,6 @@
 import { type ReactNode, type Ref, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, Circle, MapPin, Maximize, Minus, Plus, Ruler, Slash, Triangle } from "lucide-react";
-import { Banner, IconButton, Material } from "../ui";
+import { Banner, IconButton, Material, SegmentedControl, type SegmentOption } from "../ui";
 import "./MapCanvas.css";
 import { MapController, type Tool, type ToolState } from "./controller";
 import type { WallMode } from "./drawTools";
@@ -37,6 +37,8 @@ export interface MapCanvasProps extends MapScene, MapHandlers {
   label?: string;
   /** Viewport iniziale; se manca la mappa viene adattata allo schermo. */
   defaultViewport?: Viewport;
+  /** Chi vede le misure e le segnalazioni (scelta mostrata accanto agli strumenti). Senza, nessuna scelta. */
+  measureAudience?: { value: string; options: Array<SegmentOption<string>>; onChange: (value: string) => void };
   /** Lo strumento attivo, il pennello o il modo sono cambiati (anche da tastiera). */
   onToolStateChange?: (state: ToolState) => void;
 }
@@ -60,7 +62,7 @@ const MEASURE_KEYS: Record<MeasureTool, string> = { ruler: "R", circle: "O", con
 export function MapCanvas({
   ref, className, label = "Mappa di gioco", defaultViewport,
   background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight, ephemerals, pulses,
-  onShape, onShapeCancel, onContextMenu, onKey,
+  onShape, onShapeCancel, onContextMenu, onKey, measureAudience,
   onMoveToken, onResizeToken, onRotateToken, onSelectionChange, onViewportChange,
   onFogShape, onWallAdd, onWallUpdate, onWallRemove, onWallSelect, onToolStateChange
 }: MapCanvasProps) {
@@ -116,10 +118,7 @@ export function MapCanvas({
       setFogMode: (m) => controller.setFogMode(m),
       setWallMode: (m) => controller.setWallMode(m),
       setSelection: (ids) => controller.setSelection(ids),
-      clearMeasure: () => {
-        controller.clearShapeDraft(true);
-        controller.setTool("select");
-      },
+      clearMeasure: () => controller.clearMeasurements(),
       closePolygon: () => {
         controller.draw.closePolygon();
         controller.onToolState(controller.toolState);
@@ -244,16 +243,21 @@ export function MapCanvas({
           </Material>
           {measuresOpen ? (
             <Material thickness="regular" className="lanterna-map__group lanterna-map__measures a-enter" role="toolbar" aria-label="Strumenti di misura e segnalazione">
-              {MEASURE_TOOLS.map((m) => (
-                <IconButton
-                  key={m}
-                  label={`${MEASURE_LABELS[m]}${tool === m ? ": attivo, premi per uscire" : ` (${MEASURE_KEYS[m]})`}`}
-                  aria-pressed={tool === m}
-                  variant={tool === m ? "tinted" : "plain"}
-                  icon={MEASURE_ICONS[m]}
-                  onClick={() => controller.setTool(tool === m ? "select" : m)}
-                />
-              ))}
+              <div className="lanterna-map__row">
+                {MEASURE_TOOLS.map((m) => (
+                  <IconButton
+                    key={m}
+                    label={`${MEASURE_LABELS[m]}${tool === m ? ": attivo, premi per uscire" : ` (${MEASURE_KEYS[m]})`}`}
+                    aria-pressed={tool === m}
+                    variant={tool === m ? "tinted" : "plain"}
+                    icon={MEASURE_ICONS[m]}
+                    onClick={() => controller.setTool(tool === m ? "select" : m)}
+                  />
+                ))}
+              </div>
+              {measureAudience ? (
+                <SegmentedControl aria-label="Chi vede la misura" value={measureAudience.value} onValueChange={measureAudience.onChange} options={measureAudience.options} />
+              ) : null}
             </Material>
           ) : null}
         </div>

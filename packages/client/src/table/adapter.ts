@@ -1,5 +1,5 @@
 import type { CampaignView, FogView, SceneView, TokenView } from "@lanterna/shared";
-import type { MapFog, MapScene, MapSight, MapToken, MapWall, TokenKind as MapTokenKind } from "../map";
+import type { MapEphemeral, MapFog, MapPulse, MapScene, MapSight, MapToken, MapWall, TokenKind as MapTokenKind } from "../map";
 import { availableTiles, geometryOf, tileUrl, viewMask } from "../fog/fogLogic";
 import { API_BASE, assetUrl } from "../realtime/urls";
 
@@ -62,7 +62,7 @@ export function movableIds(view: CampaignView, sceneId: string): string[] {
     .map((t) => t.id);
 }
 
-export function toMapToken(token: TokenView): MapToken {
+export function toMapToken(token: TokenView, turnTokenId: string | null = null): MapToken {
   const url = assetUrl(token.imageUrl);
   return {
     id: token.id,
@@ -77,7 +77,9 @@ export function toMapToken(token: TokenView): MapToken {
     hidden: token.hidden,
     conditions: token.conditions.map((c) => ({ id: c.id, label: c.name })),
     // Solo se il server l'ha inviata (GM e proprietario): mai dedotta dal client.
-    health: token.health ? { current: token.health.current, max: token.health.max, temp: token.health.temp } : undefined
+    health: token.health ? { current: token.health.current, max: token.health.max, temp: token.health.temp } : undefined,
+    turn: token.id === turnTokenId ? true : undefined,
+    effects: token.effects?.length ? token.effects.length : undefined
   };
 }
 
@@ -120,11 +122,16 @@ export interface MapSceneExtras {
   walls?: readonly MapWall[];
   wallsVisible?: boolean;
   sight?: readonly MapSight[];
+  /** Forme effimere vive, richiami sui token e token di turno (combattimento). */
+  ephemerals?: readonly MapEphemeral[];
+  pulses?: readonly MapPulse[];
+  turnTokenId?: string | null;
 }
 
 export function toMapScene(view: CampaignView, scene: SceneView, extras: MapSceneExtras = {}): MapScene {
+  const { turnTokenId = null, ...rest } = extras;
   return {
-    ...extras,
+    ...rest,
     background: {
       url: scene.map ? (assetUrl(scene.map.url) ?? BLANK_BACKGROUND_URL) : BLANK_BACKGROUND_URL,
       width: scene.width,
@@ -132,7 +139,7 @@ export function toMapScene(view: CampaignView, scene: SceneView, extras: MapScen
     },
     grid: { ...scene.grid },
     scale: { unitsPerCell: scene.scale.unitsPerCell, unitLabel: scene.scale.unit },
-    tokens: tokensOfScene(view, scene.id).map(toMapToken),
+    tokens: tokensOfScene(view, scene.id).map((t) => toMapToken(t, turnTokenId)),
     role: view.viewer.role === "admin" ? "gm" : "player",
     movableTokenIds: movableIds(view, scene.id)
   };

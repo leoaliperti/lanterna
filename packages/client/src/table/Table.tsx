@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CloudFog, Eye, EyeOff, Layers, Library, Map as MapIcon, MessageSquare, Pencil, Redo2, ScrollText, ShieldCheck, Undo2, Users, WifiOff } from "lucide-react";
+import { CloudFog, Crosshair, Eye, EyeOff, Layers, Library, Map as MapIcon, MessageSquare, Pencil, Redo2, ScrollText, ShieldCheck, Swords, Undo2, Users, WifiOff } from "lucide-react";
 import type { CampaignView, FogShape, TokenView, WallPatch } from "@lanterna/shared";
 import type { SessionUser } from "../api/client";
 import { MapCanvas, type MapCanvasHandle, type Point } from "../map";
 import { fogShapeCommand, fogTarget, type FogMode } from "../fog/fogLogic";
 import { wallAddCommand, wallRemoveCommand, wallUpdateCommand } from "../fog/wallLogic";
-import { Button, IconButton, Material, Spinner } from "../ui";
+import { Button, IconButton, Material, PointMenu, Spinner, type MenuItemSpec } from "../ui";
+import { ActionButtons } from "../combat/ActionButtons";
+import { ActionSheet, type ActionRequest } from "../combat/ActionSheet";
+import { addTokenCommand, combatOf, tokensToAdd, turnTokenId } from "../combat/combatLogic";
+import { InitiativePanel } from "../combat/InitiativePanel";
+import { ACTION_LABELS, actionForKey, isTypingTarget, type ActionKind } from "../combat/selectionLogic";
+import { TargetsPanel } from "../combat/TargetsPanel";
+import { useCombatFeed } from "../combat/useCombatFeed";
 import { EmptyState } from "../screens/EmptyState";
 import { SheetWorkspace, SheetsPanel, SheetsProvider } from "../sheets";
 import { LibraryPanel } from "../library/LibraryPanel";
@@ -88,6 +95,8 @@ function LiveTable({ user, view, actions }: LiveProps) {
   const [selected, setSelected] = useState<readonly string[]>([]);
   const [editor, setEditor] = useState<{ open: boolean; tokenId: string | null }>({ open: false, tokenId: null });
   const [sceneForm, setSceneForm] = useState<"create" | "edit" | null>(null);
+  const [action, setAction] = useState<ActionRequest | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; tokenId: string } | null>(null);
   const mapRef = useRef<MapCanvasHandle>(null);
   const chatStore = useChatStore();
   const chat = useChat();
@@ -102,6 +111,9 @@ function LiveTable({ user, view, actions }: LiveProps) {
   const controls = useFogControls();
   const players = useMemo(() => view.members.filter((m) => m.role === "player"), [view.members]);
   const fogView = scene ? fogOfScene(view, scene.id) : null;
+  const combat = combatOf(view, scene?.id ?? null);
+  const turnToken = turnTokenId(combat);
+  const feed = useCombatFeed({ view, sceneId: scene?.id ?? null, mapRef });
   const wallTool = controls.tool.tool === "wall";
   const mapFog = useMemo(
     () => (scene ? toMapFog(view, scene, { viewAs: controls.viewAs, showVeil: controls.veil }) : null),
@@ -111,8 +123,19 @@ function LiveTable({ user, view, actions }: LiveProps) {
   const mapWalls = useMemo(() => (scene ? toMapWalls(view.walls, scene.id) : []), [view.walls, scene]);
   const sight = useSight(view, scene, controls.sight);
   const mapScene = useMemo(
-    () => (scene ? toMapScene(view, scene, { fog: mapFog, walls: mapWalls, wallsVisible: perms.isGm ? controls.walls || wallTool : true, sight }) : null),
-    [view, scene, mapFog, mapWalls, controls.walls, wallTool, perms.isGm, sight]
+    () =>
+      scene
+        ? toMapScene(view, scene, {
+            fog: mapFog,
+            walls: mapWalls,
+            wallsVisible: perms.isGm ? controls.walls || wallTool : true,
+            sight,
+            ephemerals: feed.shapes,
+            pulses: feed.pulses,
+            turnTokenId: turnToken
+          })
+        : null,
+    [view, scene, mapFog, mapWalls, controls.walls, wallTool, perms.isGm, sight, feed.shapes, feed.pulses, turnToken]
   );
   const hasVisionToken = useMemo(() => (scene ? view.tokens.some((t) => t.sceneId === scene.id && t.vision) : false), [view.tokens, scene]);
   const selectedWall = useMemo(() => mapWalls.find((w) => w.id === controls.selectedWall) ?? null, [mapWalls, controls.selectedWall]);
@@ -153,6 +176,62 @@ function LiveTable({ user, view, actions }: LiveProps) {
 
   const selectedToken = selected.length === 1 ? (view.tokens.find((t) => t.id === selected[0]) ?? null) : null;
 
+  const openAction = useCallback((kind: ActionKind, tokenIds: readonly string[]) => {
+    if (tokenIds.length > 0) setAction({ kind, tokenIds });
+  }, []);
+  // Scorciatoie delle azioni (solo GM, con il focus sulla mappa e almeno un token selezionato).
+  const onMapKey = (key: string): boolean => {
+    if (!perms.isGm || selected.length === 0 || isTypingTarget(document.activeElement)) return false;
+    const kind = actionForKey(key);
+    if (!kind) return false;
+    openAction(kind, selected);
+    return true;
+  };
+  const onContextMenu = (x: number, y: number, tokenId: string | null) => {
+    if (!tokenId) {
+      setMenu(null);
+      return;
+    }
+    setMenu({ x, y, tokenId });
+  };
+  const menuItems = (): MenuItemSpec[] => {
+    const token = menu ? view.tokens.find((t) => t.id === menu.tokenId) : null;
+    if (!menu || !token) return [];
+    const ids = selected.includes(token.id) ? selected : [token.id];
+    if (!perms.isGm) {
+      return perms.canOpenEditor(token) ? [{ id: "edit", label: "Condizioni", icon: <Pencil size={16} />, onSelect: () => setEditor({ open: true, tokenId: token.id }) }] : [];
+    }
+    const act = (kind: ActionKind, key: string): MenuItemSpec => ({ id: kind, label: `${ACTION_LABELS[kind]} (${key})`, onSelect: () => openAction(kind, ids) });
+    const inCombat = combat?.participants.some((p) => p.tokenId === token.id) ?? false;
+    return [
+      act("damage", "D"),
+      act("heal", "H"),
+      act("condition", "K"),
+      act("effect", "E"),
+      act("move", "M"),
+      ...(scene && !inCombat && tokensToAdd([token], scene.id, combat).length > 0
+        ? [{ id: "combat", label: "Aggiungi al combattimento", icon: <Swords size={16} />, onSelect: () => void run(addTokenCommand(crypto.randomUUID(), scene.id, token.id)) } satisfies MenuItemSpec]
+        : []),
+      { id: "edit", label: "Modifica", icon: <Pencil size={16} />, onSelect: () => setEditor({ open: true, tokenId: token.id }) },
+      {
+        id: "hide",
+        label: token.hidden ? "Rivela" : "Nascondi",
+        icon: token.hidden ? <Eye size={16} /> : <EyeOff size={16} />,
+        onSelect: () => void run({ type: "token.update", tokenId: token.id, patch: { hidden: !token.hidden } })
+      }
+    ];
+  };
+  const audienceOptions = perms.isGm
+    ? [
+        { value: "private", label: "Solo io" },
+        { value: "all", label: "Tutti" }
+      ]
+    : [
+        { value: "private", label: "Solo io" },
+        { value: "gm", label: "Solo GM" },
+        { value: "all", label: "Tutti" }
+      ];
+
   const openToken = (t: TokenView) => {
     mapRef.current?.centerOn({ x: t.x, y: t.y });
     if (perms.canOpenEditor(t)) setEditor({ open: true, tokenId: t.id });
@@ -186,6 +265,22 @@ function LiveTable({ user, view, actions }: LiveProps) {
         />
       )
     },
+    {
+      id: "combat",
+      label: "Iniziativa",
+      icon: <Swords size={16} />,
+      content: <InitiativePanel view={view} scene={scene} selected={selected} />
+    },
+    ...(perms.isGm && scene
+      ? [
+          {
+            id: "targets",
+            label: "Bersagli",
+            icon: <Crosshair size={16} />,
+            content: <TargetsPanel view={view} scene={scene} selected={selected} onSelect={(ids) => mapRef.current?.setSelection(ids)} onAction={(kind) => openAction(kind, selected)} />
+          }
+        ]
+      : []),
     {
       id: "sheets",
       label: "Schede",
@@ -251,6 +346,11 @@ function LiveTable({ user, view, actions }: LiveProps) {
             onWallRemove={perms.isGm ? onWallRemove : undefined}
             onWallSelect={controls.setSelectedWall}
             onToolStateChange={controls.setTool}
+            onShape={feed.onShape}
+            onShapeCancel={feed.onShapeCancel}
+            onContextMenu={onContextMenu}
+            onKey={onMapKey}
+            measureAudience={{ value: feed.audience, options: audienceOptions, onChange: (v) => feed.setAudience(v as typeof feed.audience) }}
           />
           <FogToolbar
             canvas={mapRef}
@@ -271,13 +371,20 @@ function LiveTable({ user, view, actions }: LiveProps) {
               </Button>
             </Material>
           ) : null}
-          {selectedToken && perms.canOpenEditor(selectedToken) ? (
-            <Material thickness="regular" className="a-selbar a-enter" role="toolbar" aria-label={`Azioni su ${selectedToken.name}`}>
-              <span className="a-selbar__name t-subhead">{selectedToken.name}</span>
-              <Button variant="gray" size="sm" icon={<Pencil size={16} />} onClick={() => setEditor({ open: true, tokenId: selectedToken.id })}>
-                {perms.isGm ? "Modifica" : "Condizioni"}
-              </Button>
-              {perms.isGm ? (
+          {selectedToken && perms.canOpenEditor(selectedToken) || (perms.isGm && selected.length > 1) ? (
+            <Material
+              thickness="regular"
+              className="a-selbar a-enter"
+              role="toolbar"
+              aria-label={selectedToken ? `Azioni su ${selectedToken.name}` : `Azioni su ${selected.length} token`}
+            >
+              <span className="a-selbar__name t-subhead">{selectedToken ? selectedToken.name : `${selected.length} token`}</span>
+              {selectedToken ? (
+                <Button variant="gray" size="sm" icon={<Pencil size={16} />} onClick={() => setEditor({ open: true, tokenId: selectedToken.id })}>
+                  {perms.isGm ? "Modifica" : "Condizioni"}
+                </Button>
+              ) : null}
+              {perms.isGm && selectedToken ? (
                 <Button
                   variant="gray"
                   size="sm"
@@ -287,6 +394,7 @@ function LiveTable({ user, view, actions }: LiveProps) {
                   {selectedToken.hidden ? "Rivela" : "Nascondi"}
                 </Button>
               ) : null}
+              {perms.isGm ? <ActionButtons onAction={(kind) => openAction(kind, selected)} /> : null}
             </Material>
           ) : null}
         </div>
@@ -322,7 +430,13 @@ function LiveTable({ user, view, actions }: LiveProps) {
         tokenId={editor.tokenId}
         open={editor.open}
         onOpenChange={(open) => setEditor((e) => ({ ...e, open }))}
+        onAddEffect={(id) => {
+          setEditor((e) => ({ ...e, open: false }));
+          openAction("effect", [id]);
+        }}
       />
+      <ActionSheet view={view} cellSize={scene?.grid.cellSize ?? 70} request={action} onClose={() => setAction(null)} />
+      <PointMenu position={menu ? { x: menu.x, y: menu.y } : null} label="Azioni sul token" items={menuItems()} onClose={() => setMenu(null)} />
       <SceneForm
         open={sceneForm !== null}
         onOpenChange={(open) => !open && setSceneForm(null)}

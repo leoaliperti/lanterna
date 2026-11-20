@@ -451,7 +451,12 @@ export class MapController {
         break;
       }
       case "ruler": {
-        if (this.ruler) this.setRuler(this.ruler.a, this.rulerPoint(this.toMap(p)));
+        if (this.ruler) {
+          this.setRuler(this.ruler.a, this.rulerPoint(this.toMap(p)));
+          if (this.ruler.a.x !== this.ruler.b.x || this.ruler.a.y !== this.ruler.b.y) {
+            this.handlers.onShape?.({ kind: "ruler", points: [this.ruler.a, this.ruler.b] }, "draft");
+          }
+        }
         break;
       }
       case "measure": {
@@ -719,6 +724,13 @@ export class MapController {
     if (!this.ruler) return;
     this.ruler = null;
     this.onRuler(null);
+  }
+
+  /** Toglie righello e forma in costruzione senza segnalare annullamenti (la misura e' stata consegnata altrove). */
+  clearMeasurements() {
+    this.clearRuler();
+    this.clearShapeDraft(true);
+    this.invalidate();
   }
 
   private cancelLongPress() {
