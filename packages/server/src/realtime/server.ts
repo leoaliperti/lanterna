@@ -10,6 +10,7 @@ import type { AppConfig } from "../config.js";
 import { session as sessionTable } from "../db/schema.js";
 import { isAllowedOrigin } from "../security.js";
 import { CLOSE, type Hub, type Peer } from "./hub.js";
+import { TokenBucket } from "./rate.js";
 
 /** Percorso del WebSocket (in sviluppo il client passa dal proxy Vite: `/api/ws`). */
 export const WS_PATH = "/ws";
@@ -29,26 +30,6 @@ function rejectUpgrade(socket: Duplex, status: number, message: string): void {
       "X-Content-Type-Options: nosniff\r\n\r\n" +
       body,
   );
-}
-
-/** Secchiello di gettoni: `rate` messaggi al secondo in media, raffiche fino a `burst`. */
-class TokenBucket {
-  private tokens: number;
-  private last = Date.now();
-  constructor(
-    private readonly rate: number,
-    private readonly burst: number,
-  ) {
-    this.tokens = burst;
-  }
-  take(): boolean {
-    const now = Date.now();
-    this.tokens = Math.min(this.burst, this.tokens + ((now - this.last) / 1000) * this.rate);
-    this.last = now;
-    if (this.tokens < 1) return false;
-    this.tokens -= 1;
-    return true;
-  }
 }
 
 /**
@@ -198,8 +179,13 @@ export function attachRealtime(
         peer.send({ type: "pong" });
         return;
       case "chat.send":
+        void hub.chat(peer, msg);
+        return;
       case "roll.request":
-        peer.send({ type: "error", requestId: msg.requestId, code: "INVALID", message: "non ancora disponibile" });
+        void hub.roll(peer, msg);
+        return;
+      case "history.request":
+        void hub.history(peer, msg);
         return;
     }
   }

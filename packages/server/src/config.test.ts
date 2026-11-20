@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ConfigError, loadConfig } from "./config.js";
+import { ConfigError, MAX_HISTORY_ON_CONNECT, loadConfig } from "./config.js";
 
 const SECRET = "x".repeat(32);
 
@@ -32,6 +32,20 @@ describe("loadConfig", () => {
     expect(c.production).toBe(false);
     expect(c.authSecret.length).toBeGreaterThanOrEqual(32);
     expect(c.trustedOrigins).toEqual(["http://localhost:5173"]);
+  });
+
+  it("chat: default, valori da env e cronologia iniziale limitata", () => {
+    expect(loadConfig({}).chat).toEqual({
+      historyOnConnect: 50,
+      messagesPerMinute: 30,
+      messageBurst: 10,
+      rollsPerMinute: 30,
+      rollBurst: 10,
+    });
+    const c = loadConfig({ CHAT_HISTORY_LIMIT: "100000", CHAT_MESSAGE_BURST: "3", ROLLS_PER_MINUTE: "abc" });
+    expect(c.chat.historyOnConnect).toBe(MAX_HISTORY_ON_CONNECT);
+    expect(c.chat.messageBurst).toBe(3);
+    expect(c.chat.rollsPerMinute).toBe(30);
   });
 
   it.each([

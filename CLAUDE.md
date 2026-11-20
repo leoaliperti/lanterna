@@ -52,6 +52,18 @@ Dettagli completi in `docs/PROTOCOL.md` (sezione "Server").
 - **Upload** (`src/media/`, non `uploads/` perché è in `.gitignore`): `POST /uploads/map|token` solo admin, tipo dai magic bytes (PNG/JPEG/WebP, niente SVG), limiti di byte e pixel, file in `UPLOAD_DIR` con nome UUID, `GET /assets/:uuid.:ext` solo autenticati. Nessuna miniatura (servirebbero dipendenze native).
 - **Test**: `npm test -w @lanterna/server`. I test di `src/realtime/realtime.test.ts` avviano il server su una porta vera con GM e giocatori connessi via `ws` e cercano i dati segreti nel traffico ricevuto; helper in `src/test/` (`ws.ts`, `campaign.ts`, `images.ts`).
 
+## Chat e dadi (M4, server)
+
+Dettagli in `docs/PROTOCOL.md` (sezione "Chat e dadi"). Tipi condivisi in `packages/shared/src/protocol/chat.ts`.
+
+- **Messaggi**: `chat.send` (testo semplice, max 2000, `whisperTo?`), `roll.request` (`formula`, `visibility: public | gm | whisper`, `whisperTo?`, `label?`), `history.request` (cursore = `id` della voce più vecchia). Il server risponde con `chat.message`, `roll.result` (formula canonica, `detail`, `terms` con i dadi, `total`, `critical`), `history`; errori `FORBIDDEN`/`INVALID` (formula: messaggio del parser e `reason`)/`NOT_FOUND`/`RATE_LIMITED`.
+- **Esito solo sul server**: `parseFormula` + `roll` con `crypto.randomInt` (`src/dice/crypto-rng.ts`). L'RNG si inietta solo nei test con `buildApp({ rng })` / `createTestApp(env, tweak, persistent, { rng })`.
+- **Visibilità** (`canSeeEntry`, unica regola): `gm` solo GM e solo il GM può usarla; `whisper` solo autore e destinatario (il GM non vede i whisper altrui); il giocatore sussurra solo a un GM.
+- **Persistenza**: tabella `chat_entry` (migrazione `0002_chat`), salvataggio prima dell'invio; cronologia filtrata in SQL (`src/chat/store.ts`). Dopo ogni `hello` arrivano le ultime `CHAT_HISTORY_LIMIT` voci.
+- **REST**: `GET /campaigns/:id/log` (admin tutto, giocatore membro solo ciò che vedeva, altri 404), JSON o `?format=text`.
+- **Rate limit** per utente: `CHAT_MESSAGES_PER_MINUTE`/`CHAT_MESSAGE_BURST`, `ROLLS_PER_MINUTE`/`ROLL_BURST`.
+- **Test**: `src/chat/chat.test.ts` (GM + 2 giocatori su WebSocket reali, ricerca di formule, totali e testi privati nel traffico) e `src/chat/crypto-roll.test.ts` (l'app di produzione chiama `crypto.randomInt`). Il client deve mostrare il testo come testo, mai come HTML.
+
 ## Regole non negoziabili
 
 1. **Account: solo l'admin li crea.** L'admin coincide con il GM. I ruoli sono due: admin/GM e giocatore. Nessuna registrazione pubblica. Il controllo del ruolo avviene **lato server** su ogni endpoint di creazione/modifica/eliminazione utenti. Nascondere il pulsante nella UI non basta. Ogni funzione di questo tipo deve avere un test che dimostri il rifiuto (403) per un utente non admin.

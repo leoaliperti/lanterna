@@ -8,8 +8,9 @@ import { z } from "zod";
  * - NOT_FOUND: l'oggetto non esiste **oppure l'attore non può vederlo**.
  *   Per un giocatore un token nascosto e un token inesistente danno lo stesso errore,
  *   con lo stesso messaggio: l'errore non deve rivelarne l'esistenza.
+ * - RATE_LIMITED: troppi messaggi di chat o tiri in poco tempo (mai prodotto dai comandi).
  */
-export const ErrorCodeSchema = z.enum(["FORBIDDEN", "INVALID", "CONFLICT", "NOT_FOUND"]);
+export const ErrorCodeSchema = z.enum(["FORBIDDEN", "INVALID", "CONFLICT", "NOT_FOUND", "RATE_LIMITED"]);
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;
 
 export interface CommandError {

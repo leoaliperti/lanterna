@@ -15,6 +15,13 @@
       "when": 1795133186425,
       "tag": "0001_campaigns",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1795134388861,
+      "tag": "0002_chat",
+      "breakpoints": true
     }
   ]
 }

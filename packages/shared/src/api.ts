@@ -1,3 +1,4 @@
+import type { ChatLogEntry } from "./protocol/chat.js";
 import type { Role } from "./state/schema.js";
 
 /** Tipi delle API REST di campagne e upload (server: packages/server/src/campaigns, uploads). */
@@ -46,4 +47,17 @@ export interface UploadResponse {
   width: number;
   height: number;
   bytes: number;
+}
+
+/**
+ * GET /campaigns/:id/log (autenticato). Log di sessione (chat e tiri) in ordine cronologico.
+ * Admin: log completo (`scope: "full"`, whisper altrui compresi). Giocatore membro: solo le voci
+ * che poteva vedere (`scope: "visible"`). Con `?format=text` lo stesso log in testo semplice.
+ * `?since=<ms>` limita alle voci da quell'istante in poi.
+ */
+export interface SessionLogExport {
+  campaignId: string;
+  exportedAt: string;
+  scope: "full" | "visible";
+  entries: ChatLogEntry[];
 }
