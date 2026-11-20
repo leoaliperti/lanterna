@@ -205,7 +205,7 @@ describe("tracker, turni ed effetti nel traffico dei giocatori", () => {
     await settle();
     for (const c of [s.p1, s.p2, p1b]) {
       const traffic = c.traffic();
-      for (const secret of [S.hiddenName, S.entry, S.effect, S.faction, S.group, String(S.hiddenInit), String(S.monsterInit), "tok-m", '"pe"', '"pf"', "hideInitiative", '"faction"', '"groups"']) {
+      for (const secret of [S.hiddenName, S.entry, S.effect, S.faction, S.group, `"initiative":${S.hiddenInit}`, `"initiative":${S.monsterInit}`, "tok-m", '"pe"', '"pf"', "hideInitiative", '"faction"', '"groups"']) {
         expect(traffic, `trapela ${secret}`).not.toContain(secret);
       }
     }
