@@ -33,7 +33,7 @@ const FAILURE_TEXT: Record<FailureReason, string> = {
 /** Avviso non invasivo sotto la barra quando la connessione non e' attiva. Nessun avviso mentre e' tutto a posto. */
 export function ConnectionBanner() {
   const client = useRealtimeClient();
-  const { status, failure, view } = useRealtimeState();
+  const { status, failure, view, attempt } = useRealtimeState();
   if (status === "connected" || (status === "connecting" && !view)) return null;
   if (failure) {
     return (
@@ -47,7 +47,9 @@ export function ConnectionBanner() {
       <Banner tone="warning" title={status === "offline" ? "Sei offline" : "Riconnessione in corso"}>
         {status === "offline"
           ? "Appena torna la rete il tavolo si riallinea da solo. Nel frattempo non puoi fare modifiche."
-          : "Il tavolo si riallinea da solo. Nel frattempo non puoi fare modifiche."}
+          : attempt >= 3
+            ? "Non riesco a ricollegarmi. Se hai molte schede o finestre aperte su questo tavolo chiudine qualcuna: il server limita le connessioni per utente."
+            : "Il tavolo si riallinea da solo. Nel frattempo non puoi fare modifiche."}
       </Banner>
       <Button variant="plain" size="sm" onClick={() => client.retryNow()}>
         Riprova ora

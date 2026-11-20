@@ -65,12 +65,12 @@ export function sheetErrorMessage(err: unknown): string {
   if (err instanceof ApiRequestError) {
     if (err.status === 0) return err.message;
     if (err.status === 403) return "Non hai il permesso di farlo.";
-    if (err.status === 404) return "La scheda non esiste piu' o non e' disponibile.";
-    if (err.status === 409) return err.code === "CONFLICT" ? "La scheda e' stata modificata altrove." : err.message;
+    if (err.status === 404) return "La scheda non esiste più o non è disponibile.";
+    if (err.status === 409) return err.code === "CONFLICT" ? "La scheda è stata modificata altrove." : err.message;
     if (err.status === 400) return "I dati della scheda non sono validi.";
     if (err.status === 429) return "Troppe richieste. Attendi qualche secondo e riprova.";
     if (err.status >= 500) return "Il server ha avuto un problema. Riprova fra poco.";
     return err.message;
   }
-  return "Qualcosa e' andato storto. Riprova.";
+  return "Qualcosa è andato storto. Riprova.";
 }

@@ -45,7 +45,7 @@ export interface SheetsProviderProps {
   children: ReactNode;
   /**
    * Sincronizza PF e condizioni scheda -> token (solo GM). Default `true`. Le finestre secondarie (M9) la
-   * spengono: la fa solo la finestra del tavolo, cosi' piu' finestre dello stesso GM non inviano comandi doppi.
+   * spengono: la fa solo la finestra del tavolo, così più finestre dello stesso GM non inviano comandi doppi.
    */
   syncTokens?: boolean;
 }
@@ -78,7 +78,7 @@ export function SheetsProvider({ campaignId, user, children, syncTokens = true }
       if (!mounted.current) return;
       setSheets(next);
       setError(null);
-      // Schede sparite (eliminate o non piu' visibili): si chiudono.
+      // Schede sparite (eliminate o non più visibili): si chiudono.
       const ids = new Set(next.map((s) => s.id));
       setOpenIds((o) => o.filter((id) => ids.has(id)));
       setActiveId((a) => (a && !ids.has(a) ? null : a));

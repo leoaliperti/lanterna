@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type DragEvent,
   type HTMLAttributes,
   type KeyboardEvent,
   type ReactNode
@@ -61,9 +62,11 @@ export interface ListRowProps {
   destructive?: boolean;
   selected?: boolean;
   disabled?: boolean;
+  /** Riga trascinabile (HTML5 drag and drop, solo puntatori precisi). */
+  onDragStart?: (e: DragEvent<HTMLLIElement>) => void;
 }
 
-export function ListRow({ title, subtitle, leading, trailing, onPress, chevron, destructive, selected, disabled }: ListRowProps) {
+export function ListRow({ title, subtitle, leading, trailing, onPress, chevron, destructive, selected, disabled, onDragStart }: ListRowProps) {
   const body = (
     <>
       {leading ? <span className="l-row__leading" aria-hidden="true">{leading}</span> : null}
@@ -77,7 +80,7 @@ export function ListRow({ title, subtitle, leading, trailing, onPress, chevron, 
   );
   const cls = cx("l-row", destructive && "l-row--destructive", selected && "l-row--selected");
   return (
-    <li className="l-listitem">
+    <li className="l-listitem" draggable={onDragStart ? true : undefined} onDragStart={onDragStart}>
       {onPress ? (
         <button type="button" className={cls} onClick={onPress} disabled={disabled} aria-current={selected || undefined}>
           {body}

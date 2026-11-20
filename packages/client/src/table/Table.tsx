@@ -29,6 +29,9 @@ import { SceneForm } from "./SceneForm";
 import { PropsPanel } from "./PropsPanel";
 import { ScenePanel } from "./ScenePanel";
 import { useHistoryShortcuts } from "./shortcuts";
+import { ShortcutsHelp } from "./ShortcutsHelp";
+import { useHelpShortcut } from "./shortcutRegistry";
+import { LIBRARY_DRAG_TYPE, draggedItem, dropCommand, setDraggedItem } from "../library/libraryLogic";
 import { TableFrame } from "./TableFrame";
 import { TokenEditor } from "./TokenEditor";
 import { TokenPanel } from "./TokenPanel";
@@ -146,6 +149,9 @@ function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
   const chat = useChat();
   const focusChat = useCallback(() => chatStore.requestFocus(), [chatStore]);
   useChatShortcuts(focusChat);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const openHelp = useCallback(() => setHelpOpen(true), []);
+  useHelpShortcut(openHelp);
   const onVisibleTab = useCallback((tab: string | null) => chatStore.setPanelVisible(tab === "chat"), [chatStore]);
   const focusRequest = useMemo(() => ({ tab: "chat", nonce: chat.focusNonce }), [chat.focusNonce]);
 
@@ -375,7 +381,31 @@ function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
   const body = (
     <>
       {mapScene && scene ? (
-        <div className="a-map__live">
+        <div
+          className="a-map__live"
+          onDragOver={
+            perms.isGm && !readOnly
+              ? (e) => {
+                  if (e.dataTransfer.types.includes(LIBRARY_DRAG_TYPE)) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "copy";
+                  }
+                }
+              : undefined
+          }
+          onDrop={
+            perms.isGm && !readOnly
+              ? (e) => {
+                  const item = draggedItem();
+                  if (!item || !e.dataTransfer.types.includes(LIBRARY_DRAG_TYPE)) return;
+                  e.preventDefault();
+                  setDraggedItem(null);
+                  const at = mapRef.current?.clientToMap(e.clientX, e.clientY);
+                  if (at) void run(dropCommand(item, scene, at, crypto.randomUUID()));
+                }
+              : undefined
+          }
+        >
           <MapCanvas
             ref={mapRef}
             {...mapScene}
@@ -468,6 +498,7 @@ function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
         </p>
       ) : null}
 
+      <ShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} isGm={perms.isGm} />
       {readOnly ? null : (
         <>
           <TokenEditor

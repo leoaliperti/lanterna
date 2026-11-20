@@ -36,7 +36,7 @@ export function EditSection(props: EditSectionProps) {
     <div className="s-stack">
       <section className="s-block" aria-labelledby="s-e-id">
         <h3 id="s-e-id" className="t-headline">
-          Identita'
+          Identità
         </h3>
         <TextField label="Nome" value={s.name} maxLength={200} onChange={(e) => change((d) => patchSheet(d, { name: e.target.value }))} />
         <Picker
@@ -121,7 +121,7 @@ export function EditSection(props: EditSectionProps) {
 
       <section className="s-block" aria-labelledby="s-e-sk">
         <h3 id="s-e-sk" className="t-headline">
-          Competenze nelle abilita'
+          Competenze nelle abilità
         </h3>
         <div className="s-grid2">
           {(SKILLS as readonly Skill[]).map((k) => (
@@ -141,7 +141,7 @@ export function EditSection(props: EditSectionProps) {
           Valori e bonus
         </h3>
         <div className="s-grid2">
-          <NumInput label="Velocita' base (ft)" value={s.baseSpeed} min={0} max={500} onValueChange={(n) => change((d) => patchSheet(d, { baseSpeed: n }))} />
+          <NumInput label="Velocità base (ft)" value={s.baseSpeed} min={0} max={500} onValueChange={(n) => change((d) => patchSheet(d, { baseSpeed: n }))} />
           <NumInput label="Bonus alla CA" value={s.acBonus} min={-20} max={30} onValueChange={(n) => change((d) => patchSheet(d, { acBonus: n }))} />
           <NumInput label="Bonus all'iniziativa" value={s.initiativeBonus} min={-20} max={30} onValueChange={(n) => change((d) => patchSheet(d, { initiativeBonus: n }))} />
           <NumInput label="Bonus PF per livello" value={s.hpBonusPerLevel} min={-50} max={9999} onValueChange={(n) => change((d) => patchSheet(d, { hpBonusPerLevel: n }))} />
@@ -172,7 +172,7 @@ export function EditSection(props: EditSectionProps) {
             options={[{ value: "none", label: "Nessuno" }, ...tokens.map((t) => ({ value: t.id, label: t.name }))]}
           />
           <Banner tone="info" title="PF e condizioni">
-            La scheda e' la fonte di verita': quando cambiano PF o condizioni, il GM aggiorna la barra del token collegato.
+            La scheda è la fonte di verità: quando cambiano PF o condizioni, il GM aggiorna la barra del token collegato.
           </Banner>
           {onSyncFromToken ? (
             <Button variant="gray" size="sm" onClick={onSyncFromToken}>
@@ -186,7 +186,7 @@ export function EditSection(props: EditSectionProps) {
             open={confirmDelete}
             onOpenChange={setConfirmDelete}
             title="Eliminare la scheda?"
-            message="L'operazione non si puo' annullare."
+            message="L'operazione non si può annullare."
             actions={[
               { label: "Annulla", role: "cancel" },
               { label: "Elimina", role: "destructive", onPress: onDelete }

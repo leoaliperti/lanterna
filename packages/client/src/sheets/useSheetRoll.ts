@@ -12,7 +12,7 @@ import { useSheets } from "./SheetsProvider";
 const WAIT_MS = 10_000;
 
 export interface SheetRoller {
-  /** Tiro di scheda (abilita', salvezza, attacco, incantesimo...): formula e vantaggio dalla scheda, esito dal server. */
+  /** Tiro di scheda (abilità, salvezza, attacco, incantesimo...): formula e vantaggio dalla scheda, esito dal server. */
   rollTarget: (target: RollTarget, label: string) => Promise<void>;
   /** Una formula libera (danno di un attacco, dado vita...). */
   rollFormula: (formula: string, label: string) => Promise<boolean>;
@@ -23,7 +23,7 @@ export interface SheetRoller {
 
 /**
  * Tiri dalla scheda. Il client non calcola mai l'esito: invia `roll.request` con la formula di `rollFor`
- * (vantaggio/svantaggio gia' composti dalle condizioni) e il server risponde con `roll.result`.
+ * (vantaggio/svantaggio già composti dalle condizioni) e il server risponde con `roll.result`.
  */
 export function useSheetRoll(doc: SheetDoc): SheetRoller {
   const { user, isGm } = useSheets();
@@ -62,7 +62,7 @@ export function useSheetRoll(doc: SheetDoc): SheetRoller {
         toast.show({ title: label, message: "Fallimento automatico: non si tira.", tone: "warning" });
         return;
       }
-      // Il vantaggio/svantaggio e' gia' nella formula: l'impostazione del pannello dei dadi non lo ripete.
+      // Il vantaggio/svantaggio è già nella formula: l'impostazione del pannello dei dadi non lo ripete.
       const problem = await send(formula, { label: labelOf(label), advantage: false });
       if (problem) toast.show({ title: "Tiro non inviato", message: problem, tone: "warning" });
     },

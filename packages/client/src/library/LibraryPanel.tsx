@@ -8,7 +8,7 @@ import { useCommands } from "../realtime/RealtimeProvider";
 import { EmptyState } from "../screens/EmptyState";
 import { permissionsFor } from "../table/permissions";
 import { deleteLibraryItem, hasStats, listLibrary, type AnyLibraryItem } from "./libraryApi";
-import { KIND_LABEL, instanceCommand } from "./libraryLogic";
+import { KIND_LABEL, LIBRARY_DRAG_TYPE, instanceCommand, setDraggedItem } from "./libraryLogic";
 
 type Filter = "all" | "pc" | "monster" | "object";
 
@@ -129,6 +129,15 @@ export function LibraryPanel({ view, scene, tokens, onAdded }: LibraryPanelProps
               key={item.id}
               title={item.name}
               subtitle={subtitle(item)}
+              onDragStart={
+                perms.isGm && hasStats(item) && scene
+                  ? (e) => {
+                      e.dataTransfer.setData(LIBRARY_DRAG_TYPE, item.id);
+                      e.dataTransfer.effectAllowed = "copy";
+                      setDraggedItem(item);
+                    }
+                  : undefined
+              }
               leading={<Avatar name={item.name} src={assetUrl(item.imageUrl)} size="sm" />}
               trailing={
                 <span className="a-row-meta">

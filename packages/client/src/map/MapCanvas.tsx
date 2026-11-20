@@ -2,6 +2,7 @@ import { type ReactNode, type Ref, useEffect, useImperativeHandle, useMemo, useR
 import { ArrowUpRight, Circle, MapPin, Maximize, Minus, Plus, Ruler, Slash, Triangle } from "lucide-react";
 import { Banner, IconButton, Material, SegmentedControl, type SegmentOption } from "../ui";
 import "./MapCanvas.css";
+import { screenToMap } from "./geometry";
 import { MapController, type Tool, type ToolState } from "./controller";
 import type { WallMode } from "./drawTools";
 import type { FogBrush, FogMode } from "../fog/fogLogic";
@@ -17,6 +18,8 @@ export interface MapCanvasHandle {
   zoomBy(factor: number): void;
   /** Centra lo schermo su un punto di mappa (pixel di mappa). */
   centerOn(point: Point): void;
+  /** Punto di mappa sotto una coordinata di pagina (trascinamento dalla libreria), o `null` senza canvas. */
+  clientToMap(clientX: number, clientY: number): Point | null;
   /** Strumenti GM: selezione, righello, nebbia, muri. */
   setTool(tool: Tool): void;
   setFogBrush(brush: FogBrush): void;
@@ -122,6 +125,10 @@ export function MapCanvas({
       closePolygon: () => {
         controller.draw.closePolygon();
         controller.onToolState(controller.toolState);
+      },
+      clientToMap: (cx, cy) => {
+        const r = canvasRef.current?.getBoundingClientRect();
+        return r ? screenToMap(controller.viewport, { x: cx - r.left, y: cy - r.top }) : null;
       },
       centerOn: (p) => {
         const vp = controller.viewport;

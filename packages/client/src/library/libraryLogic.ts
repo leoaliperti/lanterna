@@ -1,4 +1,5 @@
 import type { Command, CreateLibraryItem, LibraryItem, Token } from "@lanterna/shared";
+import { resolveDropPosition } from "../map/geometry";
 import { spawnPoint, type TokenDraft } from "../table/tokenDraft";
 
 /** Logica pura della libreria: cosa si salva dall'editor dei token e come si crea un'istanza in scena. */
@@ -52,4 +53,32 @@ export function instanceCommand(
     gmNotes: ""
   };
   return { type: "token.create", token };
+}
+
+/** Tipo MIME del trascinamento dalla libreria: porta solo l'id dell'elemento, mai dati sensibili. */
+export const LIBRARY_DRAG_TYPE = "application/x-lanterna-library-item";
+
+/**
+ * Come `instanceCommand`, ma l'istanza compare dove e' stata lasciata: centro agganciato alla griglia
+ * (se la scena ha lo snap) e riportato dentro la mappa.
+ */
+export function dropCommand(
+  item: LibraryItem,
+  scene: { id: string; width: number; height: number; grid: { cellSize: number; offsetX: number; offsetY: number; snap: boolean } },
+  at: { x: number; y: number },
+  id: string
+): Command {
+  const cmd = instanceCommand(item, scene, [], id);
+  if (cmd.type !== "token.create") return cmd;
+  const pos = resolveDropPosition(at, item.size, { ...scene.grid, color: "", opacity: 0 }, { width: scene.width, height: scene.height });
+  return { ...cmd, token: { ...cmd.token, x: pos.x, y: pos.y } };
+}
+
+let dragged: LibraryItem | null = null;
+/** L'elemento in trascinamento (il DataTransfer porta solo il tipo: il resto sta qui, nel client). */
+export function setDraggedItem(item: LibraryItem | null): void {
+  dragged = item;
+}
+export function draggedItem(): LibraryItem | null {
+  return dragged;
 }

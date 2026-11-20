@@ -32,7 +32,7 @@ import { layoutTable } from "./layout";
 import type { Vec3 } from "./math";
 import { type Shape, getPolyhedron, triangulate } from "./polyhedra";
 
-const DIE_SCALE = 0.8;
+const DIE_SCALE = 1.15;
 const LABEL_LIFT = 0.004;
 
 const COLORS: Record<DieKind, string> = {

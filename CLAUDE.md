@@ -137,6 +137,10 @@ Dettagli in `docs/PROTOCOL.md` (sezione "Livelli, oggetti di scena e gestione sc
 - **Client**: `map/propLayer.ts` (tre contenitori Pixi, dissolvenza degli `above` in `propLogic.ts`), scheda "Oggetti" (`table/PropsPanel.tsx`, solo GM, posizione e dimensioni da campi numerici), "Duplica" in `ScenePanel`, selettore di campagne nel titolo (`table/CampaignSwitcher.tsx`, `#/?campaign=<id>`).
 - Migrazione `0008_props`. Esportazione/importazione di campagna non copre ancora gli oggetti.
 
+## Scorciatoie e mobile (M10 B, client)
+
+Registro unico delle scorciatoie in `packages/client/src/table/shortcutRegistry.ts` (aiuto con `?`, `shortcutRegistry.test.ts` fallisce sui conflitti): ogni nuova scorciatoia va scritta li'. Libreria trascinabile sulla mappa (`library/libraryLogic.ts`, `dropCommand`). Tablet in verticale: pannello ancorato sotto la mappa (`DOCK` in `TableFrame.tsx`). Dettagli in `docs/QA.md`.
+
 ## Regole non negoziabili
 
 1. **Account: solo l'admin li crea.** L'admin coincide con il GM. I ruoli sono due: admin/GM e giocatore. Nessuna registrazione pubblica. Il controllo del ruolo avviene **lato server** su ogni endpoint di creazione/modifica/eliminazione utenti. Nascondere il pulsante nella UI non basta. Ogni funzione di questo tipo deve avere un test che dimostri il rifiuto (403) per un utente non admin.

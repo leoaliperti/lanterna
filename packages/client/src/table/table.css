@@ -9,9 +9,9 @@
 
 .a-map__hint {
   position: absolute;
-  top: var(--space-3);
+  top: 50%;
   left: 50%;
-  translate: -50% 0;
+  translate: -50% -50%;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -140,3 +140,38 @@
   .a-fogbar__mode { min-width: 7.5rem; }
   .a-fogbar__help { max-width: none; }
 }
+
+/* Finestra delle scorciatoie */
+.a-shortcuts { display: grid; gap: var(--space-4); padding-bottom: var(--space-4); }
+.a-shortcuts__group { margin: 0 0 var(--space-1); text-transform: uppercase; letter-spacing: 0.04em; }
+.a-shortcuts__list { margin: 0; display: grid; }
+.a-shortcuts__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: var(--hit-min); border-bottom: 1px solid var(--separator); }
+.a-shortcuts__row dt { margin: 0; }
+.a-shortcuts__row dd { margin: 0; display: flex; gap: var(--space-1); flex-wrap: wrap; justify-content: flex-end; }
+.a-kbd { padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); background: var(--fill-tertiary); font-family: inherit; font-size: var(--text-footnote); }
+
+/* Telefono: barra delle azioni compatta (solo icone, scorre di lato) e sempre sopra home indicator e controlli */
+@media (max-width: 40rem) {
+  .a-selbar {
+    left: max(var(--space-3), var(--safe-left));
+    right: calc(max(var(--space-3), var(--safe-right)) + var(--hit-min) + var(--space-3));
+    translate: none;
+    max-width: none;
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .a-selbar::-webkit-scrollbar { display: none; }
+  .a-selbar > * { flex: none; }
+  .a-selbar__name { max-width: 6rem; }
+  .a-selbar .l-btn__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .a-selbar .l-btn { padding: 0; width: var(--hit-min); justify-content: center; }
+  .a-selbar .c-actions { display: flex; gap: var(--space-2); flex-wrap: nowrap; }
+}
+/* Con la barra nebbia in alto l'avviso "Carica mappa" resta al centro: mai sovrapposto */
+
+/* Libreria: la riga non schiaccia il nome quando ci sono piu' pulsanti */
+.a-panel { grid-template-columns: minmax(0, 1fr); }
+.a-panel .l-row__text { min-width: 6rem; }
+.a-panel .l-row { flex-wrap: wrap; }
+.a-row-meta { flex-wrap: wrap; justify-content: flex-end; }
