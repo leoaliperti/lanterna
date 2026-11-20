@@ -94,9 +94,23 @@ export function snapTokenCenter(center: Point, size: number, grid: GridConfig): 
   };
 }
 
-/** Posizione finale al rilascio: agganciata se la griglia ha lo snap, altrimenti libera. */
-export function resolveDropPosition(center: Point, size: number, grid: GridConfig): Point {
-  return grid.snap && grid.cellSize > 0 ? snapTokenCenter(center, size, grid) : center;
+/** Riporta un centro dentro la mappa: con lo snap lo sposta di celle intere, senza lo porta sul bordo. */
+export function keepInside(p: Point, bounds: Size, cell: number): Point {
+  const fit = (v: number, max: number) => {
+    if (v > max) return cell > 0 ? v - Math.ceil((v - max) / cell) * cell : max;
+    if (v < 0) return cell > 0 ? v + Math.ceil(-v / cell) * cell : 0;
+    return v;
+  };
+  return { x: fit(p.x, bounds.width), y: fit(p.y, bounds.height) };
+}
+
+/**
+ * Posizione finale al rilascio: agganciata se la griglia ha lo snap, altrimenti libera. Con `bounds`
+ * resta sempre dentro la mappa (il server rifiuta le posizioni fuori, e un rifiuto al rilascio è un errore inutile).
+ */
+export function resolveDropPosition(center: Point, size: number, grid: GridConfig, bounds?: Size): Point {
+  const snapped = grid.snap && grid.cellSize > 0 ? snapTokenCenter(center, size, grid) : center;
+  return bounds ? keepInside(snapped, bounds, grid.snap && grid.cellSize > 0 ? grid.cellSize : 0) : snapped;
 }
 
 /** Cella di destinazione evidenziata durante il trascinamento (rettangolo di `size` x `size` celle). */

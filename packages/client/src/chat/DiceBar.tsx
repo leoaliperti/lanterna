@@ -167,7 +167,7 @@ export function DiceBar({ isGm, targets }: DiceBarProps) {
         <TextField
           label="Formula"
           hideLabel
-          placeholder="Formula: 2d6+3, 4d6kh3, d20 adv"
+          placeholder="Formula, es. 2d6+3"
           value={composer.formula}
           maxLength={200}
           autoComplete="off"

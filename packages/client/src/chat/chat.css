@@ -100,15 +100,16 @@
 .a-dice-overlay {
   position: absolute; left: 50%; bottom: calc(max(var(--space-6), var(--safe-bottom)) + var(--hit-min));
   translate: -50% 0; z-index: var(--z-bar);
-  width: min(20rem, calc(100% - var(--space-6)));
+  width: min(26rem, calc(100% - var(--space-6)));
   pointer-events: none; user-select: none;
-  --lanterna-dice-height: 12rem; --lanterna-surface: transparent; --lanterna-border: transparent; --lanterna-text: var(--label);
+  --lanterna-dice-height: 15rem; --lanterna-surface: transparent; --lanterna-border: transparent; --lanterna-text: var(--label);
   animation: a-dice-in var(--dur-base) var(--ease-out) both;
   transition: opacity var(--dur-base) var(--ease-out);
 }
 .a-dice-overlay * { pointer-events: none !important; }
 .a-dice-overlay[data-leaving] { opacity: 0; }
-.a-dice-overlay .lanterna-dice-tray__result { text-align: center; font-size: var(--text-subhead); font-weight: 600; text-shadow: 0 0 0.5rem var(--bg); }
+.a-dice-overlay .lanterna-dice-tray__result { justify-self: center; min-height: 0; padding: var(--space-1) var(--space-3); border-radius: var(--radius-full); background: var(--material-opaque); box-shadow: var(--shadow-md); text-align: center; font-size: var(--text-subhead); font-weight: 600; }
+.a-dice-overlay .lanterna-dice-tray__result:empty { display: none; }
 @keyframes a-dice-in { from { opacity: 0; transform: translateY(var(--space-2)); } }
 @media (prefers-reduced-motion: reduce) { .a-dice-overlay, .a-chat__entry--crit, .a-chat__entry--fumble { animation: none; } }
 

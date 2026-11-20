@@ -220,7 +220,10 @@
 .l-listgroup { margin: 0 0 var(--space-6); }
 .l-listgroup__header { margin: 0; padding: 0 var(--space-4) var(--space-2) calc(var(--space-4) + var(--space-4)); font-size: var(--text-footnote); font-weight: 400; text-transform: uppercase; letter-spacing: 0; color: var(--label-secondary); }
 .l-listgroup__footer { margin: var(--space-2) 0 0; padding: 0 var(--space-8); font-size: var(--text-footnote); color: var(--label-secondary); }
-.l-list { list-style: none; margin: 0 var(--space-4); padding: 0; background: var(--bg-grouped-secondary); border-radius: var(--radius-lg); overflow: hidden; }
+.l-list { list-style: none; margin: 0 var(--space-4); padding: 0; background: var(--bg-grouped-secondary); border-radius: var(--radius-lg); }
+/* Niente overflow: hidden, altrimenti i menu delle righe (Menu, Popover) verrebbero tagliati: gli angoli si arrotondano sulle righe. */
+.l-list > .l-listitem:first-child, .l-list > .l-listitem:first-child > .l-row { border-top-left-radius: var(--radius-lg); border-top-right-radius: var(--radius-lg); }
+.l-list > .l-listitem:last-child, .l-list > .l-listitem:last-child > .l-row { border-bottom-left-radius: var(--radius-lg); border-bottom-right-radius: var(--radius-lg); }
 .l-listitem { position: relative; }
 .l-listitem + .l-listitem::before { content: ""; position: absolute; top: 0; left: var(--space-4); right: 0; height: 0.5px; background: var(--separator); }
 .l-row { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: var(--hit-min); padding: var(--space-2) var(--space-4); border: 0; background: transparent; text-align: left; color: var(--label); font-size: var(--text-body); }

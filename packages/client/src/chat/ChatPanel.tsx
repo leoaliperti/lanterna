@@ -169,7 +169,7 @@ export function ChatPanel({ user }: ChatPanelProps) {
             ref={inputRef}
             label="Messaggio"
             hideLabel
-            placeholder={recipientName ? `Sussurra a ${recipientName}` : "Messaggio, /r 2d6+3, /w nome testo"}
+            placeholder={recipientName ? `Sussurra a ${recipientName}` : "Scrivi un messaggio"}
             value={composer.text}
             maxLength={2000}
             autoComplete="off"

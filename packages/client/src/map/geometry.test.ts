@@ -74,6 +74,11 @@ describe("snap alla griglia", () => {
     const free = { ...grid, snap: false };
     expect(resolveDropPosition({ x: 41.3, y: 7 }, 1, free)).toEqual({ x: 41.3, y: 7 });
     expect(resolveDropPosition({ x: 40, y: 40 }, 1, grid)).toEqual({ x: 35, y: 45 });
+    // con i limiti della mappa il centro non esce mai: senza snap sul bordo, con snap di celle intere
+    expect(resolveDropPosition({ x: -30, y: 900 }, 1, free, { width: 400, height: 300 })).toEqual({ x: 0, y: 300 });
+    const inside = resolveDropPosition({ x: 5000, y: -400 }, 1, grid, { width: 400, height: 300 });
+    expect(inside.x).toBeLessThanOrEqual(400);
+    expect(inside.y).toBeGreaterThanOrEqual(0);
   });
   it("calcola la cella di destinazione e la cella sotto un punto", () => {
     expect(destinationRect({ x: 35, y: 45 }, 1, 50)).toEqual({ x: 10, y: 20, width: 50, height: 50 });
