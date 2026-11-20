@@ -7,7 +7,7 @@ export type CampaignsState =
   | { status: "error"; message: string }
   | { status: "ready"; campaigns: CampaignSummary[] };
 
-/** Le campagne dell'utente. Si usa la prima (oggi un'istanza ne ha una sola). */
+/** Le campagne dell'utente. La scelta della campagna aperta sta in `#/?campaign=<id>` (vedi `TableScreen`). */
 export function useCampaigns() {
   const [state, setState] = useState<CampaignsState>({ status: "loading" });
 
@@ -25,10 +25,11 @@ export function useCampaigns() {
 
   useEffect(() => load(), [load]);
 
-  /** Crea la campagna (solo admin: il server rifiuta gli altri) e la seleziona. */
+  /** Crea la campagna (solo admin: il server rifiuta gli altri) e la aggiunge all'elenco; restituisce quella creata. */
   const create = useCallback(async (name: string) => {
     const created = await createCampaign(name);
-    setState({ status: "ready", campaigns: [created] });
+    setState((s) => ({ status: "ready", campaigns: s.status === "ready" ? [...s.campaigns, created] : [created] }));
+    return created;
   }, []);
 
   return { state, reload: load, create };

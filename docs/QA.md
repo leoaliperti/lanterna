@@ -47,7 +47,7 @@ Test aggiunti: `tokenDraft.test.ts` (spawn senza sovrapposizioni), `geometry.tes
 | Bassa | All'apertura di uno sheet il focus va sul pulsante "Fine": con interazione da tastiera mostra l'anello di focus (corretto), meglio sul primo campo. |
 | Bassa | Il tipo predefinito di un nuovo token è "Mostro" (di solito si parte dai personaggi). |
 | Bassa | Il limite di connessioni WebSocket per utente (429) si raggiunge con molte schede aperte; il client riprova in silenzio senza dire il motivo. |
-| Info | Nessuna interfaccia per spostare la campagna selezionata: l'app usa sempre la prima campagna dell'utente. |
+| Info | (risolto in M10) il titolo della campagna è ora un menu per cambiare campagna. |
 
 ## Non verificato
 

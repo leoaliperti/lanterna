@@ -2,15 +2,18 @@ import { z } from "zod";
 import type { StateChange } from "./changes.js";
 import type { Fog } from "./fog.js";
 import type { Actor, Scene, Token } from "./schema.js";
+import { PropViewSchema, type Prop } from "./props.js";
 import {
   FogViewSchema,
   SceneViewSchema,
   TokenViewSchema,
   WallViewSchema,
+  canSeeProp,
   canSeeScene,
   canSeeToken,
   isGm,
   projectFog,
+  projectProp,
   projectScene,
   projectToken,
   projectWall,
@@ -53,7 +56,12 @@ export const ServerEventSchema = z.discriminatedUnion("type", [
     /** Nebbia e muri visibili della scena attivata (M6): sostituiscono quelli precedenti. */
     fog: FogViewSchema.nullable().optional(),
     walls: z.array(WallViewSchema).optional(),
+    /** Oggetti di scena visibili della scena attivata (M10). */
+    props: z.array(PropViewSchema).optional(),
   }),
+  z.strictObject({ type: z.literal("prop.created"), prop: PropViewSchema }),
+  z.strictObject({ type: z.literal("prop.updated"), prop: PropViewSchema }),
+  z.strictObject({ type: z.literal("prop.deleted"), propId: z.string() }),
   /** Nebbia di una scena sostituita per intero (`null` = nebbia tolta). */
   z.strictObject({ type: z.literal("fog.updated"), sceneId: z.string(), fog: FogViewSchema.nullable() }),
   z.strictObject({ type: z.literal("wall.created"), wall: WallViewSchema }),
@@ -142,6 +150,19 @@ function tokenEvents(b: TokenView | null, a: TokenView | null): ServerEvent[] {
   const changes = diff(b as TokenView, a as TokenView);
   if (Object.keys(changes).length === 0) return [];
   return [{ type: "token.updated", tokenId: (a as TokenView).id, changes }];
+}
+
+type PropV = ReturnType<typeof projectProp>;
+
+function propView(p: Prop | null, viewer: Actor, activeSceneId: string | null, fog: Fog | null): PropV | null {
+  return p && canSeeProp(p, viewer, activeSceneId, fog) ? projectProp(p, viewer) : null;
+}
+
+function propEvents(b: PropV | null, a: PropV | null): ServerEvent[] {
+  if (!b && !a) return [];
+  if (!b && a) return [{ type: "prop.created", prop: a }];
+  if (b && !a) return [{ type: "prop.deleted", propId: b.id }];
+  return deepEqual(a, b) ? [] : [{ type: "prop.updated", prop: a as PropV }];
 }
 
 function wallEvents(b: WallView | null, a: WallView | null): ServerEvent[] {
@@ -241,6 +262,10 @@ export function filterEventFor(change: StateChange, viewer: Actor): ServerEvent[
         const v = projectWall(w, viewer, active, fog);
         return v ? [v] : [];
       });
+      const props = (change.props ?? []).flatMap((p) => {
+        const v = propView(p, viewer, active, fog);
+        return v ? [v] : [];
+      });
       return [
         {
           type: "scene.activated",
@@ -249,9 +274,15 @@ export function filterEventFor(change: StateChange, viewer: Actor): ServerEvent[
           tokens,
           fog: fog && change.scene ? fogView(fog, viewer, active, change.scene) : null,
           walls,
+          props,
         },
       ];
     }
+    case "prop":
+      return propEvents(
+        propView(change.before, viewer, change.activeSceneId, change.fog),
+        propView(change.after, viewer, change.activeSceneId, change.fog),
+      );
     case "wall":
       return wallEvents(
         change.before ? projectWall(change.before, viewer, change.activeSceneId, change.fog) : null,
@@ -271,6 +302,9 @@ export function filterEventFor(change: StateChange, viewer: Actor): ServerEvent[
       }
       for (const w of change.walls) {
         events.push(...wallEvents(projectWall(w, viewer, active, change.before), projectWall(w, viewer, active, change.after)));
+      }
+      for (const p of change.props ?? []) {
+        events.push(...propEvents(propView(p, viewer, active, change.before), propView(p, viewer, active, change.after)));
       }
       return events;
     }

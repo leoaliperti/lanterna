@@ -21,6 +21,7 @@ import {
 } from "./combat.js";
 import type { Actor, CampaignState, Scene, Token } from "./schema.js";
 import { MemberSchema, RoleSchema, SceneSchema, TokenSchema, fogOf } from "./schema.js";
+import { PropViewSchema, propHalfExtent, type Prop, type PropView } from "./props.js";
 import { clipSegmentToMask, type Wall } from "./walls.js";
 
 /**
@@ -102,6 +103,8 @@ export const CampaignViewSchema = z.strictObject({
   fogs: z.array(FogViewSchema).optional(),
   /** Muri visibili (M6). Sempre presente nelle viste del server. */
   walls: z.array(WallViewSchema).optional(),
+  /** Oggetti di scena visibili (M10): il giocatore solo quelli non nascosti della scena attiva (e rivelati). */
+  props: z.array(PropViewSchema).optional(),
   /** Combattimenti visibili (M7): il GM tutti, il giocatore solo quello della scena attiva. */
   combats: z.array(CombatViewSchema).optional(),
   /** Gruppi di token (M7): solo GM. */
@@ -129,6 +132,41 @@ export function canSeeToken(token: Token, viewer: Actor, activeSceneId: string |
   // Impronta del token (quadrato di `size` celle della nebbia, senza rotazione).
   const half = (token.size * f.cellSize) / 2;
   return rectRevealed(maskFor(f, viewer.userId), f, token.x - half, token.y - half, token.x + half, token.y + half);
+}
+
+/**
+ * Il viewer puo' sapere che l'oggetto di scena esiste? Come per i token: GM tutto; giocatore solo scena
+ * attiva, non nascosto e, con la nebbia, solo se una cella sotto il suo ingombro e' rivelata a lui.
+ */
+export function canSeeProp(prop: Prop, viewer: Actor, activeSceneId: string | null, fog: Fog | null): boolean {
+  if (isGm(viewer)) return true;
+  if (prop.hidden || activeSceneId === null || prop.sceneId !== activeSceneId) return false;
+  const f = fogFor(fog, prop.sceneId);
+  if (!f) return true;
+  const { hx, hy } = propHalfExtent(prop);
+  return rectRevealed(maskFor(f, viewer.userId), f, prop.x - hx, prop.y - hy, prop.x + hx, prop.y + hy);
+}
+
+/** Proiezione per lista bianca. Il GM riceve anche `name` e `hidden`; il giocatore mai. */
+export function projectProp(prop: Prop, viewer: Actor): PropView & { name?: string; hidden?: boolean } {
+  const view: PropView & { name?: string; hidden?: boolean } = {
+    id: prop.id,
+    sceneId: prop.sceneId,
+    imageUrl: prop.imageUrl,
+    x: prop.x,
+    y: prop.y,
+    width: prop.width,
+    height: prop.height,
+    rotation: prop.rotation,
+    layer: prop.layer,
+    opacity: prop.opacity,
+    fade: prop.fade,
+  };
+  if (isGm(viewer)) {
+    view.name = prop.name;
+    view.hidden = prop.hidden;
+  }
+  return view;
 }
 
 /** Il viewer può vedere la barra della vita del token? */
@@ -322,6 +360,9 @@ export function viewFor(state: CampaignState, viewer: Actor): CampaignView {
       const v = projectWall(w, viewer, active, fogOf(state, w.sceneId));
       return v ? [v] : [];
     }),
+    props: (state.props ?? [])
+      .filter((p) => canSeeProp(p, viewer, active, fogOf(state, p.sceneId)))
+      .map((p) => projectProp(p, viewer)),
     combats: (state.combats ?? []).flatMap((c) => {
       const v = projectCombat(c, state.tokens.filter((t) => t.sceneId === c.sceneId), viewer, active, fogOf(state, c.sceneId));
       return v ? [v] : [];

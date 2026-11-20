@@ -7,6 +7,7 @@ import {
   CombatSchema,
   GroupSchema,
   FogSchema,
+  PropSchema,
   SceneSchema,
   StateChangeSchema,
   TokenSchema,
@@ -20,7 +21,7 @@ import {
   type StateChange,
 } from "@lanterna/shared";
 import type { Db } from "../db/client.js";
-import { campaign, campaignEvent, campaignMember, combat, fog, scene, token, tokenGroup, user, wall } from "../db/schema.js";
+import { campaign, campaignEvent, campaignMember, combat, fog, scene, token, prop, tokenGroup, user, wall } from "../db/schema.js";
 
 /**
  * Persistenza delle campagne su SQLite (Drizzle + libSQL).
@@ -93,6 +94,7 @@ export async function loadCampaign(db: Db, id: string): Promise<(LoadedCampaign 
   };
   const fogRows = await db.select().from(fog).where(eq(fog.campaignId, id)).orderBy(asc(fog.sceneId));
   const wallRows = await db.select().from(wall).where(eq(wall.campaignId, id)).orderBy(asc(wall.sort));
+  const propRows = await db.select().from(prop).where(eq(prop.campaignId, id)).orderBy(asc(prop.sort));
   const combatRows = await db.select().from(combat).where(eq(combat.campaignId, id)).orderBy(asc(combat.sceneId));
   const groupRows = await db.select().from(tokenGroup).where(eq(tokenGroup.campaignId, id)).orderBy(asc(tokenGroup.sort));
   const parsed = CampaignStateSchema.safeParse({
@@ -105,6 +107,7 @@ export async function loadCampaign(db: Db, id: string): Promise<(LoadedCampaign 
     tokens: tokenRows.map((r) => parse(TokenSchema, r.data, `token ${r.id}`)),
     fogs: fogRows.map((r) => parse(FogSchema, r.data, `nebbia ${r.sceneId}`)),
     walls: wallRows.map((r) => parse(WallSchema, r.data, `muro ${r.id}`)),
+    props: propRows.map((r) => parse(PropSchema, r.data, `oggetto di scena ${r.id}`)),
     combats: combatRows.map((r) => parse(CombatSchema, r.data, `combattimento ${r.sceneId}`)),
     groups: groupRows.map((r) => parse(GroupSchema, r.data, `gruppo ${r.id}`)),
   });
@@ -224,7 +227,7 @@ export async function campaignIdsOf(db: Db, userId: string): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
-const nextSort = (table: typeof scene | typeof token | typeof wall | typeof tokenGroup, campaignId: string): SQL =>
+const nextSort = (table: typeof scene | typeof token | typeof wall | typeof prop | typeof tokenGroup, campaignId: string): SQL =>
   sql`(select coalesce(max(${table.sort}), 0) + 1 from ${table} where ${table.campaignId} = ${campaignId})`;
 
 /**
@@ -270,6 +273,7 @@ export async function persistChanges(
         if (c.before) {
           ops.push(db.delete(token).where(and(eq(token.campaignId, id), eq(token.sceneId, c.before.id))));
           ops.push(db.delete(wall).where(and(eq(wall.campaignId, id), eq(wall.sceneId, c.before.id))));
+          ops.push(db.delete(prop).where(and(eq(prop.campaignId, id), eq(prop.sceneId, c.before.id))));
           ops.push(db.delete(fog).where(and(eq(fog.campaignId, id), eq(fog.sceneId, c.before.id))));
           ops.push(db.delete(combat).where(and(eq(combat.campaignId, id), eq(combat.sceneId, c.before.id))));
           ops.push(db.delete(scene).where(and(eq(scene.campaignId, id), eq(scene.id, c.before.id))));
@@ -299,6 +303,18 @@ export async function persistChanges(
             .insert(wall)
             .values({ campaignId: id, id: c.after.id, sceneId: c.after.sceneId, sort: nextSort(wall, id), data })
             .onConflictDoUpdate({ target: [wall.campaignId, wall.id], set: { sceneId: c.after.sceneId, data } }),
+        );
+      }
+    } else if (c.type === "prop") {
+      if (c.after === null) {
+        if (c.before) ops.push(db.delete(prop).where(and(eq(prop.campaignId, id), eq(prop.id, c.before.id))));
+      } else {
+        const data = JSON.stringify(c.after);
+        ops.push(
+          db
+            .insert(prop)
+            .values({ campaignId: id, id: c.after.id, sceneId: c.after.sceneId, sort: nextSort(prop, id), data })
+            .onConflictDoUpdate({ target: [prop.campaignId, prop.id], set: { sceneId: c.after.sceneId, data } }),
         );
       }
     } else if (c.type === "fog") {

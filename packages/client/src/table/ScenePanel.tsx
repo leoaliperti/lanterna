@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Eye, Layers, Plus, Settings2, Trash2 } from "lucide-react";
-import type { CampaignView, SceneView } from "@lanterna/shared";
+import { Copy, Eye, Layers, Plus, Settings2, Trash2 } from "lucide-react";
+import { LIMITS, type CampaignView, type SceneView } from "@lanterna/shared";
 import { Alert, Badge, Button, List, ListRow } from "../ui";
 import { useCommands } from "../realtime/RealtimeProvider";
 import { EmptyState } from "../screens/EmptyState";
@@ -31,6 +31,18 @@ export function ScenePanel({ view, shown, onShow }: ScenePanelProps) {
     }
   }
 
+  /** Copia la scena (mappa, token, muri, nebbia, oggetti) come scena non attiva: resta una preparazione solo del GM. */
+  async function duplicate(source: SceneView) {
+    setBusy(true);
+    try {
+      const id = crypto.randomUUID();
+      const name = `${source.name} (copia)`.slice(0, LIMITS.nameMaxLength);
+      if (await run({ type: "scene.duplicate", sceneId: source.id, newSceneId: id, name })) onShow(id);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="a-panel">
       <div className="a-panel__bar">
@@ -47,7 +59,7 @@ export function ScenePanel({ view, shown, onShow }: ScenePanelProps) {
             <ListRow
               key={s.id}
               title={s.name}
-              subtitle={s.id === activeId ? "Visibile ai giocatori" : s.id === shown?.id ? "La stai guardando" : undefined}
+              subtitle={s.id === activeId ? "Visibile ai giocatori" : s.id === shown?.id ? "La stai guardando" : "In preparazione: solo tu la vedi"}
               trailing={s.id === activeId ? <Badge tone="green">In gioco</Badge> : undefined}
               selected={s.id === shown?.id}
               onPress={() => onShow(s.id)}
@@ -71,6 +83,15 @@ export function ScenePanel({ view, shown, onShow }: ScenePanelProps) {
             )}
             <Button variant="gray" size="sm" icon={<Settings2 size={16} />} onClick={() => setEditing(true)}>
               Mappa e griglia
+            </Button>
+            <Button
+              variant="gray"
+              size="sm"
+              icon={<Copy size={16} />}
+              loading={busy}
+              onClick={() => void duplicate(shown)}
+            >
+              Duplica
             </Button>
             <Button variant="destructive" size="sm" icon={<Trash2 size={16} />} onClick={() => setConfirmDelete(true)}>
               Elimina

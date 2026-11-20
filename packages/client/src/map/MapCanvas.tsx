@@ -61,7 +61,7 @@ const MEASURE_KEYS: Record<MeasureTool, string> = { ruler: "R", circle: "O", con
  */
 export function MapCanvas({
   ref, className, label = "Mappa di gioco", defaultViewport,
-  background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight, ephemerals, pulses,
+  background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight, ephemerals, pulses, objects,
   onShape, onShapeCancel, onContextMenu, onKey, measureAudience,
   onMoveToken, onResizeToken, onRotateToken, onSelectionChange, onViewportChange,
   onFogShape, onWallAdd, onWallUpdate, onWallRemove, onWallSelect, onToolStateChange
@@ -81,8 +81,8 @@ export function MapCanvas({
   const [measuresOpen, setMeasuresOpen] = useState(false);
 
   const scene = useMemo<MapScene>(
-    () => ({ background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight, ephemerals, pulses }),
-    [background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight, ephemerals, pulses]
+    () => ({ background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight, ephemerals, pulses, objects }),
+    [background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight, ephemerals, pulses, objects]
   );
   const toolStateRef = useRef(onToolStateChange);
   toolStateRef.current = onToolStateChange;

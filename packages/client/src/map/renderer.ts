@@ -3,6 +3,7 @@ import "pixi.js/unsafe-eval";
 import { Application, CanvasSource, Container, Graphics, ImageSource, Sprite, Text, Texture } from "pixi.js";
 import { parseCssColor } from "./color";
 import { FogLayer } from "./fogLayer";
+import { PropLayer } from "./propLayer";
 import type { MapController } from "./controller";
 import { isTokenShown, rectsIntersect, tokenRadius, visibleRect } from "./geometry";
 import { type BackgroundPlan, MAX_LOADED_TILES, needsDetail, planBackground, tileRect, tilesToEvict, visibleTiles } from "./tiles";
@@ -118,6 +119,7 @@ export class PixiMapView {
   private maxTexture = 4096;
 
   private fogLayer: FogLayer;
+  private propLayer: PropLayer;
   private cleanup: (() => void)[] = [];
   private invalidateHook: () => void = () => {};
 
@@ -130,6 +132,10 @@ export class PixiMapView {
     this.theme = readTheme(host);
     this.rulerText = new Text({ text: "", style: { fontFamily: "system-ui, sans-serif", fontSize: 13, fontWeight: "600", fill: this.theme.onTint } });
     this.rulerText.anchor.set(0.5);
+    this.propLayer = new PropLayer({
+      textureFor: (url) => this.textureFor(url),
+      releaseTexture: (url) => this.releaseTexture(url),
+    });
     this.fogLayer = new FogLayer({
       theme: () => this.theme,
       reducedMotion: () => this.reducedMotion,
@@ -166,8 +172,9 @@ export class PixiMapView {
     world.isRenderGroup = true;
     // Ordine: sfondo, tessere (giocatore), griglia, aiuto di vista, velo della nebbia, muri, anteprime, token.
     world.addChild(
-      this.bgLayer, this.fogLayer.tilesLayer, this.gridGfx, this.fogLayer.sightGfx, this.fogLayer.veilLayer, this.fogLayer.wallsGfx,
-      this.cellsGfx, this.fogLayer.previewGfx, this.tokenLayer, this.shapesGfx, this.pulseGfx, this.selectionGfx
+      this.bgLayer, this.fogLayer.tilesLayer, this.propLayer.background, this.gridGfx, this.propLayer.ground, this.fogLayer.sightGfx,
+      this.fogLayer.veilLayer, this.fogLayer.wallsGfx,
+      this.cellsGfx, this.fogLayer.previewGfx, this.tokenLayer, this.propLayer.above, this.shapesGfx, this.pulseGfx, this.selectionGfx
     );
     this.bgLayer.addChild(this.bgFill);
     this.overlay.addChild(this.marqueeGfx, this.rulerGfx, this.rulerText, this.handlesGfx);
@@ -221,6 +228,7 @@ export class PixiMapView {
     if (this.disposed) return;
     this.syncBackground(scene);
     this.fogLayer.sync(scene);
+    this.propLayer.sync(scene);
     this.syncTokens(scene);
     this.syncPulses(scene.pulses ?? []);
     this.requestRender();
@@ -256,6 +264,7 @@ export class PixiMapView {
     this.views.clear();
     this.clearBackground();
     this.fogLayer.dispose();
+    this.propLayer.dispose();
     for (const e of this.textures.values()) void e.texture.then((t) => t?.destroy(true));
     this.textures.clear();
     this.app.destroy({ removeView: false }, { children: true, texture: false });
@@ -644,6 +653,7 @@ export class PixiMapView {
 
     const pending = this.updateTiles(area, s, now);
     if (this.fogLayer.frame(dt, s, c)) animating = true;
+    if (this.propLayer.frame(dt, this.reducedMotion)) animating = true;
 
     // Token: posizione (con transizione), culling, decorazioni.
     const pad = cell * DECOR_PAD_CELLS;

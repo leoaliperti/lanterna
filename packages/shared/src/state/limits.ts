@@ -20,6 +20,8 @@ export const LIMITS = {
   maxScenes: 200,
   /** Muri e porte, in tutta la campagna. */
   maxWalls: 5000,
+  /** Oggetti di scena (M10), in tutta la campagna. */
+  maxProps: 3000,
   /** Terne per maschera di nebbia (vedi `fog.ts`). */
   fogMaxRuns: 20_000,
   /** Maschere personali per scena (giocatori con una maschera diversa da quella di tutti). */
