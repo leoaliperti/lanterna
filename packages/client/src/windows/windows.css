@@ -1,0 +1,101 @@
+/* Finestre secondarie (M9). Solo token del design system (docs/DESIGN.md): niente colori, px o durate a mano. */
+
+.w-view {
+  position: relative;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* Contenuto: la mappa occupa tutta la finestra; i pannelli scorrono sotto la pillola. */
+.w-view__body { grid-row: 1; padding: 0; }
+.w-view__panel {
+  grid-row: 1;
+  overflow-y: auto;
+  padding: calc(var(--hit-min) + var(--space-6) + var(--safe-top)) max(var(--space-4), var(--safe-right)) max(var(--space-6), var(--safe-bottom)) max(var(--space-4), var(--safe-left));
+  background: var(--bg-grouped);
+}
+.w-view__panel:focus-visible, .w-view__body:focus-visible { outline-offset: calc(var(--space-1) * -1); }
+.w-view__content { width: 100%; max-width: 46rem; margin: 0 auto; display: grid; gap: var(--space-3); align-content: start; }
+
+/* Pillola con nome della vista e connessione: in alto a sinistra, sopra il contenuto. */
+.w-view__bar {
+  position: absolute;
+  z-index: var(--z-bar);
+  top: max(var(--space-3), var(--safe-top));
+  left: max(var(--space-3), var(--safe-left));
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: calc(100% - var(--space-6));
+  min-height: var(--hit-min);
+  padding: 0 var(--space-1) 0 var(--space-4);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md);
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+.w-view__title { margin: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Proiettore: senza attività la pillola si fa da parte (ritorna al primo movimento o al focus). */
+.w-view[data-idle="true"] .w-view__bar:not(:hover):not(:focus-within) { opacity: 0.25; }
+
+/* Banner "Stai guardando come ...": in alto al centro, discreto, mai sopra i controlli della mappa. */
+.w-view__as {
+  position: absolute;
+  z-index: var(--z-bar);
+  top: max(var(--space-3), var(--safe-top));
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: calc(100% - var(--space-6));
+  min-height: var(--hit-min);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md);
+  color: var(--label);
+  white-space: nowrap;
+}
+.w-view__as > span:first-of-type { overflow: hidden; text-overflow: ellipsis; }
+.w-view__ro { padding: var(--space-1) var(--space-2); border-radius: var(--radius-full); background: var(--tint-bg); color: var(--tint-text); }
+/* Su finestre strette il banner scende sotto la pillola. */
+@media (max-width: 48rem) {
+  .w-view__as { top: calc(max(var(--space-3), var(--safe-top)) + var(--hit-min) + var(--space-2)); }
+}
+
+.w-view__banner { position: absolute; z-index: var(--z-bar); left: 0; right: 0; bottom: max(var(--space-3), var(--safe-bottom)); pointer-events: none; }
+.w-view__banner > * { pointer-events: auto; }
+
+/* Stato di caricamento o errore di una finestra secondaria, prima della connessione. */
+.w-view__center { height: 100dvh; display: grid; place-items: center; background: var(--bg-secondary); padding: var(--space-6); }
+
+/* Tracker del combattimento */
+.w-combat { display: grid; gap: var(--space-3); }
+.w-combat__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.w-combat__round { margin: 0; }
+.w-combat__nav { display: flex; gap: var(--space-2); }
+.w-combat__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.w-combat__row {
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--hit-min);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-grouped-secondary);
+  transition: background-color var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-ios);
+}
+.w-combat__row[aria-current="true"] { background: var(--tint-bg); transform: scale(1.01); }
+.w-combat__init { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--label-secondary); }
+.w-combat__row[aria-current="true"] .w-combat__init { color: var(--tint-text); }
+.w-combat__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w-combat__tag { color: var(--label-secondary); }
+@media (prefers-reduced-motion: reduce) {
+  .w-combat__row[aria-current="true"] { transform: none; }
+}
+
+/* Pulsante "Apri in nuova finestra" in cima al pannello laterale */
+.a-side__head { display: flex; justify-content: flex-end; margin: calc(var(--space-1) * -1) 0 var(--space-1); }

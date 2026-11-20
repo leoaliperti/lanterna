@@ -31,37 +31,76 @@ import { useHistoryShortcuts } from "./shortcuts";
 import { TableFrame } from "./TableFrame";
 import { TokenEditor } from "./TokenEditor";
 import { TokenPanel } from "./TokenPanel";
+import { ViewFrame } from "../windows/ViewFrame";
+import { WindowsMenu } from "../windows/WindowsMenu";
+import type { SecondaryRoute } from "../windows/routes";
 import "./table.css";
+
+/**
+ * Finestre multiple (M9): il tavolo completo o solo la mappa in una finestra a parte.
+ * `mapOnly` riusa la stessa mappa (e gli stessi strumenti del GM) senza barra ne' pannello.
+ */
+export interface MapOnlyLayout {
+  /** Titolo della finestra. */
+  title: string;
+  /** Scena fissa (`#/view/scene/<id>`): il GM la guarda senza cambiare quella dei giocatori. */
+  sceneId?: string | null;
+  /** Vista giocatore: nessuna interazione, la connessione e' gia' in sola lettura sul server. */
+  readOnly?: boolean;
+  /** Vista giocatore: identita' con cui chiedere le tessere della mappa (`?viewAs=`). */
+  tilesAs?: string | null;
+}
 
 export interface TableProps {
   user: SessionUser;
   /** Nome della campagna finche' non arriva lo stato. */
   campaignName: string;
+  /** Solo mappa, in una finestra secondaria. Senza: tavolo completo. */
+  mapOnly?: MapOnlyLayout;
 }
 
 /** Il tavolo reale: stato dal server, mappa, pannello token e scene, annulla/ripeti. */
-export function Table({ user, campaignName }: TableProps) {
+export function Table({ user, campaignName, mapOnly }: TableProps) {
   return (
     <ChatProvider selfId={user.id}>
-      <TableContent user={user} campaignName={campaignName} />
+      <TableContent user={user} campaignName={campaignName} mapOnly={mapOnly} />
     </ChatProvider>
   );
 }
 
-function TableContent({ user, campaignName }: TableProps) {
+function TableContent({ user, campaignName, mapOnly }: TableProps) {
   const { view, status, failure } = useRealtimeState();
   const commands = useCommands();
   const connected = status === "connected";
+  const readOnly = mapOnly?.readOnly ?? false;
 
-  useHistoryShortcuts({ undo: () => void commands.undo(), redo: () => void commands.redo(), enabled: connected && view !== null });
+  useHistoryShortcuts({ undo: () => void commands.undo(), redo: () => void commands.redo(), enabled: connected && view !== null && !readOnly });
 
   const actions = (
     <>
       <ConnectionDot />
+      <WindowsMenu user={user} view={view} />
       <IconButton label="Annulla (Cmd/Ctrl+Z)" icon={<Undo2 size={20} />} disabled={!connected} onClick={() => void commands.undo()} />
       <IconButton label="Ripeti (Maiusc+Cmd/Ctrl+Z)" icon={<Redo2 size={20} />} disabled={!connected} onClick={() => void commands.redo()} />
     </>
   );
+
+  if (mapOnly) {
+    const viewing = readOnly && view ? (view.members.find((m) => m.userId === view.viewer.userId)?.displayName ?? null) : null;
+    return (
+      <ViewFrame title={mapOnly.title} layout="map" viewingAs={viewing}>
+        {view ? (
+          <SheetsProvider campaignId={view.campaignId} user={user} syncTokens={false}>
+            <LiveTable user={user} view={view} actions={null} mapOnly={mapOnly} />
+          </SheetsProvider>
+        ) : failure ? (
+          <EmptyState icon={<WifiOff size={36} />} title="Impossibile aprire la vista" description="Controlla il messaggio qui sotto, poi chiudi la finestra o ricaricala." />
+        ) : (
+          <Spinner label="Connessione al tavolo" size="lg" />
+        )}
+      </ViewFrame>
+    );
+  }
 
   if (!view) {
     return (
@@ -85,13 +124,17 @@ interface LiveProps {
   user: SessionUser;
   view: CampaignView;
   actions: React.ReactNode;
+  mapOnly?: MapOnlyLayout;
 }
 
-function LiveTable({ user, view, actions }: LiveProps) {
+function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
   const commands = useCommands();
   const { run } = commands;
-  const perms = permissionsFor(view);
-  const [viewedId, setViewedId] = useState<string | null>(null);
+  const readOnly = mapOnly?.readOnly ?? false;
+  const basePerms = permissionsFor(view);
+  // Sola lettura (vista giocatore): nessuno strumento, nessun trascinamento. Il server rifiuterebbe comunque.
+  const perms = readOnly ? { ...basePerms, isGm: false, canMoveToken: () => false, canOpenEditor: () => false } : basePerms;
+  const [viewedId, setViewedId] = useState<string | null>(mapOnly?.sceneId ?? null);
   const [selected, setSelected] = useState<readonly string[]>([]);
   const [editor, setEditor] = useState<{ open: boolean; tokenId: string | null }>({ open: false, tokenId: null });
   const [sceneForm, setSceneForm] = useState<"create" | "edit" | null>(null);
@@ -116,27 +159,26 @@ function LiveTable({ user, view, actions }: LiveProps) {
   const feed = useCombatFeed({ view, sceneId: scene?.id ?? null, mapRef });
   const wallTool = controls.tool.tool === "wall";
   const mapFog = useMemo(
-    () => (scene ? toMapFog(view, scene, { viewAs: controls.viewAs, showVeil: controls.veil }) : null),
+    () => (scene ? toMapFog(view, scene, { viewAs: controls.viewAs, showVeil: controls.veil, tilesAs: mapOnly?.tilesAs ?? null }) : null),
     // La nebbia cambia solo con `fogs`, la scena o le scelte del GM: non a ogni movimento di token.
-    [view.fogs, view.campaignId, view.viewer.role, scene, controls.viewAs, controls.veil]
+    [view.fogs, view.campaignId, view.viewer.role, scene, controls.viewAs, controls.veil, mapOnly?.tilesAs]
   );
   const mapWalls = useMemo(() => (scene ? toMapWalls(view.walls, scene.id) : []), [view.walls, scene]);
   const sight = useSight(view, scene, controls.sight);
-  const mapScene = useMemo(
-    () =>
-      scene
-        ? toMapScene(view, scene, {
-            fog: mapFog,
-            walls: mapWalls,
-            wallsVisible: perms.isGm ? controls.walls || wallTool : true,
-            sight,
-            ephemerals: feed.shapes,
-            pulses: feed.pulses,
-            turnTokenId: turnToken
-          })
-        : null,
-    [view, scene, mapFog, mapWalls, controls.walls, wallTool, perms.isGm, sight, feed.shapes, feed.pulses, turnToken]
-  );
+  const mapScene = useMemo(() => {
+    if (!scene) return null;
+    const s = toMapScene(view, scene, {
+      fog: mapFog,
+      walls: mapWalls,
+      wallsVisible: perms.isGm ? controls.walls || wallTool : true,
+      sight,
+      ephemerals: feed.shapes,
+      pulses: feed.pulses,
+      turnTokenId: turnToken
+    });
+    // Vista giocatore (sola lettura): nessun token trascinabile.
+    return readOnly ? { ...s, movableTokenIds: [] } : s;
+  }, [view, scene, mapFog, mapWalls, controls.walls, wallTool, perms.isGm, sight, feed.shapes, feed.pulses, turnToken, readOnly]);
   const hasVisionToken = useMemo(() => (scene ? view.tokens.some((t) => t.sceneId === scene.id && t.vision) : false), [view.tokens, scene]);
   const selectedWall = useMemo(() => mapWalls.find((w) => w.id === controls.selectedWall) ?? null, [mapWalls, controls.selectedWall]);
   const sceneTokens = useMemo(() => (scene ? tokensOfScene(view, scene.id) : []), [view, scene]);
@@ -315,28 +357,23 @@ function LiveTable({ user, view, actions }: LiveProps) {
       : [])
   ];
 
-  return (
-    <TableFrame
-      user={user}
-      title={view.name}
-      actions={actions}
-      banner={<ConnectionBanner />}
-      tabs={tabs}
-      defaultTab="token"
-      focusRequest={focusRequest}
-      onVisibleTabChange={onVisibleTab}
-      panelBadge={chat.unread}
-    >
-      <ChatLive />
-      <DiceOverlay />
-      <SheetWorkspace />
+  // "Apri in nuova finestra" per le schede del pannello che hanno una vista propria (M9).
+  const tabWindows: Record<string, SecondaryRoute> = {
+    chat: { kind: "chat" },
+    sheets: { kind: "notes" },
+    combat: { kind: "combat" },
+    ...(scene && perms.isGm ? { scene: { kind: "scene", sceneId: scene.id } as SecondaryRoute } : {})
+  };
+
+  const body = (
+    <>
       {mapScene && scene ? (
         <div className="a-map__live">
           <MapCanvas
             ref={mapRef}
             {...mapScene}
             label={`Mappa: ${scene.name}`}
-            onMoveToken={onMoveToken}
+            onMoveToken={readOnly ? undefined : onMoveToken}
             onResizeToken={perms.isGm ? onResizeToken : undefined}
             onRotateToken={perms.isGm ? onRotateToken : undefined}
             onSelectionChange={setSelected}
@@ -346,10 +383,10 @@ function LiveTable({ user, view, actions }: LiveProps) {
             onWallRemove={perms.isGm ? onWallRemove : undefined}
             onWallSelect={controls.setSelectedWall}
             onToolStateChange={controls.setTool}
-            onShape={feed.onShape}
-            onShapeCancel={feed.onShapeCancel}
-            onContextMenu={onContextMenu}
-            onKey={onMapKey}
+            onShape={readOnly ? undefined : feed.onShape}
+            onShapeCancel={readOnly ? undefined : feed.onShapeCancel}
+            onContextMenu={readOnly ? undefined : onContextMenu}
+            onKey={readOnly ? undefined : onMapKey}
             measureAudience={{ value: feed.audience, options: audienceOptions, onChange: (v) => feed.setAudience(v as typeof feed.audience) }}
           />
           <FogToolbar
@@ -418,31 +455,64 @@ function LiveTable({ user, view, actions }: LiveProps) {
       ) : (
         <EmptyState icon={<MapIcon size={36} />} title="In attesa della mappa" description="Il GM non ha ancora aperto una scena. Comparirà qui appena sarà pronta." />
       )}
-      {perms.isGm ? (
+      {perms.isGm && !mapOnly ? (
         <p className="a-map__badge t-caption1 a-muted">
           <ShieldCheck size={14} aria-hidden="true" /> Sei il GM di questo tavolo
         </p>
       ) : null}
 
-      <TokenEditor
-        view={view}
-        scene={scene}
-        tokenId={editor.tokenId}
-        open={editor.open}
-        onOpenChange={(open) => setEditor((e) => ({ ...e, open }))}
-        onAddEffect={(id) => {
-          setEditor((e) => ({ ...e, open: false }));
-          openAction("effect", [id]);
-        }}
-      />
-      <ActionSheet view={view} cellSize={scene?.grid.cellSize ?? 70} request={action} onClose={() => setAction(null)} />
-      <PointMenu position={menu ? { x: menu.x, y: menu.y } : null} label="Azioni sul token" items={menuItems()} onClose={() => setMenu(null)} />
-      <SceneForm
-        open={sceneForm !== null}
-        onOpenChange={(open) => !open && setSceneForm(null)}
-        scene={sceneForm === "edit" ? scene : null}
-        onCreated={setViewedId}
-      />
+      {readOnly ? null : (
+        <>
+          <TokenEditor
+            view={view}
+            scene={scene}
+            tokenId={editor.tokenId}
+            open={editor.open}
+            onOpenChange={(open) => setEditor((e) => ({ ...e, open }))}
+            onAddEffect={(id) => {
+              setEditor((e) => ({ ...e, open: false }));
+              openAction("effect", [id]);
+            }}
+          />
+          <ActionSheet view={view} cellSize={scene?.grid.cellSize ?? 70} request={action} onClose={() => setAction(null)} />
+          <PointMenu position={menu ? { x: menu.x, y: menu.y } : null} label="Azioni sul token" items={menuItems()} onClose={() => setMenu(null)} />
+          <SceneForm
+            open={sceneForm !== null}
+            onOpenChange={(open) => !open && setSceneForm(null)}
+            scene={sceneForm === "edit" ? scene : null}
+            onCreated={setViewedId}
+          />
+        </>
+      )}
+    </>
+  );
+
+  if (mapOnly) {
+    return (
+      <>
+        <DiceOverlay />
+        {body}
+      </>
+    );
+  }
+
+  return (
+    <TableFrame
+      user={user}
+      title={view.name}
+      actions={actions}
+      banner={<ConnectionBanner />}
+      tabs={tabs}
+      tabWindows={tabWindows}
+      defaultTab="token"
+      focusRequest={focusRequest}
+      onVisibleTabChange={onVisibleTab}
+      panelBadge={chat.unread}
+    >
+      <ChatLive />
+      <DiceOverlay />
+      <SheetWorkspace />
+      {body}
     </TableFrame>
   );
 }
