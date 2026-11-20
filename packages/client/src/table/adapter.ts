@@ -93,6 +93,11 @@ export interface FogDisplay {
   viewAs: string | null;
   /** GM: mostra il velo in trasparenza. */
   showVeil: boolean;
+  /**
+   * Vista giocatore del GM (M9): la connessione riceve la vista di questo membro e le tessere vanno
+   * chieste con la stessa identita' (`?viewAs=`), altrimenti il server servirebbe quelle del GM.
+   */
+  tilesAs?: string | null;
 }
 
 /**
@@ -107,7 +112,9 @@ export function toMapFog(view: CampaignView, scene: SceneView, display: FogDispl
     return { sceneId: scene.id, geometry, mask: display.showVeil ? viewMask(fog, display.viewAs) : null, opaque: false, tiles: [] };
   }
   const tiles = fog.tiles
-    ? availableTiles(fog.tiles, fog.mask, geometry, scene.width, scene.height, (col, row, key) => tileUrl(API_BASE, view.campaignId, scene.id, col, row, key))
+    ? availableTiles(fog.tiles, fog.mask, geometry, scene.width, scene.height, (col, row, key) =>
+        tileUrl(API_BASE, view.campaignId, scene.id, col, row, key, display.tilesAs ?? null)
+      )
     : [];
   return { sceneId: scene.id, geometry, mask: fog.mask, opaque: true, tiles };
 }

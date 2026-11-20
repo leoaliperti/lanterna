@@ -162,5 +162,6 @@ describe("tessere disponibili", () => {
   });
   it("URL: sotto /api, con la chiave di copertura per scavalcare la cache", () => {
     expect(tileUrl("/api", "c 1", "s1", 2, 3, "a:b")).toBe("/api/campaigns/c%201/scenes/s1/tiles/2/3?k=a%3Ab");
+    expect(tileUrl("/api", "c1", "s1", 0, 0, "k", "user-a")).toBe("/api/campaigns/c1/scenes/s1/tiles/0/0?k=k&viewAs=user-a");
   });
 });
