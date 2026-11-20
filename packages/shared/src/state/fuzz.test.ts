@@ -5,7 +5,7 @@ import { filterEventsFor } from "./filter.js";
 import { GM, P1, P2, STRANGER, deepFreeze, rng, scene, token } from "./fixtures.test-utils.js";
 import { createHistory, execute, redo, undo, type History, type HistoryResult } from "./history.js";
 import { checkInvariants } from "./invariants.js";
-import { CampaignStateSchema, type Actor, type CampaignState } from "./schema.js";
+import { CampaignStateSchema, fogOf, type Actor, type CampaignState } from "./schema.js";
 import { canSeeToken, viewFor, type CampaignView } from "./view.js";
 
 /**
@@ -125,7 +125,7 @@ function forbiddenFor(s: CampaignState, viewer: Actor): string[] {
   const out: string[] = [];
   for (const t of s.tokens) {
     out.push(`Nota-${t.id}`);
-    if (!canSeeToken(t, viewer, s.activeSceneId)) out.push(t.id, `Nome-${t.id}`);
+    if (!canSeeToken(t, viewer, s.activeSceneId, fogOf(s, t.sceneId))) out.push(t.id, `Nome-${t.id}`);
   }
   for (const sc of s.scenes) if (sc.id !== s.activeSceneId) out.push(sc.id, `Nome-${sc.id}`);
   return out;

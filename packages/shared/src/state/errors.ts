@@ -37,4 +37,8 @@ export const MESSAGES = {
   nothingToUndo: "niente da annullare",
   nothingToRedo: "niente da ripetere",
   stale: "lo stato è cambiato nel frattempo",
+  fogNotFound: "nebbia non attiva su questa scena",
+  fogExists: "nebbia già attiva su questa scena",
+  unknownPlayer: "giocatore non membro della campagna",
+  wallNotFound: "muro non trovato",
 } as const;

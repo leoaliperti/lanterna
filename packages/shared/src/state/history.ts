@@ -5,6 +5,8 @@ import { deepEqual } from "./filter.js";
 import { applyCommand, applyCommands } from "./reducer.js";
 import type { Actor, CampaignState, Scene, Token } from "./schema.js";
 import { canSeeToken, isGm } from "./view.js";
+import { fogOf } from "./schema.js";
+import type { Wall } from "./walls.js";
 
 /**
  * Annulla/ripeti per utente, come logica pura sopra il riduttore.
@@ -113,7 +115,7 @@ function checkExpect(state: CampaignState, expect: StateChange[], actor: Actor):
       const id = (c.after ?? c.before)?.id;
       if (!id) continue;
       const cur: Token | undefined = state.tokens.find((t) => t.id === id);
-      if (cur && !canSeeToken(cur, actor, state.activeSceneId)) {
+      if (cur && !canSeeToken(cur, actor, state.activeSceneId, fogOf(state, cur.sceneId))) {
         return { code: "NOT_FOUND", message: MESSAGES.tokenNotFound };
       }
       if (c.after === null) {
@@ -133,6 +135,19 @@ function checkExpect(state: CampaignState, expect: StateChange[], actor: Actor):
       if (!cur) return { code: "CONFLICT", message: MESSAGES.stale };
       const keys = c.before === null ? [] : changedKeys(c.before, c.after);
       if (keys.some((k) => !deepEqual(cur[k], c.after?.[k]))) return { code: "CONFLICT", message: MESSAGES.stale };
+    } else if (c.type === "wall") {
+      const id = (c.after ?? c.before)?.id;
+      const cur: Wall | undefined = (state.walls ?? []).find((w) => w.id === id);
+      if (c.after === null) {
+        if (cur) return { code: "CONFLICT", message: MESSAGES.stale };
+        continue;
+      }
+      if (!cur) return { code: "CONFLICT", message: MESSAGES.stale };
+      const keys = c.before === null ? [] : changedKeys(c.before, c.after);
+      if (keys.some((k) => !deepEqual(cur[k], c.after?.[k]))) return { code: "CONFLICT", message: MESSAGES.stale };
+    } else if (c.type === "fog") {
+      // La nebbia è un oggetto unico: deve essere esattamente quella lasciata dall'azione.
+      if (!deepEqual(fogOf(state, c.sceneId), c.after)) return { code: "CONFLICT", message: MESSAGES.stale };
     } else if (state.activeSceneId !== c.after) {
       return { code: "CONFLICT", message: MESSAGES.stale };
     }

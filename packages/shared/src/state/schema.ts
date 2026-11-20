@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { FogSchema, type Fog } from "./fog.js";
+import { IdSchema, LIMITS } from "./limits.js";
+import { WallSchema, type Wall } from "./walls.js";
 
 /**
  * Modello di stato di una campagna. È la forma "completa" (vista del GM)
@@ -6,33 +9,7 @@ import { z } from "zod";
  * proiezione filtrata (vedi `viewFor` in `view.ts`).
  */
 
-/** Limiti condivisi: usati sia dagli schemi sia dai test. */
-export const LIMITS = {
-  idMaxLength: 64,
-  nameMaxLength: 64,
-  urlMaxLength: 2048,
-  notesMaxLength: 10_000,
-  sceneMinSize: 1,
-  sceneMaxSize: 20_000,
-  cellMinSize: 4,
-  cellMaxSize: 1024,
-  tokenMinSize: 0.25,
-  tokenMaxSize: 32,
-  maxConditions: 32,
-  hpMax: 100_000,
-  unitsPerCellMax: 1000,
-  unitMaxLength: 16,
-  maxTokens: 2000,
-  maxScenes: 200,
-} as const;
-
-/** Identificatore opaco (UUID o simile). Mai contatori: non devono rivelare quanti oggetti esistono. */
-export const IdSchema = z
-  .string()
-  .min(1)
-  .max(LIMITS.idMaxLength)
-  .regex(/^[A-Za-z0-9_-]+$/, "id non valido");
-export type Id = z.infer<typeof IdSchema>;
+export { IdSchema, LIMITS, type Id } from "./limits.js";
 
 export const NameSchema = z.string().trim().min(1).max(LIMITS.nameMaxLength);
 
@@ -119,6 +96,23 @@ export const HealthSchema = z
   .refine((h) => h.current <= h.max, { message: "vita attuale oltre il massimo" });
 export type Health = z.infer<typeof HealthSchema>;
 
+const visionRange = z.number().min(0).max(LIMITS.visionMaxRange);
+
+/**
+ * Vista e luce di un token, in unità di gioco (es. piedi). Serve SOLO all'aiuto visivo
+ * ("cosa vede questo token"): non scopre mai la nebbia.
+ * - `range`: distanza massima di vista (`null` = illimitata);
+ * - `darkvision`: scurovisione (vede al buio entro questo raggio);
+ * - `bright` / `dim`: luce emessa dal token (luce intensa entro `bright`, fioca fino a `bright + dim`).
+ */
+export const TokenVisionSchema = z.strictObject({
+  range: visionRange.nullable(),
+  darkvision: visionRange,
+  bright: visionRange,
+  dim: visionRange,
+});
+export type TokenVision = z.infer<typeof TokenVisionSchema>;
+
 export const TokenSchema = z.strictObject({
   id: IdSchema,
   sceneId: IdSchema,
@@ -137,6 +131,8 @@ export const TokenSchema = z.strictObject({
   conditions: ConditionsSchema,
   health: HealthSchema.nullable(),
   gmNotes: z.string().max(LIMITS.notesMaxLength),
+  /** Facoltativo (assente nelle campagne precedenti a M6): vista e luce per l'aiuto visivo. */
+  vision: TokenVisionSchema.nullable().optional(),
 });
 export type Token = z.infer<typeof TokenSchema>;
 
@@ -150,6 +146,13 @@ export const CampaignStateSchema = z.strictObject({
   scenes: z.array(SceneSchema).max(LIMITS.maxScenes),
   /** L'ordine dell'array è l'ordine di disegno (z-order). */
   tokens: z.array(TokenSchema).max(LIMITS.maxTokens),
+  /**
+   * Nebbia di guerra per scena (M6), al più una per scena. Facoltativo: assente o vuoto =
+   * nessuna nebbia (comportamento precedente a M6).
+   */
+  fogs: z.array(FogSchema).max(LIMITS.maxScenes).optional(),
+  /** Muri e porte (M6), di tutte le scene. Facoltativo come `fogs`. */
+  walls: z.array(WallSchema).max(LIMITS.maxWalls).optional(),
 });
 export type CampaignState = z.infer<typeof CampaignStateSchema>;
 
@@ -186,6 +189,16 @@ export function createCampaignState(
     scenes: [],
     tokens: [],
   });
+}
+
+/** Nebbia della scena, se attiva. */
+export function fogOf(state: Pick<CampaignState, "fogs">, sceneId: string): Fog | null {
+  return state.fogs?.find((f) => f.sceneId === sceneId) ?? null;
+}
+
+/** Muri della scena, nell'ordine dello stato. */
+export function wallsOf(state: Pick<CampaignState, "walls">, sceneId: string): Wall[] {
+  return (state.walls ?? []).filter((w) => w.sceneId === sceneId);
 }
 
 /** Risolve l'attore dai membri della campagna; `null` se l'utente non ne fa parte. */
