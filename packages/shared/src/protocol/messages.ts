@@ -13,6 +13,13 @@ import {
   RollRequestSchema,
   RollResultSchema,
 } from "./chat.js";
+import {
+  EphemeralClearSchema,
+  EphemeralClearedSchema,
+  EphemeralShowSchema,
+  EphemeralShownSchema,
+  InitiativeRollSchema,
+} from "./ephemeral.js";
 
 /**
  * Protocollo WebSocket di Lanterna, versione 1. Messaggi JSON, uno per frame.
@@ -66,6 +73,9 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
   ChatSendSchema,
   RollRequestSchema,
   HistoryRequestSchema,
+  EphemeralShowSchema,
+  EphemeralClearSchema,
+  InitiativeRollSchema,
   PingSchema,
 ]);
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
@@ -123,6 +133,8 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   ChatMessageSchema,
   RollResultSchema,
   HistoryMessageSchema,
+  EphemeralShownSchema,
+  EphemeralClearedSchema,
   PongSchema,
 ]);
 export type ServerMessage = z.infer<typeof ServerMessageSchema>;
