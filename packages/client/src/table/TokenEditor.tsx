@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Library, Trash2 } from "lucide-react";
 import type { CampaignView, SceneView } from "@lanterna/shared";
-import { uploadErrorMessage, uploadImage } from "../api/client";
-import { Alert, Button, Picker, SegmentedControl, Sheet, Stepper, TextArea, TextField, Toggle } from "../ui";
+import { userErrorMessage, uploadErrorMessage, uploadImage } from "../api/client";
+import { createLibraryItem } from "../library/libraryApi";
+import { libraryInputFromDraft } from "../library/libraryLogic";
+import { LIBRARY_CHANGED } from "../library/LibraryPanel";
+import { Alert, Button, Menu, Picker, SegmentedControl, Sheet, Stepper, TextArea, TextField, Toggle, useToast } from "../ui";
 import { assetUrl } from "../realtime/urls";
 import { useCommands } from "../realtime/RealtimeProvider";
 import { CONDITION_LIST, ConditionIcon } from "./conditions";
@@ -35,6 +38,7 @@ const KIND_OPTIONS = [
  */
 export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenEditorProps) {
   const { run } = useCommands();
+  const toast = useToast();
   const token = useMemo(() => (tokenId ? (view.tokens.find((t) => t.id === tokenId) ?? null) : null), [view.tokens, tokenId]);
   const perms = permissionsFor(view);
   const creating = tokenId === null;
@@ -74,6 +78,22 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
       ...d,
       conditions: d.conditions.some((c) => c.id === id) ? d.conditions.filter((c) => c.id !== id) : [...d.conditions, { id, name }]
     }));
+  }
+
+  /** "Salva nella libreria": un modello dal token com'e' ora nel modulo (immagine: l'ultima salvata). */
+  async function saveToLibrary(global: boolean) {
+    if (hasErrors(errors) || !token) {
+      setSubmitted(true);
+      return;
+    }
+    try {
+      const image = imageRemoved ? null : (token.imageUrl ?? null);
+      await createLibraryItem(libraryInputFromDraft(draft, image, global ? { kind: "global" } : { kind: "campaign", campaignId: view.campaignId }));
+      window.dispatchEvent(new Event(LIBRARY_CHANGED));
+      toast.show({ title: `${draft.name.trim()} salvato nella libreria`, tone: "success" });
+    } catch (err) {
+      toast.show({ title: "Non riesco a salvare nella libreria", message: userErrorMessage(err), tone: "danger" });
+    }
   }
 
   async function submit() {
@@ -228,6 +248,21 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
             <Button variant="destructive" icon={<Trash2 size={16} />} onClick={() => setConfirmDelete(true)} disabled={busy}>
               Elimina
             </Button>
+          ) : null}
+          {!creating && fields.all ? (
+            <Menu
+              label="Salva nella libreria"
+              placement="top-start"
+              items={[
+                { id: "campaign", label: "Libreria della campagna", icon: <Library size={18} />, onSelect: () => void saveToLibrary(false) },
+                { id: "global", label: "Libreria globale", icon: <Library size={18} />, onSelect: () => void saveToLibrary(true) }
+              ]}
+              trigger={
+                <Button variant="gray" icon={<Library size={16} />} disabled={busy}>
+                  Salva nella libreria
+                </Button>
+              }
+            />
           ) : null}
           <span className="a-form__spacer" />
           <Button variant="gray" onClick={() => onOpenChange(false)} disabled={busy}>

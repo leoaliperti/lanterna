@@ -39,6 +39,7 @@ Ogni libreria o snippet copiato va elencato qui con licenza e fonte.
 | jpeg-js 0.4.4 | BSD-3-Clause | https://github.com/jpeg-js/jpeg-js | nebbia (M6): decodifica e codifica JPEG in JavaScript puro per le tessere |
 | @jsquash/webp 1.5.0 (libwebp in WebAssembly, dal progetto Squoosh) | Apache-2.0 (libwebp: BSD-3-Clause) | https://github.com/jamsinclair/jSquash | nebbia (M6): decodifica WebP per le tessere; il modulo `.wasm` è incluso nel pacchetto npm, nessuno script di installazione |
 | wasm-feature-detect (dipendenza di @jsquash/webp) | Apache-2.0 | https://github.com/GoogleChromeLabs/wasm-feature-detect | rilevamento delle funzioni WebAssembly |
+| fflate 0.8.3 | MIT | https://github.com/101arrowz/fflate | esportazione/importazione di campagna (M10): zip e unzip in streaming in JavaScript puro, nessuna dipendenza nativa (`packages/server/src/archive`); anche nei test del client (e2e) |
 
 Il design system del client (`packages/client/src/ui`) e' scritto da zero in CSS puro e React, senza librerie di animazione ne' primitive esterne; segue le Human Interface Guidelines di Apple come ispirazione, senza includere font, icone o asset Apple (si usa lo stack di sistema `-apple-system, system-ui`). Dettagli in [`docs/DESIGN.md`](docs/DESIGN.md); la gallery e' su `#/ui` in sviluppo.
 

@@ -116,3 +116,13 @@
 .a-page .l-navbar__row, .a-page .l-navlarge { max-width: 44rem; margin-inline: auto; }
 .a-page__intro { margin-bottom: var(--space-5) !important; }
 .a-row-actions { display: inline-flex; align-items: center; gap: var(--space-1); }
+
+/* ---------- Backup e importazione ---------- */
+.a-backup { display: grid; gap: var(--space-4); margin-bottom: var(--space-8); }
+.a-backup h2 { margin: 0; }
+.a-backup__form { gap: var(--space-4); }
+.a-backup__members { display: grid; gap: var(--space-3); margin: 0; padding: 0; border: 0; min-width: 0; }
+.a-backup__members legend { padding: 0; margin-bottom: var(--space-2); }
+.a-backup__members p { margin: 0; }
+.a-backup__member { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.a-backup__done { display: grid; gap: var(--space-4); }

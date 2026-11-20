@@ -5,15 +5,17 @@ import { navigate, usePath } from "./router/hashRouter";
 import { LoginScreen } from "./screens/LoginScreen";
 import { TableScreen } from "./screens/TableScreen";
 import { AdminUsersScreen } from "./screens/AdminUsersScreen";
+import { BackupScreen } from "./screens/BackupScreen";
 import "./screens/app.css";
 
-type Screen = "loading" | "login" | "table" | "admin-users" | "redirect-home";
+type Screen = "loading" | "login" | "table" | "admin-users" | "admin-backup" | "redirect-home";
 
 const TITLES: Record<Screen, string> = {
   loading: "Lanterna",
   login: "Accedi - Lanterna",
   table: "Tavolo - Lanterna",
   "admin-users": "Gestione utenti - Lanterna",
+  "admin-backup": "Backup e importazione - Lanterna",
   "redirect-home": "Lanterna"
 };
 
@@ -26,6 +28,7 @@ export function resolveScreen(path: string, status: "loading" | "anonymous" | "a
   if (status === "anonymous") return "login";
   if (path === "/") return "table";
   if (path === "/admin/users" && role === "admin") return "admin-users";
+  if (path === "/admin/backup" && role === "admin") return "admin-backup";
   return "redirect-home";
 }
 
@@ -54,9 +57,19 @@ export function App() {
         <TableScreen />
       ) : screen === "admin-users" ? (
         <AdminUsersScreen />
+      ) : screen === "admin-backup" ? (
+        <BackupScreen />
       ) : null}
       <p className="l-sr-only" role="status" aria-live="polite">
-        {screen === "table" ? "Tavolo" : screen === "admin-users" ? "Gestione utenti" : screen === "login" ? "Accesso" : ""}
+        {screen === "table"
+          ? "Tavolo"
+          : screen === "admin-users"
+            ? "Gestione utenti"
+            : screen === "admin-backup"
+              ? "Backup e importazione"
+              : screen === "login"
+                ? "Accesso"
+                : ""}
       </p>
     </>
   );

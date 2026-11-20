@@ -246,6 +246,22 @@ sudo systemctl start lanterna
 
 Prova il ripristino **prima** di averne bisogno, su una copia (`DATABASE_URL=file:/tmp/prova.db UPLOAD_DIR=/tmp/prova-up npm run restore ...`).
 
+### Esportazione di campagna e backup: quale usare
+
+Sono due strumenti diversi.
+
+| | Backup SQLite (`npm run backup` / `restore`) | Esportazione di campagna (schermata "Backup e importazione") |
+|---|---|---|
+| Cosa copia | **tutta** l'istanza: database (utenti compresi, password con hash, sessioni, tutte le campagne, contenuti) e `uploads/` | **una** campagna: stato, schede, contenuti e libreria della campagna, immagini usate, chat facoltativa |
+| Account | sì (stessi utenti, stesse password) | **no**: solo nome e ruolo dei membri, mai email, password, sessioni o segreti |
+| Ripristino | server **fermo**, sostituisce i dati attuali (che restano accanto, `.prima-del-ripristino-<data>`); nuova epoca, i client ricaricano | server **acceso**, crea una **nuova** campagna accanto alle altre (mai sovrascrive), l'admin associa i giocatori ai suoi utenti |
+| Quando | disastro (disco rotto, errore grave), aggiornamenti rischiosi, copia notturna | spostare una campagna su un altro server, tenerne una copia portabile, duplicarla, archiviarla |
+| Formato | cartella con `lanterna.db` + `uploads/` | `.zip` con JSON e immagini, manifesto versionato (docs/PROTOCOL.md) |
+
+L'esportazione **non sostituisce** il backup: non contiene gli utenti né le altre campagne. Per il ripristino dopo un guasto usa sempre il backup SQLite; usa l'esportazione per portare una campagna altrove. Per ripristinare una campagna da un archivio: admin → menu utente → "Backup e importazione" → "Scegli un archivio…" → controlla l'anteprima → associa i giocatori → "Importa campagna". La campagna importata è nuova (non tocca quella da cui è stata esportata) e si apre da "Apri la campagna" (o da `#/?campaign=<id>`).
+
+Limiti configurabili in `.env` (`ARCHIVE_MAX_BYTES`, `ARCHIVE_MAX_UNPACKED_BYTES`, `ARCHIVE_MAX_JSON_BYTES`, `ARCHIVE_MAX_ENTRIES`): valgono sui byte realmente letti. Se Cloudflare Tunnel o un proxy limita la dimensione del corpo delle richieste (il piano gratuito di Cloudflare accetta fino a 100 MB), gli archivi più grandi vanno importati da rete locale. Mentre si importa il server crea una cartella temporanea `.import-<uuid>` dentro `UPLOAD_DIR` (la rimuove da sola, anche all'avvio dopo un arresto brusco; `npm run backup` la ignora).
+
 ## 8. Contenuti di gioco
 
 Non sono nel repo: importali con `npm run import-content -w @lanterna/server -- <file|cartella>` (formato in [`CONTENT.md`](CONTENT.md)).

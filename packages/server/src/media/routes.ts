@@ -9,7 +9,7 @@ import { IdSchema, type UploadKind, type UploadResponse } from "@lanterna/shared
 import { requireRole, requireSession } from "../auth/session.js";
 import type { AppConfig } from "../config.js";
 import { asset } from "../db/schema.js";
-import { sniffImage } from "./image.js";
+import { exceedsImageLimits, sniffImage } from "./image.js";
 import type { Hub } from "../realtime/hub.js";
 import type { TileService } from "./tiles.js";
 
@@ -65,7 +65,7 @@ export async function uploadRoutes(app: FastifyInstance, config: AppConfig, hub:
         }
         const info = sniffImage(buffer);
         if (!info) return fail(reply, 415, "Formato non supportato: solo PNG, JPEG o WebP");
-        if (info.width > upload.maxSide || info.height > upload.maxSide || info.width * info.height > upload.maxPixels) {
+        if (exceedsImageLimits(info, upload)) {
           return fail(reply, 413, "Immagine troppo grande in pixel");
         }
 

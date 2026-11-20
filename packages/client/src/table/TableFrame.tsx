@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { KeyRound, LogOut, PanelRight, Settings, Users } from "lucide-react";
+import { Archive, KeyRound, LogOut, PanelRight, Settings, Users } from "lucide-react";
 import { Avatar, IconButton, Menu, Sheet, Tabs, type MenuItemSpec, type TabItem } from "../ui";
 import type { SessionUser } from "../api/client";
 import { useSession } from "../session/SessionProvider";
@@ -95,7 +95,10 @@ export function TableFrame({
     { id: "settings", label: "Impostazioni", icon: <Settings size={18} />, onSelect: () => setSettingsOpen(true) },
     { id: "password", label: "Cambia password", icon: <KeyRound size={18} />, onSelect: () => setPasswordOpen(true) },
     ...(user.role === "admin"
-      ? [{ id: "users", label: "Gestione utenti", icon: <Users size={18} />, onSelect: () => navigate("/admin/users") } satisfies MenuItemSpec]
+      ? [
+          { id: "users", label: "Gestione utenti", icon: <Users size={18} />, onSelect: () => navigate("/admin/users") } satisfies MenuItemSpec,
+          { id: "backup", label: "Backup e importazione", icon: <Archive size={18} />, onSelect: () => navigate("/admin/backup") } satisfies MenuItemSpec
+        ]
       : []),
     { id: "logout", label: "Esci", icon: <LogOut size={18} />, destructive: true, onSelect: () => void doLogout() }
   ];

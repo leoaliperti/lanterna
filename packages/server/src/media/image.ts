@@ -87,3 +87,14 @@ export function sniffImage(buf: Buffer): ImageInfo | null {
   if (!info || info.width < 1 || info.height < 1) return null;
   return info;
 }
+
+/** Limiti in pixel di un'immagine ammessa (da `config.upload`). */
+export interface ImageLimits {
+  maxSide: number;
+  maxPixels: number;
+}
+
+/** `true` se l'immagine supera i limiti per lato o per area: stesso controllo dell'upload e dell'importazione. */
+export function exceedsImageLimits(info: ImageInfo, limits: ImageLimits): boolean {
+  return info.width > limits.maxSide || info.height > limits.maxSide || info.width * info.height > limits.maxPixels;
+}

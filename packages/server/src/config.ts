@@ -36,6 +36,22 @@ export interface AppConfig {
   contentMaxBytes: number;
   /** Tipi di contenuto leggibili dai giocatori (membri di una campagna). */
   contentPlayerKinds: string[];
+  /**
+   * Esportazione e importazione di campagne (M10). Tutti i limiti si applicano ai byte REALMENTE
+   * letti o scritti, mai alle dimensioni dichiarate dall'archivio (che possono mentire).
+   */
+  archive: {
+    /** Dimensione massima dell'archivio (caricato o prodotto), compresso, in byte. */
+    maxBytes: number;
+    /** Dimensione massima totale dei file decompressi. */
+    maxUnpackedBytes: number;
+    /** Dimensione massima di un documento JSON decompresso. */
+    maxJsonBytes: number;
+    /** Numero massimo di voci dell'archivio. */
+    maxEntries: number;
+  };
+  /** Tipi di elemento della libreria (pc, monster, object) leggibili dai giocatori. Default: nessuno. */
+  libraryPlayerKinds: string[];
   rateLimit: {
     login: RateLimitRule;
     createUser: RateLimitRule;
@@ -180,6 +196,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       .split(",")
       .map((k) => k.trim())
       .filter(Boolean),
+    archive: {
+      maxBytes: positiveInt(env.ARCHIVE_MAX_BYTES, 512 * 1024 * 1024),
+      maxUnpackedBytes: positiveInt(env.ARCHIVE_MAX_UNPACKED_BYTES, 1024 * 1024 * 1024),
+      maxJsonBytes: positiveInt(env.ARCHIVE_MAX_JSON_BYTES, 32 * 1024 * 1024),
+      maxEntries: positiveInt(env.ARCHIVE_MAX_ENTRIES, 5000),
+    },
+    libraryPlayerKinds: (env.LIBRARY_PLAYER_KINDS ?? "")
+      .split(",")
+      .map((k) => k.trim())
+      .filter((k) => ["pc", "monster", "object"].includes(k)),
     rateLimit: {
       login: { max: positiveInt(env.RATE_LIMIT_LOGIN_MAX, 5), timeWindowMs: 60_000 },
       createUser: { max: positiveInt(env.RATE_LIMIT_CREATE_USER_MAX, 10), timeWindowMs: 60_000 },

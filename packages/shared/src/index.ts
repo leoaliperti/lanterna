@@ -9,3 +9,5 @@ export * from "./api.js";
 export * from "./sheetsApi.js";
 export * from "./protocol/index.js";
 export * from "./state/index.js";
+export * from "./library.js";
+export * from "./campaignIo.js";
