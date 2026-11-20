@@ -2,7 +2,6 @@ import { z } from "zod";
 import type { StateChange } from "./changes.js";
 import type { Fog } from "./fog.js";
 import type { Actor, Scene, Token } from "./schema.js";
-import type { Wall } from "./walls.js";
 import {
   FogViewSchema,
   SceneViewSchema,
