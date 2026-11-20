@@ -1,9 +1,11 @@
 import type {
+  AddMemberRequest,
   ApiError,
   CampaignSummary,
   CreateCampaignRequest,
   CreateUserRequest,
   ListCampaignsResponse,
+  ListMembersResponse,
   ListUsersResponse,
   PublicUser,
   ResetPasswordRequest,
@@ -126,6 +128,20 @@ export async function listMyCampaigns(): Promise<CampaignSummary[]> {
 export function createCampaign(name: string): Promise<CampaignSummary> {
   const body: CreateCampaignRequest = { name };
   return request("POST", "/campaigns", { body });
+}
+
+/** Id degli utenti che fanno parte della campagna (solo admin). */
+export async function listMemberIds(campaignId: string): Promise<string[]> {
+  return (await request<ListMembersResponse>("GET", `/campaigns/${encodeURIComponent(campaignId)}/members`)).members.map((m) => m.userId);
+}
+
+export async function addCampaignMember(campaignId: string, userId: string): Promise<void> {
+  const body: AddMemberRequest = { userId };
+  await request("POST", `/campaigns/${encodeURIComponent(campaignId)}/members`, { body });
+}
+
+export async function removeCampaignMember(campaignId: string, userId: string): Promise<void> {
+  await request("DELETE", `/campaigns/${encodeURIComponent(campaignId)}/members/${encodeURIComponent(userId)}`);
 }
 
 /* ---------------- /api/uploads ---------------- */
