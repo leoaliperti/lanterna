@@ -55,6 +55,22 @@ export function applyServerEvent(view: CampaignView, event: ServerEvent): Campai
       return { ...view, walls: (view.walls ?? []).map((w) => (w.id === event.wall.id ? event.wall : w)) };
     case "wall.deleted":
       return { ...view, walls: (view.walls ?? []).filter((w) => w.id !== event.wallId) };
+    case "combat.updated": {
+      const others = (view.combats ?? []).filter((c) => c.sceneId !== event.sceneId);
+      return { ...view, combats: event.combat ? [...others, event.combat] : others };
+    }
+    case "group.created":
+      if ((view.groups ?? []).some((g) => g.id === event.group.id)) return view;
+      return { ...view, groups: [...(view.groups ?? []), event.group] };
+    case "group.updated":
+      return { ...view, groups: (view.groups ?? []).map((g) => (g.id === event.group.id ? event.group : g)) };
+    case "group.deleted":
+      return { ...view, groups: (view.groups ?? []).filter((g) => g.id !== event.groupId) };
+    // Avvisi: non cambiano la vista (il client li mostra a modo suo).
+    case "combat.turn":
+    case "effect.expiring":
+    case "effect.expired":
+      return view;
   }
 }
 

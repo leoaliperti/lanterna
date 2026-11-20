@@ -28,6 +28,19 @@ export const LIMITS = {
   fogMaxCells: 4096,
   /** Raggi di vista e luce, in unità di gioco. */
   visionMaxRange: 10_000,
+  /** Combattimento (M7). */
+  maxEffectsPerToken: 16,
+  maxEffectRounds: 1000,
+  maxParticipants: 200,
+  maxRound: 100_000,
+  initiativeMin: -1000,
+  initiativeMax: 1000,
+  maxGroups: 100,
+  maxGroupTokens: 500,
+  /** Celle esaminate al massimo per una forma effimera (righello, cono, ...). */
+  maxShapeCells: 40_000,
+  /** Durata massima di un'indicazione effimera, in millisecondi. */
+  maxEphemeralTtlMs: 30_000,
 } as const;
 
 /** Identificatore opaco (UUID o simile). Mai contatori: non devono rivelare quanti oggetti esistono. */

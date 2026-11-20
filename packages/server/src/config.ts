@@ -71,6 +71,11 @@ export interface AppConfig {
     rollsPerMinute: number;
     rollBurst: number;
   };
+  /** Misurazioni, frecce e ping effimeri (M7): limite per utente su tutte le sue connessioni. */
+  ephemeral: {
+    perSecond: number;
+    burst: number;
+  };
 }
 
 /** Massimo di voci inviate alla connessione (`CHAT_HISTORY_LIMIT`). */
@@ -198,6 +203,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       messageBurst: positiveInt(env.CHAT_MESSAGE_BURST, 10),
       rollsPerMinute: positiveInt(env.ROLLS_PER_MINUTE, 30),
       rollBurst: positiveInt(env.ROLL_BURST, 10),
+    },
+    ephemeral: {
+      perSecond: positiveInt(env.EPHEMERAL_PER_SECOND, 10),
+      burst: positiveInt(env.EPHEMERAL_BURST, 20),
     },
   };
 }

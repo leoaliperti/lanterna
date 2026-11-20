@@ -20,6 +20,15 @@ import {
   fogOf,
   isGm,
   maskFor,
+  canSeeScene,
+  defaultTtlMs,
+  rollInitiative,
+  shapeForViewer,
+  validateEphemeral,
+  MAX_LIVE_EPHEMERALS,
+  type EphemeralClear,
+  type EphemeralShow,
+  type InitiativeRollRequest,
   type Fog,
   type FogMask,
   type Scene,
@@ -78,11 +87,22 @@ export interface Peer {
   close(code: number, reason: string): void;
 }
 
+/** Forma effimera ancora viva (M7): non viene mai salvata, vive solo in memoria finché non scade. */
+interface LiveEphemeral {
+  authorId: string;
+  id: string;
+  expiresAt: number;
+  /** Chi l'ha ricevuta: a loro, e solo a loro, si manda l'eventuale `ephemeral.cleared`. */
+  recipients: Set<Peer>;
+}
+
 interface Room {
   core: CampaignCore;
   peers: Set<Peer>;
   /** Coda delle operazioni: comandi e cambi di membri si applicano uno alla volta. */
   queue: Promise<void>;
+  /** Forme effimere vive, per `autore:id`. */
+  ephemerals: Map<string, LiveEphemeral>;
 }
 
 function errorMessage(requestId: string | null, code: ErrorMessage["code"], message: string): ErrorMessage {
@@ -99,12 +119,14 @@ export interface HubOptions {
   /** Generatore dei tiri. In produzione `crypto.randomInt` (`dice/crypto-rng.ts`); i test possono iniettarne uno. */
   rng: RandomInt;
   chat: AppConfig["chat"];
+  ephemeral: AppConfig["ephemeral"];
 }
 
 /** Limiti di chat e tiri di un utente (condivisi fra tutte le sue connessioni). */
 interface UserLimits {
   chat: TokenBucket;
   roll: TokenBucket;
+  ephemeral: TokenBucket;
 }
 
 /**
@@ -140,7 +162,7 @@ export class Hub {
       await persistReset(this.db, loaded.state, epoch, loaded.touchedTokenIds, loaded.touchedFogSceneIds);
     }
     const log = { ...createEventLog(epoch, LOG_CAPACITY), entries: loaded.log };
-    this.rooms.set(id, { core: { state: loaded.state, history: createHistory(), log }, peers: new Set(), queue: Promise.resolve() });
+    this.rooms.set(id, { core: { state: loaded.state, history: createHistory(), log }, peers: new Set(), queue: Promise.resolve(), ephemerals: new Map() });
   }
 
   /** Stato completo (solo per test e diagnostica lato server). */
@@ -262,6 +284,7 @@ export class Hub {
       l = {
         chat: new TokenBucket(c.messagesPerMinute / 60, c.messageBurst),
         roll: new TokenBucket(c.rollsPerMinute / 60, c.rollBurst),
+        ephemeral: new TokenBucket(this.options.ephemeral.perSecond, this.options.ephemeral.burst),
       };
       this.limits.set(userId, l);
     }
@@ -351,23 +374,143 @@ export class Hub {
       peer.send(errorMessage(input.requestId, "INVALID", "serve prima hello"));
       return Promise.resolve();
     }
-    return this.enqueue(room, async () => {
-      // La connessione potrebbe essere stata chiusa o spostata mentre era in coda.
-      if (!peer.actor || !room.peers.has(peer)) return;
-      const r = dispatch(room.core, peer.actor, input);
-      if (r.changes.length > 0) {
-        try {
-          await persistChanges(this.db, r.core.state, r.changes);
-        } catch (err) {
-          this.log.error({ err }, "salvataggio della campagna non riuscito");
-          peer.send(errorMessage(input.requestId, "CONFLICT", "salvataggio non riuscito, riprova"));
-          return;
-        }
+    return this.enqueue(room, () => this.runInput(room, peer, input));
+  }
+
+  /** Applica un comando / annulla / ripeti DENTRO la coda della stanza: salva, poi invia i delta. */
+  private async runInput(room: Room, peer: Peer, input: DispatchInput): Promise<void> {
+    // La connessione potrebbe essere stata chiusa o spostata mentre era in coda.
+    if (!peer.actor || !room.peers.has(peer)) return;
+    const r = dispatch(room.core, peer.actor, input);
+    if (r.changes.length > 0) {
+      try {
+        await persistChanges(this.db, r.core.state, r.changes);
+      } catch (err) {
+        this.log.error({ err }, "salvataggio della campagna non riuscito");
+        peer.send(errorMessage(input.requestId, "CONFLICT", "salvataggio non riuscito, riprova"));
+        return;
       }
-      room.core = r.core;
-      if (r.changes.length > 0) this.broadcast(room, r);
-      peer.send(r.reply);
+    }
+    room.core = r.core;
+    if (r.changes.length > 0) this.broadcast(room, r);
+    peer.send(r.reply);
+  }
+
+  // -------------------------------------------------------------------------
+  // Iniziativa tirata dal server (M7)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Tiro dell'iniziativa: solo il GM. L'esito lo decide il server (`this.rng`, `crypto.randomInt` in
+   * produzione): d20 + bonus, con vantaggio/svantaggio. I valori entrano nello stato con un solo comando
+   * `combat.setInitiative` (un'unica azione annullabile), che passa dal riduttore come ogni altro.
+   */
+  initiativeRoll(peer: Peer, msg: InitiativeRollRequest): Promise<void> {
+    const room = this.roomOf(peer, msg.requestId);
+    if (!room) return Promise.resolve();
+    // Il permesso si controlla prima di guardare lo stato (e prima di consumare il limite).
+    if (!isGm(peer.actor!)) {
+      peer.send(errorMessage(msg.requestId, "FORBIDDEN", "azione riservata al GM"));
+      return Promise.resolve();
+    }
+    if (!this.limitsOf(peer.userId).roll.take()) {
+      peer.send(errorMessage(msg.requestId, "RATE_LIMITED", "troppi tiri, riprova tra poco"));
+      return Promise.resolve();
+    }
+    return this.enqueue(room, async () => {
+      const values = msg.rolls.map((r) => ({
+        participantId: r.participantId,
+        initiative: rollInitiative(this.rng, r.bonus, r.mode ?? "normal").total,
+      }));
+      await this.runInput(room, peer, {
+        type: "command",
+        requestId: msg.requestId,
+        command: { type: "combat.setInitiative", sceneId: msg.sceneId, values, ...(msg.sort ? { sort: true } : {}) },
+      });
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // Misurazioni, frecce e ping effimeri (M7): mai salvati
+  // -------------------------------------------------------------------------
+
+  private pruneEphemerals(room: Room, now: number): void {
+    for (const [key, e] of room.ephemerals) if (e.expiresAt <= now) room.ephemerals.delete(key);
+  }
+
+  /**
+   * Mostra una forma effimera. Ogni destinatario riceve la forma ritagliata per la SUA nebbia (`shapeForViewer`):
+   * chi non vede nulla di ciò che copre non riceve nemmeno il messaggio. `private` non invia nulla a nessuno.
+   */
+  ephemeralShow(peer: Peer, msg: EphemeralShow): void {
+    const room = this.roomOf(peer, msg.requestId);
+    if (!room) return;
+    const actor = peer.actor!;
+    if (!this.limitsOf(peer.userId).ephemeral.take()) {
+      peer.send(errorMessage(msg.requestId, "RATE_LIMITED", "troppi messaggi, riprova tra poco"));
+      return;
+    }
+    const state = room.core.state;
+    const v = validateEphemeral(state, actor, msg);
+    if (!v.ok) {
+      peer.send(errorMessage(msg.requestId, v.error.code, v.error.message));
+      return;
+    }
+    const ack = { type: "ack", requestId: msg.requestId, version: state.version } as const;
+    if (msg.audience === "private") {
+      // Le misure private restano sul client: nessun evento.
+      peer.send(ack);
+      return;
+    }
+    const now = Date.now();
+    this.pruneEphemerals(room, now);
+    const key = `${peer.userId}:${msg.id}`;
+    const old = room.ephemerals.get(key);
+    // Al massimo `MAX_LIVE_EPHEMERALS` forme vive per utente: oltre, si toglie la più vecchia.
+    const mine = [...room.ephemerals.entries()].filter(([k, e]) => e.authorId === peer.userId && k !== key);
+    if (mine.length >= MAX_LIVE_EPHEMERALS) {
+      mine.sort((a, b) => a[1].expiresAt - b[1].expiresAt);
+      const [oldKey, oldest] = mine[0]!;
+      room.ephemerals.delete(oldKey);
+      for (const p of oldest.recipients) p.send({ type: "ephemeral.cleared", id: oldest.id, authorId: oldest.authorId });
+    }
+    const ttlMs = msg.ttlMs ?? defaultTtlMs(msg.shape);
+    const fog = fogOf(state, v.scene.id);
+    const recipients = new Set<Peer>();
+    for (const p of room.peers) {
+      if (p === peer || !p.actor) continue;
+      if (msg.audience === "gm" && !isGm(p.actor)) continue;
+      if (!canSeeScene(v.scene, p.actor, state.activeSceneId)) continue;
+      const shape = shapeForViewer(msg.shape, v.scene, fog, p.actor);
+      if (!shape) continue;
+      p.send({
+        type: "ephemeral.shown",
+        id: msg.id,
+        authorId: peer.userId,
+        sceneId: v.scene.id,
+        ttlMs,
+        shape,
+        ...(msg.color ? { color: msg.color } : {}),
+      });
+      recipients.add(p);
+    }
+    // Chi aveva ricevuto la versione precedente e ora non riceve più nulla deve togliere la vecchia.
+    if (old) for (const p of old.recipients) if (!recipients.has(p)) p.send({ type: "ephemeral.cleared", id: msg.id, authorId: peer.userId });
+    room.ephemerals.set(key, { authorId: peer.userId, id: msg.id, expiresAt: now + ttlMs, recipients });
+    peer.send(ack);
+  }
+
+  /** L'autore toglie una sua forma effimera: l'avviso va solo a chi l'aveva ricevuta. Idempotente. */
+  ephemeralClear(peer: Peer, msg: EphemeralClear): void {
+    const room = this.roomOf(peer, msg.requestId);
+    if (!room) return;
+    const key = `${peer.userId}:${msg.id}`;
+    const live = room.ephemerals.get(key);
+    if (live) {
+      room.ephemerals.delete(key);
+      for (const p of live.recipients) p.send({ type: "ephemeral.cleared", id: live.id, authorId: live.authorId });
+    }
+    peer.send({ type: "ack", requestId: msg.requestId, version: room.core.state.version });
   }
 
   private broadcast(room: Room, r: DispatchResult): void {

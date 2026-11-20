@@ -15,6 +15,19 @@ import {
 } from "./schema.js";
 import { FogLightingSchema, FogSchema, FogShapeSchema, FogStateSchema, FogTargetSchema } from "./fog.js";
 import { WallSchema } from "./walls.js";
+import {
+  CombatSchema,
+  EffectInputSchema,
+  EffectPatchSchema,
+  EffectsSchema,
+  GroupActionSchema,
+  GroupPatchSchema,
+  GroupSchema,
+  InitiativeValueSchema,
+  ParticipantPatchSchema,
+  ParticipantSchema,
+  TokenTargetSchema,
+} from "./combat.js";
 
 /**
  * Comandi che mutano lo stato. Sono l'unico modo di cambiare una campagna:
@@ -53,6 +66,10 @@ export const TokenPatchSchema = z
     health: HealthSchema.nullable(),
     gmNotes: z.string().max(LIMITS.notesMaxLength),
     vision: TokenVisionSchema.nullable(),
+    /** Solo GM (M7). */
+    faction: z.string().trim().min(1).max(LIMITS.nameMaxLength).nullable(),
+    /** Solo GM (M7): di norma si cambia con `effect.*`; qui serve all'annulla/ripeti. */
+    effects: EffectsSchema,
   })
   .partial()
   .refine((p) => Object.keys(p).length > 0, { message: "patch vuota" });
@@ -208,7 +225,117 @@ export const WallUpdateSchema = z.strictObject({
 
 export const WallRemoveSchema = z.strictObject({ type: z.literal("wall.remove"), wallId: IdSchema });
 
+// ---------------------------------------------------------------------------
+// Combattimento (M7): tutti solo GM
+// ---------------------------------------------------------------------------
+
+/** Aggiunge un partecipante (crea il combattimento della scena se manca). */
+export const CombatAddSchema = z.strictObject({
+  type: z.literal("combat.add"),
+  sceneId: IdSchema,
+  participant: ParticipantSchema,
+});
+export const CombatUpdateSchema = z.strictObject({
+  type: z.literal("combat.update"),
+  sceneId: IdSchema,
+  participantId: IdSchema,
+  patch: ParticipantPatchSchema,
+});
+export const CombatRemoveSchema = z.strictObject({
+  type: z.literal("combat.remove"),
+  sceneId: IdSchema,
+  participantId: IdSchema,
+});
+/** Sposta un partecipante in una posizione (0 = primo). */
+export const CombatReorderSchema = z.strictObject({
+  type: z.literal("combat.reorder"),
+  sceneId: IdSchema,
+  participantId: IdSchema,
+  toIndex: z.number().int().min(0).max(LIMITS.maxParticipants),
+});
+/** Imposta i valori di iniziativa (tirati dal server o scelti dal GM), con riordino facoltativo. */
+export const CombatSetInitiativeSchema = z.strictObject({
+  type: z.literal("combat.setInitiative"),
+  sceneId: IdSchema,
+  values: z.array(InitiativeValueSchema).min(1).max(LIMITS.maxParticipants),
+  sort: z.boolean().optional(),
+});
+export const CombatSortSchema = z.strictObject({ type: z.literal("combat.sort"), sceneId: IdSchema });
+export const CombatStartSchema = z.strictObject({
+  type: z.literal("combat.start"),
+  sceneId: IdSchema,
+  sort: z.boolean().optional(),
+});
+export const CombatNextSchema = z.strictObject({ type: z.literal("combat.next"), sceneId: IdSchema });
+export const CombatPreviousSchema = z.strictObject({ type: z.literal("combat.previous"), sceneId: IdSchema });
+export const CombatEndSchema = z.strictObject({ type: z.literal("combat.end"), sceneId: IdSchema });
+/** Imposta il combattimento completo di una scena (`null` = nessuno): inverso per annulla/ripeti. */
+export const CombatRestoreSchema = z.strictObject({
+  type: z.literal("combat.restore"),
+  sceneId: IdSchema,
+  combat: CombatSchema.nullable(),
+});
+
+export const EffectAddSchema = z.strictObject({
+  type: z.literal("effect.add"),
+  tokenId: IdSchema,
+  effect: EffectInputSchema,
+});
+export const EffectUpdateSchema = z.strictObject({
+  type: z.literal("effect.update"),
+  tokenId: IdSchema,
+  effectId: IdSchema,
+  patch: EffectPatchSchema,
+});
+export const EffectRemoveSchema = z.strictObject({
+  type: z.literal("effect.remove"),
+  tokenId: IdSchema,
+  effectId: IdSchema,
+});
+
+export const GroupCreateSchema = z.strictObject({ type: z.literal("group.create"), group: GroupSchema });
+export const GroupUpdateSchema = z.strictObject({
+  type: z.literal("group.update"),
+  groupId: IdSchema,
+  patch: GroupPatchSchema,
+});
+export const GroupDeleteSchema = z.strictObject({ type: z.literal("group.delete"), groupId: IdSchema });
+/** Imposta un gruppo (`null` = eliminato): inverso per annulla/ripeti. */
+export const GroupRestoreSchema = z.strictObject({
+  type: z.literal("group.restore"),
+  groupId: IdSchema,
+  group: GroupSchema.nullable(),
+});
+/**
+ * Azione rapida su più token, atomica (tutti o nessuno) e annullabile in un colpo solo.
+ * GM: qualunque bersaglio. Giocatore: solo `tokens` con i propri token e solo `move`/`addCondition`/`removeCondition`.
+ */
+export const GroupApplySchema = z.strictObject({
+  type: z.literal("group.apply"),
+  target: TokenTargetSchema,
+  action: GroupActionSchema,
+});
+
 export const CommandSchema = z.discriminatedUnion("type", [
+  CombatAddSchema,
+  CombatUpdateSchema,
+  CombatRemoveSchema,
+  CombatReorderSchema,
+  CombatSetInitiativeSchema,
+  CombatSortSchema,
+  CombatStartSchema,
+  CombatNextSchema,
+  CombatPreviousSchema,
+  CombatEndSchema,
+  CombatRestoreSchema,
+  EffectAddSchema,
+  EffectUpdateSchema,
+  EffectRemoveSchema,
+  GroupCreateSchema,
+  GroupUpdateSchema,
+  GroupDeleteSchema,
+  GroupRestoreSchema,
+  GroupApplySchema,
   MoveTokenSchema,
   CreateTokenSchema,
   UpdateTokenSchema,

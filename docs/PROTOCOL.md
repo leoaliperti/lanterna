@@ -360,3 +360,22 @@ Le schede NON passano dal WebSocket (nessun cambiamento a protocollo e stato con
 - **Scheda → token** (unica sincronizzazione automatica): il client del GM (`planTokenSync`, `SheetsProvider`) legge l'elenco schede ogni 8 s e dopo ogni salvataggio proprio; quando PF o condizioni di una scheda collegata **cambiano** rispetto all'ultima osservazione, invia `token.update { health, conditions }` (comando del GM, quindi con tutti i controlli di permesso del server). Le condizioni del token che non sono del motore 5e (personalizzate) restano. La prima osservazione fissa solo il riferimento: non sovrascrive la barra; un token senza barra la riceve subito.
 - **Token → scheda**: solo su richiesta del GM (pulsante "Copia i PF dal token alla scheda" nell'editor). Se il GM ritocca la barra del token, vale finché la scheda non cambia di nuovo (ultima scrittura vince, per sorgente).
 - **Limite noto**: se nessun GM è collegato, la barra del token resta indietro finché non si riconnette. Evita fughe: il giocatore non scrive mai sul token, e non conosce il legame.
+
+## Combattimento e forme effimere (M7)
+
+Dettagli e regole in `docs/COMBAT.md`.
+
+**Comandi** (dentro `command`, tutti con inverso per annulla/ripeti): `combat.add/update/remove/reorder/setInitiative/sort/start/next/previous/end/restore`, `effect.add/update/remove`, `group.create/update/delete/restore`, `group.apply { target, action }`. Tutti solo GM, salvo `group.apply` del giocatore (solo `move`/`addCondition`/`removeCondition` su propri token con `target.kind = "tokens"`). Campi nuovi del token: `faction` (solo GM) ed `effects` (`TokenPatch`, solo GM).
+
+**Client → server** (messaggi propri, con `requestId`, risposta `ack`/`error`):
+- `initiative.roll { sceneId, rolls: [{ participantId, bonus, mode? }], sort? }`: solo GM (altrimenti FORBIDDEN). Il server tira d20 + bonus con `crypto.randomInt` e applica `combat.setInitiative`.
+- `ephemeral.show { id, sceneId, audience: private|gm|all, ttlMs?, shape, color? }` e `ephemeral.clear { id }`. Forme: `ruler`, `circle`, `cone`, `line`, `arrow`, `ping`. `private` non genera eventi. Rate limit per utente (`EPHEMERAL_PER_SECOND`, `EPHEMERAL_BURST`): `RATE_LIMITED`.
+
+**Server → client**:
+- Nei `delta`/`snapshot`: `CampaignView.combats` (il GM tutti, il giocatore solo la scena attiva, già filtrati) e `groups` (solo GM); `TokenView.effects` (sempre presente, anche `[]`) e `faction` (solo GM). Eventi `combat.updated { sceneId, combat|null }` (sostituzione per intero), `group.created/updated/deleted` (solo GM).
+- Avvisi (nei `delta`, non cambiano la vista): `combat.turn`, `effect.expiring`, `effect.expired`, solo a GM e proprietario del token.
+- Messaggi effimeri fuori dai delta e dalla versione, mai ripetuti alla riconnessione: `ephemeral.shown { id, authorId, sceneId, ttlMs, shape, color? }` (con la nebbia `shape` può essere `{ kind: "cells", cells: [col, riga, ...] }` nella griglia della nebbia) ed `ephemeral.cleared { id, authorId }`.
+
+**Persistenza**: tabelle `combat` e `token_group` (migrazione `0006_combat`); effetti e fazione stanno nel JSON del token. Le forme effimere non vengono salvate.
+
+**Limite noto (M8)**: la sincronizzazione scheda → token riscrive `conditions`; una condizione data da un effetto ma non presente nella scheda può essere tolta dal sync del GM alla prima modifica della scheda.

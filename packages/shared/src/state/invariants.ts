@@ -70,6 +70,34 @@ export function checkInvariants(state: CampaignState): string[] {
     wallIds.add(w.id);
     if (!sceneIds.has(w.sceneId)) problems.push(`muro ${w.id} senza scena`);
   }
+  // Combattimento (M7).
+  const tokenById = new Map(state.tokens.map((t) => [t.id, t]));
+  const combatScenes = new Set<string>();
+  for (const c of state.combats ?? []) {
+    if (combatScenes.has(c.sceneId)) problems.push(`combattimento duplicato ${c.sceneId}`);
+    combatScenes.add(c.sceneId);
+    if (!sceneIds.has(c.sceneId)) problems.push(`combattimento ${c.sceneId} senza scena`);
+    if (c.participants.length === 0) problems.push(`combattimento ${c.sceneId} vuoto`);
+    for (const p of c.participants) {
+      if (p.tokenId === null) continue;
+      const t = tokenById.get(p.tokenId);
+      if (!t) problems.push(`partecipante ${p.id} con token inesistente`);
+      else if (t.sceneId !== c.sceneId) problems.push(`partecipante ${p.id} con token di un'altra scena`);
+    }
+  }
+  for (const t of state.tokens) {
+    for (const e of t.effects ?? []) {
+      if (e.turnOf === null) continue;
+      const a = tokenById.get(e.turnOf);
+      if (!a || a.sceneId !== t.sceneId) problems.push(`effetto ${e.id} con ancora non valida`);
+    }
+  }
+  const groupIds = new Set<string>();
+  for (const g of state.groups ?? []) {
+    if (groupIds.has(g.id)) problems.push(`gruppo duplicato ${g.id}`);
+    groupIds.add(g.id);
+    for (const id of g.tokenIds) if (!tokenById.has(id)) problems.push(`gruppo ${g.id} con token inesistente`);
+  }
   if (state.activeSceneId !== null && !sceneIds.has(state.activeSceneId)) {
     problems.push("scena attiva inesistente");
   }
