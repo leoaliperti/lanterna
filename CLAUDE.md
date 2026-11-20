@@ -79,7 +79,7 @@ Guide: `docs/DEPLOY.md` (deploy, Cloudflare Tunnel, backup, aggiornamenti, check
 
 ## Nebbia di guerra (M6, logica e server)
 
-Dettagli in `docs/FOG.md`. La UI del client non c'è ancora (elenco di cosa fare in fondo a `docs/FOG.md`).
+Dettagli in `docs/FOG.md`. La UI del client (`packages/client/src/fog`, `map/fogLayer.ts`, `map/drawTools.ts`, `table/Fog*.tsx`) è descritta in fondo a `docs/FOG.md`.
 
 - **Modello** (`shared/src/state/fog.ts`, `walls.ts`, `vision.ts`): per scena una nebbia con griglia propria e maschere per giocatore (`everyone` + `players`), ciascuna `{ base, runs }` a terne di celle in forma canonica; muri `{ x1, y1, x2, y2, door, open }`; `token.vision` facoltativo. Campi facoltativi: nessuna nebbia = comportamento di prima.
 - **Comandi** solo GM: `fog.enable/disable/reveal/cover/revealAll/coverAll/setLighting/restore`, `wall.add/update/remove`; `target` tutti o giocatori scelti; inverso esatto con `fog.restore`.
