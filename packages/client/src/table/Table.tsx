@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Eye, EyeOff, Layers, Map as MapIcon, MessageSquare, Pencil, Redo2, ShieldCheck, Undo2, Users, WifiOff } from "lucide-react";
+import { Eye, EyeOff, Layers, Map as MapIcon, MessageSquare, Pencil, Redo2, ScrollText, ShieldCheck, Undo2, Users, WifiOff } from "lucide-react";
 import type { CampaignView, TokenView } from "@lanterna/shared";
 import type { SessionUser } from "../api/client";
 import { MapCanvas, type MapCanvasHandle } from "../map";
 import { Button, IconButton, Material, Spinner } from "../ui";
 import { EmptyState } from "../screens/EmptyState";
+import { SheetWorkspace, SheetsPanel, SheetsProvider } from "../sheets";
 import { useCommands, useRealtimeState } from "../realtime/RealtimeProvider";
 import { ChatLive, ChatPanel, ChatProvider, DiceOverlay, useChat, useChatShortcuts, useChatStore } from "../chat";
 import { sceneToShow, tokensOfScene, toMapScene } from "./adapter";
@@ -59,7 +60,11 @@ function TableContent({ user, campaignName }: TableProps) {
       </TableFrame>
     );
   }
-  return <LiveTable user={user} view={view} actions={actions} />;
+  return (
+    <SheetsProvider campaignId={view.campaignId} user={user}>
+      <LiveTable user={user} view={view} actions={actions} />
+    </SheetsProvider>
+  );
 }
 
 interface LiveProps {
@@ -138,6 +143,12 @@ function LiveTable({ user, view, actions }: LiveProps) {
         />
       )
     },
+    {
+      id: "sheets",
+      label: "Schede",
+      icon: <ScrollText size={16} />,
+      content: <SheetsPanel onOpened={closeSheet} />
+    },
     ...(perms.canManageScenes
       ? [
           {
@@ -164,6 +175,7 @@ function LiveTable({ user, view, actions }: LiveProps) {
     >
       <ChatLive />
       <DiceOverlay />
+      <SheetWorkspace />
       {mapScene && scene ? (
         <div className="a-map__live">
           <MapCanvas

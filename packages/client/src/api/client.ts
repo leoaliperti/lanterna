@@ -42,7 +42,7 @@ interface RequestOptions {
   anonymous?: boolean;
 }
 
-async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
+export async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
   let response: Response;
   try {
     response = await fetch(`${BASE}${path}`, {

@@ -1,0 +1,85 @@
+/* Schede personaggio. Solo token del design system (docs/DESIGN.md): niente colori, px o durate a mano. */
+
+.l-sheet.s-workspace { max-width: min(72rem, 100%); }
+@media (min-width: 40rem) {
+  .l-sheet.s-workspace { max-height: min(56rem, calc(100dvh - 3rem)); width: min(72rem, calc(100% - var(--space-8))); }
+}
+
+/* Linguette delle schede aperte */
+.s-tabs-bar { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+.s-tabs { display: flex; flex: 1; gap: var(--space-1); overflow-x: auto; scrollbar-width: none; padding-bottom: var(--space-1); }
+.s-tab { display: inline-flex; align-items: center; flex: none; background: var(--fill-tertiary); border-radius: var(--radius-full); transition: background var(--dur-fast) var(--ease-out); }
+.s-tab[data-active="true"] { background: var(--tint-bg); }
+.s-tab__main { min-height: var(--hit-min); padding: 0 var(--space-2) 0 var(--space-4); border: 0; background: none; color: var(--label); font-size: var(--text-callout); font-weight: 500; cursor: pointer; max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: var(--radius-full); }
+.s-tab[data-active="true"] .s-tab__main { color: var(--tint-text); font-weight: 600; }
+
+/* Pannelli: su schermi larghi due schede affiancate; altrimenti una alla volta */
+.s-panes { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1fr); align-items: start; }
+.s-pane[hidden] { display: none; }
+@media (min-width: 56rem) {
+  .s-panes[data-split="true"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 55.99rem) {
+  .s-panes[data-split="true"] .s-pane:not([hidden]) ~ .s-pane:not([hidden]) { display: none; }
+}
+
+/* Scheda */
+.s-view { display: grid; gap: var(--space-3); align-content: start; animation: s-in var(--dur-base) var(--ease-out); }
+@keyframes s-in { from { opacity: 0; transform: translateY(var(--space-1)); } to { opacity: 1; transform: none; } }
+.s-view__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.s-view__head p, .s-view__name { margin: 0; }
+.s-view__name { overflow-wrap: anywhere; }
+.s-status { display: inline-flex; align-items: center; gap: var(--space-1); margin: 0; font-size: var(--text-footnote); color: var(--label-secondary); white-space: nowrap; }
+.s-status--error, .s-status--conflict { color: var(--red); }
+.s-status--saved { color: var(--green); }
+.s-spin { animation: s-rotate 1s linear infinite; }
+@keyframes s-rotate { to { transform: rotate(360deg); } }
+
+.s-stack { display: grid; gap: var(--space-4); }
+.s-block { display: grid; gap: var(--space-2); padding: var(--space-3); background: var(--bg-grouped-secondary); border-radius: var(--radius-lg); }
+.s-block h3 { margin: 0; display: flex; align-items: center; gap: var(--space-2); }
+.s-block p { margin: 0; }
+.s-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.s-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.s-row__grow { flex: 1 1 8rem; min-width: 0; }
+.s-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.s-form { display: grid; gap: var(--space-3); }
+.s-fieldset { border: 0; padding: var(--space-3); margin: 0; background: var(--bg-grouped-tertiary); border-radius: var(--radius-md); }
+.s-fieldset legend { padding: 0 var(--space-1); }
+.s-grid2 { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); }
+.s-library { display: grid; gap: var(--space-2); }
+.s-weight { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; }
+
+/* Valori in evidenza */
+.s-facts { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr)); }
+.s-facts > li { display: grid; gap: var(--space-1); justify-items: start; padding: var(--space-3); background: var(--bg-grouped-secondary); border-radius: var(--radius-lg); }
+.s-facts > li > span, .s-facts strong { margin: 0; }
+.s-fact-btn { all: unset; display: grid; gap: var(--space-1); justify-items: start; width: 100%; cursor: pointer; border-radius: var(--radius-md); }
+.s-fact-btn:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: var(--space-1); }
+
+/* Caratteristiche */
+.s-abilities { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); }
+.s-ability { display: grid; background: var(--bg-grouped-secondary); border-radius: var(--radius-lg); overflow: hidden; }
+.s-ability button { all: unset; box-sizing: border-box; cursor: pointer; display: grid; justify-items: center; gap: var(--space-1); padding: var(--space-3); min-height: var(--hit-min); transition: background var(--dur-press) var(--ease-out), transform var(--dur-press) var(--ease-out); }
+.s-ability button:active { background: var(--fill-secondary); transform: scale(var(--press-scale)); }
+.s-ability button:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: calc(var(--space-1) * -1); }
+.s-ability__mod { font-size: var(--text-title1); line-height: 1.1; }
+.s-ability__save { border-top: 0.5px solid var(--separator); font-size: var(--text-footnote); }
+@media (hover: hover) and (pointer: fine) {
+  .s-ability button:hover { background: var(--fill-tertiary); }
+}
+
+/* Condizioni */
+.s-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.s-chip { min-height: var(--hit-min); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-full); background: var(--fill-tertiary); color: var(--label); font-size: var(--text-subhead); cursor: pointer; transition: background var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out); }
+.s-chip[aria-pressed="true"] { background: var(--tint-solid); color: var(--on-tint); }
+.s-chip:active { transform: scale(var(--press-scale)); }
+.s-chip:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+
+.s-hp__value { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-2); }
+.s-hp__value strong { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  .s-view { animation: none; }
+  .s-spin { animation: none; }
+}
