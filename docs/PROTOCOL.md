@@ -379,3 +379,45 @@ Dettagli e regole in `docs/COMBAT.md`.
 **Persistenza**: tabelle `combat` e `token_group` (migrazione `0006_combat`); effetti e fazione stanno nel JSON del token. Le forme effimere non vengono salvate.
 
 **Limite noto (M8)**: la sincronizzazione scheda → token riscrive `conditions`; una condizione data da un effetto ma non presente nella scheda può essere tolta dal sync del GM alla prima modifica della scheda.
+
+## Esportazione e importazione di campagna, libreria di token (M10, REST)
+
+Nessun cambiamento a protocollo WebSocket e stato condiviso: sono risorse REST **solo admin** (403 al giocatore, verificato prima di leggere il corpo). Tipi in `packages/shared/src/campaignIo.ts` e `library.ts`; server in `packages/server/src/archive/` e `library/`. La nuova campagna importata riparte con **epoca nuova e versione 0**: i client collegati ad altre campagne non ricevono nulla, chi apre la nuova riceve uno `snapshot`.
+
+### Formato dell'archivio (`formatVersion` 1)
+
+Uno `.zip` con soli nomi fissi (mai usati come percorsi sul disco): `manifest.json`, `campaign.json`, `members.json`, `scenes.json`, `tokens.json`, `fog.json`, `walls.json`, `combats.json`, `groups.json`, `sheets.json`, `content.json`, `library.json`, `assets.json`, `chat.json` (solo con `?chat=true`) e `assets/<uuid>.(png|jpg|webp)`.
+
+- **Manifesto**: `format: "lanterna-campaign"`, `formatVersion`, `exportedAt`, `appVersion`, `protocolVersion`, nome della campagna, `includesChat`, conteggi, `warnings`, e l'elenco di TUTTI gli altri file con dimensione e SHA-256 (verificati all'importazione: un file modificato, mancante o in più è un errore).
+- **Membri (scelta di privacy)**: gli utenti NON sono esportati. `members.json` ha solo nome visualizzato e ruolo con un riferimento opaco (`m1`, `m2`, ...) che sostituisce ogni id utente (proprietari dei token e delle schede, maschere di nebbia, autori e destinatari della chat; gli autori non più membri diventano `x1`, ...). Mai inclusi: email, password o hash, sessioni, segreto di Better Auth, `.env`, percorsi del server. Perché: l'archivio può finire su un altro server o in mani altrui, e gli id utente sono locali all'istanza. All'importazione l'admin associa i giocatori ai propri utenti.
+- Contenuti: stato (scene, token, nebbia, muri, combattimenti, gruppi), schede, contenuti importati **della campagna** (non quelli globali), libreria **della campagna** (non quella globale), immagini realmente usate (mappe, token, libreria), chat e tiri solo con il flag (include whisper e tiri segreti: è un backup del GM).
+
+### Endpoint
+
+| Richiesta | Note |
+|---|---|
+| `GET /campaigns/:id/export[?chat=true]` | zip in streaming (memoria costante, contropressione); controlli e limiti PRIMA del primo byte (`413` oltre `ARCHIVE_MAX_BYTES`/`ARCHIVE_MAX_UNPACKED_BYTES`); `404` campagna inesistente. Rate limit come gli upload. |
+| `POST /campaigns/import?preview=true` | multipart (`file`, facoltativo `options`): valida TUTTO (stesse verifiche dell'importazione, riferimenti e invarianti compresi) e restituisce `ImportPreview` (nome, data, versione, conteggi, membri con nome e ruolo, byte, avvisi) senza scrivere nulla. |
+| `POST /campaigns/import` | multipart: `options` (JSON, prima del file: `name?`, `memberMap` ref → id utente giocatore o `null`, `includeChat`) e `file`. Crea una NUOVA campagna (mai sovrascrive), `201` con `ImportResult`. Un'importazione alla volta (le altre `429`). |
+
+### Importazione difensiva (archivio non fidato)
+
+- Streaming con `fflate` letto da disco a pezzi da 64 KiB; limiti sui byte **realmente decompressi** (non su quelli dichiarati, che possono mentire): per documento (`ARCHIVE_MAX_JSON_BYTES`), per immagine (`UPLOAD_MAX_BYTES`), totale (`ARCHIVE_MAX_UNPACKED_BYTES`), numero di voci (`ARCHIVE_MAX_ENTRIES`), archivio caricato (`ARCHIVE_MAX_BYTES`). Una "bomba" è fermata appena supera il limite.
+- Nomi: elenco chiuso. `../x`, percorsi assoluti, `\`, caratteri di controllo, voci duplicate o non elencate nel manifesto → `400`; nessun nome è mai un percorso.
+- Ogni documento passa da Zod (`strictObject`: campi sconosciuti rifiutati); le schede anche da `sheetDocSchema` + `deriveDoc`; i contenuti dalle stesse regole dell'importazione contenuti (niente HTML, profondità, `__proto__`).
+- Immagini: tipo reale dai magic bytes (`sniffImage`: PNG/JPEG/WebP, mai SVG), estensione, dimensioni, limiti per lato e area come l'upload (`exceedsImageLimits`), e coerenza con `assets.json` (`415`/`413`).
+- Id **tutti rigenerati** (campagna, scene, token, muri, gruppi, schede, voci di chat, immagini con nome UUID nuovo); riferimenti incrociati rimappati; riferimento pendente o stato incoerente (`checkInvariants`) → `400`.
+- Transazione: prima i file (nomi nuovi), poi UNA transazione SQLite; se fallisce i file vengono cancellati e non resta nulla. Cartella di parcheggio `UPLOAD_DIR/.import-<uuid>/`, sempre rimossa (e ripulita all'avvio).
+- Membri: il GM dell'archivio è l'admin che importa; i giocatori si associano solo a utenti con ruolo giocatore, uno per utente. Un giocatore non associato perde la proprietà di token e schede e la maschera di nebbia personale; il resto resta.
+
+### Libreria di token e oggetti
+
+Tabella `library_item` (migrazione `0007_library`), `data` JSON validato con `LibraryContentSchema` a ogni lettura. Elemento: `name`, `kind` (`pc|monster|object`), `size`, `imageUrl`, `stats` (`hpMax`, `armorClass`, `speed`, tutte facoltative), `tags`; ambito `campaign` (con `campaignId`) o `global`.
+
+| Richiesta | Admin | Giocatore |
+|---|---|---|
+| `GET /library?campaignId=&q=&kind=&limit=&offset=` | elementi della campagna + globali (senza `campaignId`: solo globali); ricerca su nome e tag | solo se membro della campagna (altrimenti `404`), solo tipi di `LIBRARY_PLAYER_KINDS` (default nessuno), **senza** `stats` né `campaignId` |
+| `GET /library/:id` | sì | come sopra; tipo non consentito o campagna non sua = `404` identico a "inesistente" |
+| `POST /library`, `PATCH /library/:id`, `DELETE /library/:id` | sì | `403` |
+
+Un elemento non è un token: il client crea l'istanza con il comando `token.create` esistente (id nuovo, scena e posizione scelti sul momento). Immagine: se è `/assets/<uuid>.<ext>` deve esistere.

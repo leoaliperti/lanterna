@@ -1,6 +1,6 @@
 import { createReadStream, existsSync } from "node:fs";
 import { cp, mkdir, readdir, rename, rm, stat } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { createClient } from "@libsql/client";
 
 /** Nome del file SQLite dentro una cartella di backup. */
@@ -107,7 +107,8 @@ export async function createBackup(opts: BackupOptions): Promise<BackupResult> {
     await verifySqlite(dbFile);
     let uploadsCopied = false;
     if (existsSync(uploadDir)) {
-      await cp(uploadDir, join(partial, BACKUP_UPLOADS_NAME), { recursive: true, errorOnExist: true });
+      // Le cartelle di parcheggio di un'importazione in corso (`.import-<uuid>`) non fanno parte dei dati.
+      await cp(uploadDir, join(partial, BACKUP_UPLOADS_NAME), { recursive: true, errorOnExist: true, filter: (src) => !basename(src).startsWith(".import-") });
       uploadsCopied = true;
     }
     const final = join(root, name);
