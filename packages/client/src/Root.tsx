@@ -1,5 +1,7 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { App } from "./App";
+import { SessionProvider } from "./session/SessionProvider";
+import { ToastProvider } from "./ui";
 
 // In produzione la costante e' null e il chunk della gallery non entra nel bundle.
 const Gallery = import.meta.env.DEV ? lazy(() => import("./ui/Gallery").then((m) => ({ default: m.Gallery }))) : null;
@@ -24,5 +26,11 @@ export function Root() {
       </Suspense>
     );
   }
-  return <App />;
+  return (
+    <ToastProvider>
+      <SessionProvider>
+        <App />
+      </SessionProvider>
+    </ToastProvider>
+  );
 }
