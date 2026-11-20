@@ -135,9 +135,101 @@ Lato client `applyDelta` accetta un delta solo se `fromVersion` coincide con la 
 - Prima di annullare si controlla che i campi toccati siano ancora quelli lasciati dall'azione: altrimenti `CONFLICT` (per il giocatore, su token che non vede, sempre `NOT_FOUND`).
 - Ripeti è di chi ha annullato; una nuova azione di un utente cancella i suoi ripeti. La cronologia ha un limite (default 200 voci).
 
+## Server (M2/M3): trasporto, persistenza, REST, upload
+
+Codice in `packages/server/src`: `realtime/` (WebSocket e stanze), `campaigns/` (SQLite e REST), `media/` (upload; la cartella non si chiama `uploads/` perché quel nome è in `.gitignore`).
+
+### WebSocket `/ws`
+
+- **Libreria:** `ws` usato direttamente (`noServer: true`) sull'evento `upgrade` del server HTTP di Fastify, senza `@fastify/websocket`: il rifiuto avviene in modo esplicito **prima** dell'handshake e il codice resta piccolo. `perMessageDeflate` è disattivato (niente bombe di decompressione).
+- **URL:** `ws(s)://<host>/ws`. In sviluppo il client passa dal proxy Vite come per il resto: `ws://localhost:5173/api/ws` (il proxy `/api` di `packages/client/vite.config.ts` deve avere `ws: true`).
+- **Prima dell'upgrade**, in quest'ordine: percorso diverso da `/ws` → 404; header `Origin` assente o non tra le origini ammesse (`BETTER_AUTH_URL` + `TRUSTED_ORIGINS`) → **403** (anti cross-site WebSocket hijacking; il Referer non basta); nessuna sessione valida nel cookie → **401**; più di 16 connessioni dello stesso utente → 429.
+- **Dopo l'apertura** il client ha `WS_HELLO_TIMEOUT_MS` (10 s) per inviare `hello`. Il server risponde con `planResync` (delta o snapshot) solo se l'utente è membro della campagna; altrimenti `error NOT_FOUND` (stesso messaggio per campagna inesistente) e chiusura 4404. Un secondo `hello` sulla stessa connessione è una risincronizzazione.
+- **Ogni messaggio** passa da `parseClientMessage`; frame binari, JSON non valido e campi sconosciuti danno `error INVALID` e il server continua. Frame oltre 64 KiB: chiusura 1009 (limite `maxPayload` di `ws`).
+- **Attore:** sempre `resolveActor(stato, userId della sessione)`. Il client non può indicare utente né ruolo: un campo in più nel messaggio è `INVALID` (schemi strict).
+- **Rate limit per connessione:** secchiello di gettoni (`WS_MESSAGES_PER_SECOND` = 30 di media, raffica `WS_MESSAGE_BURST` = 60). Oltre: messaggio scartato con `error INVALID "troppi messaggi"`; insistendo (4 × raffica scartati di fila) chiusura 1008.
+- **Keep-alive:** ping del server ogni `WS_HEARTBEAT_MS` (30 s, sotto i ~100 s di inattività di Cloudflare); la connessione che non ha risposto al ping precedente viene terminata. Allo stesso giro si ricontrolla la sessione nel database: logout, reset password o scadenza chiudono il socket (4401) entro un intervallo. Il client può anche mandare `ping` applicativi (`pong`).
+- **Client lenti:** oltre 16 MiB in coda d'invio la connessione viene terminata.
+- `chat.send` e `roll.request` rispondono `error INVALID "non ancora disponibile"` fino a M4.
+
+Codici di chiusura: 1001 arresto del server, 1008 rate limit, 1009 messaggio troppo grande, 4400 versione del protocollo, 4401 sessione terminata, 4403 permessi cambiati, 4404 campagna non trovata o non membro, 4408 `hello` mancante. Con 4401/4403/4404 il client non deve riconnettersi da solo in loop (4401: torna al login).
+
+### Stanze, ordine e salvataggio
+
+Una stanza per campagna (`realtime/hub.ts`), con lo stato in memoria caricato da SQLite all'avvio. Comandi, annulla/ripeti e cambi di membri di una stanza passano da una **coda** e si applicano uno alla volta:
+
+```
+r = dispatch(core, attore della connessione, input)
+se r.changes non vuoto:
+    persistChanges(db, r.core.state, r.changes)   // una transazione (db.batch)
+    se fallisce: errore CONFLICT "salvataggio non riuscito", stato in memoria invariato
+core = r.core
+per ogni connessione della stanza: deltaFor(...) filtrato
+ack (o errore) al mittente, dopo il suo delta
+```
+
+Lo stato si salva **prima** di essere inviato a chiunque: dopo un riavvio non si perde nessun comando confermato. All'avvio `loadCampaign` rilegge tutto, valida ogni scena e token con Zod e `checkInvariants`; se i dati non sono validi il server **non parte** (meglio che inventare o perdere dati in silenzio).
+
+### Schema SQLite (migrazione `0001_campaigns`)
+
+| Tabella | Contenuto |
+|---|---|
+| `campaign` | `id`, `name`, `version`, `epoch`, `active_scene_id`, `created_by` |
+| `campaign_member` | (`campaign_id`, `user_id`) con cascata su campagna e utente. Ruolo e nome visualizzato vengono dall'account (`user.role`, `user.name`): admin = GM |
+| `scene` | (`campaign_id`, `id`), `sort`, `data` = `Scene` in JSON |
+| `token` | (`campaign_id`, `id`), `scene_id`, `sort` (z-order), `data` = `Token` in JSON |
+| `campaign_event` | (`campaign_id`, `version`), `changes` = `StateChange[]` in JSON: gli ultimi 500, per riprendere con un **delta anche dopo un riavvio** |
+| `asset` | file caricati: `id` (UUID), `kind`, `mime`, `ext`, `width`, `height`, `bytes`, `uploaded_by` |
+
+JSON e non colonne per scene e token: il modello vive in un solo posto (`state/schema.ts`) e viene rivalidato a ogni lettura, quindi il database non può introdurre campi o valori non ammessi. `sort` di un oggetto nuovo è `max + 1`, quindi l'ordine salvato coincide con quello in memoria (verificato da un test con 150 comandi casuali, annulla e ripeti compresi).
+
+### Cambi di membri e di ruolo
+
+Membri e ruoli cambiano fuori dai comandi (REST `/campaigns/:id/members`, `/admin/users`). In quel caso il server ricarica i membri, toglie la proprietà dei token a chi non è più membro, **cambia epoca** (così chi si riconnette riceve uno snapshot), azzera la cronologia di annulla/ripeti della campagna, invia uno snapshot nuovo a chi resta e chiude (4403) le connessioni di chi è stato rimosso. Cambio di ruolo o eliminazione di un utente chiudono **tutte** le sue connessioni; il reset della password le chiude con 4401.
+
+### REST
+
+Tutte le rotte verificano sessione e ruolo lato server (`requireSession`, `requireRole("admin")` come `onRequest`); POST/DELETE richiedono anche `Origin` ammesso.
+
+| Rotta | Chi | Note |
+|---|---|---|
+| `GET /campaigns` | admin | tutte le campagne |
+| `POST /campaigns` `{ name }` | admin | 201; chi la crea diventa membro (GM) |
+| `GET /campaigns/mine` | autenticato | campagne di cui l'utente è membro |
+| `GET /campaigns/:id/members` | admin | |
+| `POST /campaigns/:id/members` `{ userId }` | admin | 201, 404 campagna/utente, 409 già membro |
+| `DELETE /campaigns/:id/members/:userId` | admin | 204, 404, 409 se è l'ultimo GM della campagna (controllo atomico in SQL) |
+| `POST /uploads/map`, `POST /uploads/token` | admin | multipart con un solo file |
+| `GET /assets/:uuid.:ext` | autenticato | file caricato |
+
+Lo schema ammette più campagne per istanza (oggi se ne usa una).
+
+### Upload
+
+- Tipo reale dai **magic bytes**: PNG (firma + `IHDR`), JPEG (`FFD8FF` + marcatore SOF), WebP (`RIFF…WEBP` con `VP8`, `VP8L` o `VP8X`). Estensione, nome e Content-Type inviati dal client sono ignorati. SVG, GIF e tutto il resto: 415.
+- Dimensioni in pixel lette dall'intestazione; oltre `UPLOAD_MAX_SIDE` (16384) per lato o `UPLOAD_MAX_PIXELS` (100 M) di area: 413. Oltre `UPLOAD_MAX_BYTES` (25 MiB): 413. Rate limit `RATE_LIMIT_UPLOAD_MAX` al minuto per IP.
+- Nome generato `<uuid>.<png|jpg|webp>` in `UPLOAD_DIR` (fuori dalla webroot), scrittura atomica (file temporaneo + rename), riga in `asset`.
+- `GET /assets/:nome`: il nome deve corrispondere a `^<uuid>\.(png|jpg|webp)$` e a una riga di `asset`, altrimenti 404 (nessun percorso costruito dall'input: niente path traversal). Intestazioni: `Content-Type` dal database, `X-Content-Type-Options: nosniff`, `Content-Disposition: inline; filename="<uuid>.<ext>"`, `Content-Security-Policy: default-src 'none'; sandbox`, `Cache-Control: private, max-age=31536000, immutable`.
+- La risposta dell'upload contiene `url: "/assets/<uuid>.<ext>"`, relativo all'API: in sviluppo il client lo prefissa con `/api`. Il client lo usa in `scene.map.url` / `token.imageUrl`.
+
+### Avviare e provare
+
+```
+npm install && cp .env.example .env
+npm run create-admin -w @lanterna/server
+npm run dev                       # server :3000, client :5173 (proxy /api)
+npm test -w @lanterna/server      # unitari e integrazione (client WebSocket reali)
+```
+
+Prova a mano (con `websocat` o simili), dopo il login nel browser: copiare il cookie `lanterna.session_token` e connettersi a `ws://localhost:3000/ws` con header `Origin: http://localhost:3000` e `Cookie`, poi inviare `{"type":"hello","protocolVersion":1,"campaignId":"<id>","lastVersion":null,"epoch":null}`. I test d'integrazione (`src/realtime/realtime.test.ts`) aprono GM e due giocatori sulla stessa porta e cercano le stringhe segrete nel traffico ricevuto.
+
 ## Limiti noti
 
 - Niente comando di riordino (z-order): un token ricreato da annulla torna in cima.
-- `members` non si modifica con i comandi: lo gestisce l'auth (M1).
+- `members` non si modifica con i comandi: lo gestisce il server (REST e auth) con cambio d'epoca.
+- La cronologia di annulla/ripeti vive solo in memoria: si perde a ogni riavvio e a ogni cambio di membri. Stato e registro dei delta invece sono salvati.
+- Upload: nessuna miniatura o versione ridimensionata. Servirebbe decodificare l'immagine: `sharp` ha binari nativi e script d'installazione (bloccati da npm 11), e un decodificatore in puro JS per mappe fino a 100 Mpx userebbe centinaia di MB di RAM. Il formato si verifica dall'intestazione, non decodificando tutti i pixel: un file con intestazione valida e dati corrotti viene accettato (il browser semplicemente non lo mostra; con `nosniff` e la CSP non può essere eseguito). I metadati (EXIF, posizione GPS) non vengono rimossi.
+- I file caricati sono visibili a ogni utente autenticato che conosce l'URL (UUID non indovinabile), non solo ai membri della campagna; l'immagine di un token nascosto non viene inviata ai giocatori, ma l'URL non è revocabile.
+- Il logout chiude il WebSocket solo al keep-alive successivo (al più `WS_HEARTBEAT_MS`).
 - Chat e tiri sono solo schemi segnaposto; filtri di whisper e tiri segreti arriveranno con M4.
 - Nebbia di guerra (M6) non ancora modellata.
