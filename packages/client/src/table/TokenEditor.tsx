@@ -93,7 +93,7 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
         }
       }
       if (creating) {
-        const at = spawnPoint(scene!, draft.size);
+        const at = spawnPoint(scene!, draft.size, view.tokens.filter((t) => t.sceneId === scene!.id));
         if (await run(createCommand(crypto.randomUUID(), scene!.id, draft, imageUrl, at.x, at.y))) onOpenChange(false);
         return;
       }

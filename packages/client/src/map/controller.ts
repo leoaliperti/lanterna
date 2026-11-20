@@ -311,7 +311,7 @@ export class MapController {
         this.previewCells = [];
         for (const [id, o] of g.origins) {
           const t = this.tokensById.get(id)!;
-          const pos = resolveDropPosition({ x: o.x + dx, y: o.y + dy }, t.size, this.scene.grid);
+          const pos = resolveDropPosition({ x: o.x + dx, y: o.y + dy }, t.size, this.scene.grid, this.scene.background);
           this.preview.set(id, pos);
           if (this.scene.grid.snap && this.cell > 0) this.previewCells.push(destinationRect(pos, t.size, this.cell));
         }
@@ -484,7 +484,7 @@ export class MapController {
         if (movable.length && this.cell > 0) {
           for (const id of movable) {
             const t = this.tokensById.get(id)!;
-            const p = resolveDropPosition({ x: t.x + dx * this.cell, y: t.y + dy * this.cell }, t.size, this.scene.grid);
+            const p = resolveDropPosition({ x: t.x + dx * this.cell, y: t.y + dy * this.cell }, t.size, this.scene.grid, this.scene.background);
             this.handlers.onMoveToken?.(id, p.x, p.y);
           }
         } else {

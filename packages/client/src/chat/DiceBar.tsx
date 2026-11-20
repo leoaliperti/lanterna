@@ -37,7 +37,7 @@ export function useRoll(isGm: boolean, targets: readonly Member[]) {
       if (visibility === "whisper") {
         const wanted = c.recipient ?? (isGm ? null : (targets[0]?.userId ?? null));
         if (!wanted || !targets.some((t) => t.userId === wanted)) {
-          return isGm ? "Scegli a chi sussurrare il tiro." : "Non c'e' nessun GM a cui sussurrare.";
+          return isGm ? "Scegli a chi sussurrare il tiro." : "Non c'è nessun GM a cui sussurrare.";
         }
         whisperTo = wanted;
       }
@@ -167,7 +167,7 @@ export function DiceBar({ isGm, targets }: DiceBarProps) {
         <TextField
           label="Formula"
           hideLabel
-          placeholder="Formula: 2d6+3, 4d6kh3, d20 adv"
+          placeholder="Formula, es. 2d6+3"
           value={composer.formula}
           maxLength={200}
           autoComplete="off"

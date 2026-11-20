@@ -86,7 +86,7 @@ export function TableScreen() {
         <EmptyState
           icon={<MapIcon size={36} />}
           title="Nessuna campagna"
-          description="Non fai ancora parte di nessuna campagna. Chiedi al GM di aggiungerti: comparira' qui."
+          description="Non fai ancora parte di nessuna campagna. Chiedi al GM di aggiungerti: comparirà qui."
         />
       )}
     </TableFrame>

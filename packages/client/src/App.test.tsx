@@ -231,6 +231,24 @@ describe("gestione utenti", () => {
     renderApp();
   }
 
+  it("aggiunge e toglie un giocatore dal tavolo con le rotte dei membri", async () => {
+    const u = userEvent.setup();
+    setup({
+      "GET /campaigns/mine": () => ({ body: { campaigns: [{ id: "c1", name: "Fenice", createdAt: "2026-01-01T00:00:00.000Z" }] } }),
+      "GET /campaigns/c1/members": () => ({ body: { members: [{ userId: "u1", displayName: "Marta", role: "admin" }] } }),
+      "POST /campaigns/c1/members": () => ({ status: 201, body: { members: [] } }),
+      "DELETE /campaigns/c1/members/u2": () => ({ status: 204 })
+    });
+    expect(await screen.findByText(/u2@example.org · non è al tavolo/)).toBeTruthy();
+    await u.click(await screen.findByRole("button", { name: "Azioni per Luca" }));
+    await u.click(await screen.findByRole("menuitem", { name: "Aggiungi al tavolo" }));
+    await waitFor(() => expect(calls.find((c) => c.method === "POST" && c.path === "/campaigns/c1/members")?.body).toEqual({ userId: "u2" }));
+    expect(await screen.findByText("u2@example.org")).toBeTruthy();
+    await u.click(await screen.findByRole("button", { name: "Azioni per Luca" }));
+    await u.click(await screen.findByRole("menuitem", { name: "Togli dal tavolo" }));
+    await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.path === "/campaigns/c1/members/u2")).toBe(true));
+  });
+
   it("crea un utente: valida la password e invia il corpo corretto", async () => {
     const u = userEvent.setup();
     setup({

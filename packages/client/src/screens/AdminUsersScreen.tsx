@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { ChevronLeft, Ellipsis, KeyRound, Plus, ShieldCheck, Trash2, UserRound, Users } from "lucide-react";
+import { ChevronLeft, Ellipsis, KeyRound, Plus, ShieldCheck, Trash2, UserMinus, UserPlus, UserRound, Users } from "lucide-react";
 import { USER_ROLES, type PublicUser, type UserRole } from "@lanterna/shared";
 import {
   Alert,
@@ -20,7 +20,7 @@ import {
   useToast,
   type MenuItemSpec
 } from "../ui";
-import { createUser, deleteUser, listUsers, resetUserPassword, updateUserRole, userErrorMessage } from "../api/client";
+import { addCampaignMember, createUser, deleteUser, listMemberIds, listMyCampaigns, listUsers, removeCampaignMember, resetUserPassword, updateUserRole, userErrorMessage } from "../api/client";
 import { useSession } from "../session/SessionProvider";
 import { navigate } from "../router/hashRouter";
 import { EmptyState } from "./EmptyState";
@@ -44,12 +44,27 @@ export function AdminUsersScreen() {
   const [resetFor, setResetFor] = useState<PublicUser | null>(null);
   const [deleteFor, setDeleteFor] = useState<PublicUser | null>(null);
 
+  // Campagna del tavolo e chi ne fa parte: un giocatore vede il tavolo solo dopo essere stato aggiunto.
+  const [campaign, setCampaign] = useState<{ id: string; name: string } | null>(null);
+  const [memberIds, setMemberIds] = useState<ReadonlySet<string>>(new Set());
+
   const load = useCallback(async () => {
     setLoadError(null);
     try {
       setUsers(await listUsers());
     } catch (err) {
       setLoadError(userErrorMessage(err));
+      return;
+    }
+    // Il tavolo serve solo ad aggiungere i giocatori: se non si carica, l'elenco utenti resta usabile.
+    try {
+      const first = (await listMyCampaigns())[0];
+      if (first) {
+        setCampaign({ id: first.id, name: first.name });
+        setMemberIds(new Set(await listMemberIds(first.id)));
+      }
+    } catch {
+      setCampaign(null);
     }
   }, []);
 
@@ -62,7 +77,25 @@ export function AdminUsersScreen() {
     try {
       const updated = await updateUserRole(target.id, role);
       setUsers((list) => list?.map((u) => (u.id === updated.id ? { ...u, role: updated.role } : u)) ?? list);
-      toast.show({ title: `${target.name} ora e' ${role === "admin" ? "admin" : "giocatore"}`, tone: "success" });
+      toast.show({ title: `${target.name} ora è ${role === "admin" ? "admin" : "giocatore"}`, tone: "success" });
+    } catch (err) {
+      setActionError(userErrorMessage(err));
+    }
+  }
+
+  async function toggleMember(target: PublicUser, join: boolean) {
+    if (!campaign) return;
+    setActionError(null);
+    try {
+      if (join) await addCampaignMember(campaign.id, target.id);
+      else await removeCampaignMember(campaign.id, target.id);
+      setMemberIds((ids) => {
+        const next = new Set(ids);
+        if (join) next.add(target.id);
+        else next.delete(target.id);
+        return next;
+      });
+      toast.show({ title: join ? `${target.name} è al tavolo` : `${target.name} non è più al tavolo`, tone: "success" });
     } catch (err) {
       setActionError(userErrorMessage(err));
     }
@@ -88,6 +121,16 @@ export function AdminUsersScreen() {
         icon: other === "admin" ? <ShieldCheck size={18} /> : <UserRound size={18} />,
         onSelect: () => void changeRole(target, other)
       },
+      ...(campaign && target.role === "player"
+        ? [
+            {
+              id: "member",
+              label: memberIds.has(target.id) ? "Togli dal tavolo" : "Aggiungi al tavolo",
+              icon: memberIds.has(target.id) ? <UserMinus size={18} /> : <UserPlus size={18} />,
+              onSelect: () => void toggleMember(target, !memberIds.has(target.id))
+            }
+          ]
+        : []),
       { id: "password", label: "Reimposta password", icon: <KeyRound size={18} />, onSelect: () => setResetFor(target) },
       // Non ci si elimina da soli: eviterebbe di restare senza GM e chiude la propria sessione a meta' lavoro.
       { id: "delete", label: "Elimina", icon: <Trash2 size={18} />, destructive: true, disabled: target.id === me?.id, onSelect: () => setDeleteFor(target) }
@@ -106,7 +149,10 @@ export function AdminUsersScreen() {
         }
       />
       <main className="a-page__content" aria-label="Gestione utenti">
-        <p className="t-subhead a-muted a-page__intro">Solo tu puoi creare gli account. Condividi email e password con i giocatori: potranno cambiarla dal loro menu.</p>
+        <p className="t-subhead a-muted a-page__intro">
+          Solo tu puoi creare gli account. Condividi email e password con i giocatori: potranno cambiarla dal loro menu.
+          {campaign ? ` Un giocatore vede «${campaign.name}» solo dopo che lo aggiungi al tavolo, dal menu ⋯ accanto al suo nome.` : ""}
+        </p>
 
         {actionError ? (
           <Banner tone="danger" onDismiss={() => setActionError(null)} className="a-gap">
@@ -145,7 +191,7 @@ export function AdminUsersScreen() {
                 key={u.id}
                 leading={<Avatar name={u.name} />}
                 title={u.id === me?.id ? `${u.name} (tu)` : u.name}
-                subtitle={u.email}
+                subtitle={u.role === "player" && campaign && !memberIds.has(u.id) ? `${u.email} · non è al tavolo` : u.email}
                 trailing={
                   <span className="a-row-actions">
                     <Badge tone={u.role === "admin" ? "tint" : "gray"}>{ROLE_LABEL[u.role]}</Badge>
@@ -162,7 +208,7 @@ export function AdminUsersScreen() {
         <CreateUserForm
           onCreated={(created) => {
             setUsers((list) => (list ? [...list, created] : [created]));
-            toast.show({ title: "Utente creato", message: `${created.name} puo' accedere con la password che hai scelto.`, tone: "success" });
+            toast.show({ title: "Utente creato", message: `${created.name} può accedere con la password che hai scelto.`, tone: "success" });
             setCreateOpen(false);
           }}
         />
@@ -184,7 +230,7 @@ export function AdminUsersScreen() {
         open={deleteFor !== null}
         onOpenChange={(o) => !o && setDeleteFor(null)}
         title={deleteFor ? `Eliminare ${deleteFor.name}?` : "Eliminare?"}
-        message="L'account verra' rimosso e non potra' piu' accedere. L'azione non si puo' annullare."
+        message="L'account verrà rimosso e non potrà più accedere. L'azione non si può annullare."
         actions={[
           {
             label: "Elimina",
@@ -257,7 +303,7 @@ function CreateUserForm({ onCreated }: { onCreated: (user: PublicUser) => void }
       <div className="a-field-group">
         <p className="l-field__label">Ruolo</p>
         <SegmentedControl aria-label="Ruolo" options={ROLE_OPTIONS} value={role} onValueChange={setRole} />
-        <p className="t-footnote a-muted">{role === "admin" ? "L'admin e' il GM: gestisce utenti e tavolo." : "Il giocatore muove solo il proprio token."}</p>
+        <p className="t-footnote a-muted">{role === "admin" ? "L'admin è il GM: gestisce utenti e tavolo." : "Il giocatore muove solo il proprio token."}</p>
       </div>
       <Button type="submit" size="lg" fullWidth loading={busy}>
         Crea utente

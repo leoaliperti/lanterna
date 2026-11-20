@@ -304,7 +304,7 @@ export class RealtimeClient {
           return;
         }
         if (msg.epoch === this.state.epoch && msg.toVersion === view.version && msg.fromVersion === view.version) {
-          this.markConnected(); // "sei gia' aggiornato" dopo una riconnessione
+          this.markConnected(); // "sei già aggiornato" dopo una riconnessione
           return;
         }
         const r = applyDelta(view, this.state.epoch ?? "", msg);

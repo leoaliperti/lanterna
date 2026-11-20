@@ -220,7 +220,7 @@ function LiveTable({ user, view, actions }: LiveProps) {
           title={view.scenes.length === 0 ? "Crea la prima scena" : "Nessuna scena da mostrare"}
           description={
             view.scenes.length === 0
-              ? "Una scena e' una mappa con la sua griglia e i suoi token. Creala, poi carica l'immagine della mappa."
+              ? "Una scena è una mappa con la sua griglia e i suoi token. Creala, poi carica l'immagine della mappa."
               : "Scegli una scena dal pannello \"Scena\"."
           }
           action={
@@ -232,7 +232,7 @@ function LiveTable({ user, view, actions }: LiveProps) {
           }
         />
       ) : (
-        <EmptyState icon={<MapIcon size={36} />} title="In attesa della mappa" description="Il GM non ha ancora aperto una scena. Comparira' qui appena sara' pronta." />
+        <EmptyState icon={<MapIcon size={36} />} title="In attesa della mappa" description="Il GM non ha ancora aperto una scena. Comparirà qui appena sarà pronta." />
       )}
       {perms.isGm ? (
         <p className="a-map__badge t-caption1 a-muted">

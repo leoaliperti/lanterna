@@ -28,6 +28,12 @@ export function matchRecipient(rest: string, targets: readonly Member[]): { memb
     if (lower === name) return { member: m, text: "" };
     if (lower.startsWith(name) && /\s/.test(lower.charAt(name.length))) return { member: m, text: rest.slice(name.length).trim() };
   }
+  // Ripiego: il solo nome di battesimo ("/w Giulia ...") vale se identifica un destinatario soltanto.
+  const first = /^(\S+)(?:\s+(.*))?$/s.exec(rest);
+  if (first) {
+    const matches = targets.filter((t) => norm(t.displayName).split(/\s+/)[0] === norm(first[1]!));
+    if (matches.length === 1) return { member: matches[0]!, text: (first[2] ?? "").trim() };
+  }
   return null;
 }
 

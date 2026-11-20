@@ -41,7 +41,7 @@ export function DiceTray({ ref, className, onSettled, onActivate, label = "Tavol
   const token = useRef(0);
   useEffect(
     () => () => {
-      token.current++; // dopo lo smontaggio i tiri in volo non aggiornano piu' lo stato ne' chiamano onSettled
+      token.current++; // dopo lo smontaggio i tiri in volo non aggiornano più lo stato ne' chiamano onSettled
     },
     [],
   );
@@ -59,7 +59,7 @@ export function DiceTray({ ref, className, onSettled, onActivate, label = "Tavol
         }
         setView({ phase: "rolling" });
         await latest.current.scene.animate(physical, prefersReducedMotion());
-        if (mine !== token.current) return; // sostituito da un tiro piu' recente, o smontato
+        if (mine !== token.current) return; // sostituito da un tiro più recente, o smontato
         setView({ phase: "done", dice });
         latest.current.onSettled?.(dice);
       },

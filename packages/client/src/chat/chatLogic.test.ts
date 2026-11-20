@@ -67,6 +67,16 @@ describe("comandi testuali", () => {
     expect(parseChatInput('/w "Mario Rossi" ciao', { members, self: gm, recipient: null })).toMatchObject({ whisperTo: "mr" });
   });
 
+  it("/w con il solo nome di battesimo vale se è univoco", () => {
+    const withSurname: Member[] = [...members, { userId: "gi", displayName: "Giulia Rossi", role: "player" }];
+    expect(parseChatInput("/w giulia senti un rumore", { members: withSurname, self: gm, recipient: null })).toEqual({ kind: "chat", text: "senti un rumore", whisperTo: "gi" });
+    // "Mario" è anche un nome intero: vince il nome esatto, non c'è ambiguità.
+    expect(parseChatInput("/w mario ciao", { members: withSurname, self: gm, recipient: null })).toMatchObject({ whisperTo: "mario" });
+    // Due persone con lo stesso nome di battesimo: niente ripiego, errore.
+    const twins: Member[] = [...withSurname, { userId: "gi2", displayName: "Giulia Verdi", role: "player" }];
+    expect(parseChatInput("/w giulia ciao", { members: twins, self: gm, recipient: null })).toMatchObject({ kind: "error" });
+  });
+
   it("il giocatore puo' sussurrare solo al GM", () => {
     expect(parseChatInput("/w marta psst", { members, self: luca, recipient: null })).toEqual({ kind: "chat", text: "psst", whisperTo: "gm" });
     expect(parseChatInput("/w mario psst", { members, self: luca, recipient: null })).toEqual({ kind: "error", message: "Puoi sussurrare solo al GM." });

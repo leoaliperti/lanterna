@@ -59,7 +59,7 @@ export function ChatPanel({ user }: ChatPanelProps) {
     if (p.last === null) {
       el.scrollTop = el.scrollHeight; // primo disegno
     } else if (first !== p.first && last === p.last) {
-      el.scrollTop += el.scrollHeight - p.height; // pagina piu' vecchia in testa: la riga letta resta ferma
+      el.scrollTop += el.scrollHeight - p.height; // pagina più vecchia in testa: la riga letta resta ferma
     } else if (last !== p.last) {
       const own = entries[entries.length - 1]?.authorId === user.id;
       if (stuck.current || own) {
@@ -169,7 +169,7 @@ export function ChatPanel({ user }: ChatPanelProps) {
             ref={inputRef}
             label="Messaggio"
             hideLabel
-            placeholder={recipientName ? `Sussurra a ${recipientName}` : "Messaggio, /r 2d6+3, /w nome testo"}
+            placeholder={recipientName ? `Sussurra a ${recipientName}` : "Scrivi un messaggio"}
             value={composer.text}
             maxLength={2000}
             autoComplete="off"

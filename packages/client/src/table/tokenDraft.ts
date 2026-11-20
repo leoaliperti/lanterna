@@ -78,7 +78,7 @@ export function validateDraft(d: TokenDraft): DraftErrors {
     current: d.hasHealth && current === null ? range : null,
     max: d.hasHealth && max === null ? range : null,
     temp: d.hasHealth && parseNumber(d.temp, 0, LIMITS.hpMax, true) === null ? range : null,
-    health: d.hasHealth && current !== null && max !== null && current > max ? "La vita attuale non puo' superare il massimo." : null
+    health: d.hasHealth && current !== null && max !== null && current > max ? "La vita attuale non può superare il massimo." : null
   };
 }
 
@@ -109,13 +109,31 @@ export function diffDraft(token: TokenView, d: TokenDraft, imageUrl: string | nu
   return patch;
 }
 
-/** Dove far comparire un token nuovo: il centro della scena, sul centro cella (lato dispari) o sull'incrocio (lato pari). */
-export function spawnPoint(scene: { width: number; height: number; grid: { cellSize: number; offsetX: number; offsetY: number } }, size: number): { x: number; y: number } {
+/**
+ * Dove far comparire un token nuovo: il centro della scena, sul centro cella (lato dispari) o sull'incrocio (lato pari).
+ * Se lì c'è già un token si prova nelle celle vicine (a spirale quadrata), così i token nuovi non si impilano.
+ */
+export function spawnPoint(
+  scene: { width: number; height: number; grid: { cellSize: number; offsetX: number; offsetY: number } },
+  size: number,
+  taken: ReadonlyArray<{ x: number; y: number }> = []
+): { x: number; y: number } {
   const { cellSize: c, offsetX, offsetY } = scene.grid;
   const oddSide = size < 1 || Math.round(size) % 2 === 1;
   const snap = (v: number, off: number) => (oddSide ? off + (Math.floor((v - off) / c) + 0.5) * c : off + Math.round((v - off) / c) * c);
   const clamp = (v: number, max: number) => Math.min(max, Math.max(0, v));
-  return { x: clamp(snap(scene.width / 2, offsetX), scene.width), y: clamp(snap(scene.height / 2, offsetY), scene.height) };
+  const base = { x: clamp(snap(scene.width / 2, offsetX), scene.width), y: clamp(snap(scene.height / 2, offsetY), scene.height) };
+  const free = (p: { x: number; y: number }) => p.x >= 0 && p.y >= 0 && p.x <= scene.width && p.y <= scene.height && !taken.some((t) => Math.abs(t.x - p.x) < c / 2 && Math.abs(t.y - p.y) < c / 2);
+  for (let ring = 0; ring <= 8; ring++) {
+    for (let dy = -ring; dy <= ring; dy++) {
+      for (let dx = -ring; dx <= ring; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+        const candidate = { x: base.x + dx * c, y: base.y + dy * c };
+        if (free(candidate)) return candidate;
+      }
+    }
+  }
+  return base;
 }
 
 /** Comando `token.create` da una bozza, al centro (px mappa) indicato. */

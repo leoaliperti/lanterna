@@ -121,7 +121,9 @@
 .l-picker:active { transform: scale(var(--press-scale)); }
 
 .l-popover { position: absolute; z-index: var(--z-popover); min-width: 12rem; max-width: min(22rem, calc(100vw - 2rem)); border-radius: var(--radius-lg); border: 0.5px solid var(--hairline); box-shadow: var(--shadow-lg); padding: var(--space-3); opacity: 0; transform: scale(0.95); transition: transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); }
-.l-popover--menu { padding: var(--space-1); min-width: 13.5rem; }
+.l-popover--menu { padding: var(--space-1); min-width: 15rem; }
+/* Il popover sta quasi sempre dentro la barra, che ha già un backdrop-filter: lì il suo non sfoca nulla e il contenuto sotto traspare nitido. Resta pieno. */
+.l-popover.l-material { color: var(--label); background: var(--material-opaque); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .l-popover[data-state="open"] { opacity: 1; transform: scale(1); }
 .l-popover[data-state="closed"] { transition-duration: 100ms; }
 .l-popover[data-placement^="bottom"] { top: calc(100% + 6px); }
@@ -138,7 +140,7 @@
 .l-popover--fixed { position: fixed; transform-origin: top left; }
 
 .l-menu { display: flex; flex-direction: column; }
-.l-menu__item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: var(--hit-min); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm); background: none; text-align: left; font-size: var(--text-body); cursor: pointer; }
+.l-menu__item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: var(--hit-min); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm); background: none; color: var(--label); text-align: left; font-size: var(--text-body); cursor: pointer; }
 .l-menu__item:focus-visible { outline: none; background: var(--tint-solid); color: #fff; }
 .l-menu__item:active { background: var(--fill-tertiary); }
 .l-menu__item--destructive { color: var(--red); }
@@ -213,12 +215,17 @@
 .l-banner__text { flex: 1; min-width: 0; }
 .l-banner__title { margin: 0; font-size: var(--text-subhead); font-weight: 600; }
 .l-banner__body { margin: 2px 0 0; font-size: var(--text-footnote); color: var(--label-secondary); }
+/* Banner senza titolo: il messaggio è l'unica informazione, quindi testo pieno e leggibile (anche su sfondo rosso). */
+.l-banner__body:first-child { margin: 0; font-size: var(--text-subhead); color: var(--label); }
 
 /* ---------- Lista inset grouped ---------- */
 .l-listgroup { margin: 0 0 var(--space-6); }
 .l-listgroup__header { margin: 0; padding: 0 var(--space-4) var(--space-2) calc(var(--space-4) + var(--space-4)); font-size: var(--text-footnote); font-weight: 400; text-transform: uppercase; letter-spacing: 0; color: var(--label-secondary); }
 .l-listgroup__footer { margin: var(--space-2) 0 0; padding: 0 var(--space-8); font-size: var(--text-footnote); color: var(--label-secondary); }
-.l-list { list-style: none; margin: 0 var(--space-4); padding: 0; background: var(--bg-grouped-secondary); border-radius: var(--radius-lg); overflow: hidden; }
+.l-list { list-style: none; margin: 0 var(--space-4); padding: 0; background: var(--bg-grouped-secondary); border-radius: var(--radius-lg); }
+/* Niente overflow: hidden, altrimenti i menu delle righe (Menu, Popover) verrebbero tagliati: gli angoli si arrotondano sulle righe. */
+.l-list > .l-listitem:first-child, .l-list > .l-listitem:first-child > .l-row { border-top-left-radius: var(--radius-lg); border-top-right-radius: var(--radius-lg); }
+.l-list > .l-listitem:last-child, .l-list > .l-listitem:last-child > .l-row { border-bottom-left-radius: var(--radius-lg); border-bottom-right-radius: var(--radius-lg); }
 .l-listitem { position: relative; }
 .l-listitem + .l-listitem::before { content: ""; position: absolute; top: 0; left: var(--space-4); right: 0; height: 0.5px; background: var(--separator); }
 .l-row { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: var(--hit-min); padding: var(--space-2) var(--space-4); border: 0; background: transparent; text-align: left; color: var(--label); font-size: var(--text-body); }

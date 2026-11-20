@@ -421,7 +421,7 @@ describe("overlay dei dadi 3D", () => {
     const toggle = await screen.findByRole("switch", { name: "Animazione 3D dei dadi" });
     expect(toggle.getAttribute("aria-checked")).toBe("true");
     await u.click(toggle);
-    expect(JSON.parse(window.localStorage.getItem("lanterna.settings.v1")!)).toEqual({ dice3d: false });
+    expect(JSON.parse(window.localStorage.getItem("lanterna.settings.v1")!)).toEqual({ dice3d: false, theme: "auto" });
   });
 });
 
