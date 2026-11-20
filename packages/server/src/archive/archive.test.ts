@@ -93,6 +93,7 @@ async function richCampaign() {
   for (const c of [
     { type: "scene.update", sceneId: MAIN, patch: { map: { assetId: map.assetId, url: map.url } } },
     { type: "token.create", token: token("tok-img", { name: "Con immagine", imageUrl: tokenImg.url, x: 525 }) },
+    { type: "prop.create", prop: { id: "prop-1", sceneId: MAIN, name: "Albero", imageUrl: tokenImg.url, x: 200, y: 200, width: 90, height: 90, rotation: 15, layer: "above", opacity: 0.8, fade: true, hidden: false } },
     { type: "fog.enable", sceneId: MAIN, initial: "covered" },
     { type: "fog.reveal", sceneId: MAIN, shape: { kind: "rect", x: 0, y: 0, width: 700, height: 300 }, target: { kind: "all" } },
     { type: "fog.reveal", sceneId: MAIN, shape: { kind: "rect", x: 700, y: 0, width: 300, height: 300 }, target: { kind: "players", userIds: [t.p1.id] } },
@@ -135,6 +136,7 @@ function canon(state: CampaignState): string {
     ...state.tokens.map((x, i): [string, string] => [x.id, `<T${i}>`]),
     ...(state.walls ?? []).map((x, i): [string, string] => [x.id, `<W${i}>`]),
     ...(state.groups ?? []).map((x, i): [string, string] => [x.id, `<G${i}>`]),
+    ...(state.props ?? []).map((x, i): [string, string] => [x.id, `<P${i}>`]),
   ];
   named.sort((a, b) => b[0].length - a[0].length);
   for (const [id, ph] of named) s = s.split(`"${id}"`).join(`"${ph}"`);
@@ -151,15 +153,15 @@ describe("esportazione", { timeout: 60_000 }, () => {
     expect(String(res.headers["content-disposition"])).toMatch(/^attachment; filename="lanterna-campagna-di-prova-\d{8}\.zip"$/);
     const files = unzipSync(new Uint8Array(res.rawPayload));
     const names = Object.keys(files);
-    expect(names).toEqual(expect.arrayContaining(["manifest.json", "campaign.json", "members.json", "scenes.json", "tokens.json", "fog.json", "walls.json", "combats.json", "groups.json", "sheets.json", "content.json", "library.json", "chat.json", "assets.json"]));
+    expect(names).toEqual(expect.arrayContaining(["manifest.json", "campaign.json", "members.json", "scenes.json", "tokens.json", "fog.json", "walls.json", "props.json", "combats.json", "groups.json", "sheets.json", "content.json", "library.json", "chat.json", "assets.json"]));
     expect(names.filter((n) => n.startsWith("assets/") && n !== "assets.json")).toHaveLength(2);
     const manifest = JSON.parse(strFromU8(files["manifest.json"]!)) as Record<string, unknown> & { counts: Record<string, number> };
     expect(manifest.format).toBe("lanterna-campaign");
-    expect(manifest.formatVersion).toBe(1);
+    expect(manifest.formatVersion).toBe(2);
     expect(manifest.includesChat).toBe(true);
     expect(typeof manifest.appVersion).toBe("string");
     expect(Number.isNaN(Date.parse(String(manifest.exportedAt)))).toBe(false);
-    expect(manifest.counts).toMatchObject({ scenes: 2, tokens: 5, walls: 1, fogs: 1, combats: 1, groups: 1, sheets: 2, content: 1, library: 1, assets: 2 });
+    expect(manifest.counts).toMatchObject({ scenes: 2, tokens: 5, walls: 1, props: 1, fogs: 1, combats: 1, groups: 1, sheets: 2, content: 1, library: 1, assets: 2 });
 
     // Membri: solo nome e ruolo con un riferimento opaco.
     const members = JSON.parse(strFromU8(files["members.json"]!)) as Record<string, unknown>[];
@@ -254,7 +256,10 @@ describe("importazione: round-trip", { timeout: 60_000 }, () => {
     expect(imported.log.epoch).not.toBe(original.log.epoch);
     expect(canon({ ...imported.state, name: original.state.name })).toBe(canon(original.state));
     // Id tutti nuovi.
-    const oldIds = new Set([...original.state.scenes.map((s) => s.id), ...original.state.tokens.map((x) => x.id), "wall-1", "g1"]);
+    expect(imported.state.props).toHaveLength(1);
+    expect(imported.state.props![0]!.imageUrl).not.toBe(original.state.props![0]!.imageUrl);
+    expect(imported.state.props![0]!.sceneId).toBe(imported.state.scenes.find((x) => x.name === original.state.scenes.find((o) => o.id === MAIN)!.name)!.id);
+    const oldIds = new Set([...(original.state.props ?? []).map((x) => x.id), ...original.state.scenes.map((s) => s.id), ...original.state.tokens.map((x) => x.id), "wall-1", "g1"]);
     for (const id of [...imported.state.scenes.map((s) => s.id), ...imported.state.tokens.map((x) => x.id), ...(imported.state.walls ?? []).map((w) => w.id), ...(imported.state.groups ?? []).map((g) => g.id)]) {
       expect(oldIds.has(id)).toBe(false);
     }
@@ -445,6 +450,47 @@ describe("importazione: archivi malevoli", { timeout: 90_000 }, () => {
     await rejects({}, buildZip({ ...emptyDocs(), "content.json": [item] }), 400, /content\.json/);
     await rejects({}, buildZip({ ...emptyDocs(), "content.json": [{ ...item, data: JSON.parse('{"__proto__": {"x": 1}}') }] }), 400);
     await rejects({}, buildZip({ ...emptyDocs(), "content.json": [{ ...item, data: { testo: "ok" } }, { ...item, kind: "arma" }] }), 400);
+  });
+
+  it("oggetti di scena: archivio vecchio (versione 1, senza props.json) si importa; archivi malevoli rifiutati", async () => {
+    const { t } = await setupEmpty();
+    const s = scene("s1");
+    const a = goodAsset();
+    const prop = (over: Record<string, unknown> = {}) => ({
+      id: "p1", sceneId: "s1", name: "Masso", imageUrl: `/assets/${a.id}.png`, x: 10, y: 10, width: 50, height: 50,
+      rotation: 0, layer: "ground", opacity: 1, fade: false, hidden: false, ...over,
+    });
+    // Archivio vecchio: versione 1, niente props.json, niente counts.props.
+    const old = buildZip({ ...emptyDocs(), "scenes.json": [s] }, { manifest: { formatVersion: 1 } });
+    const res = await importZip(t.gm.cookie, old);
+    expect(res.statusCode, res.body).toBe(201);
+    expect(ctx.app.realtime.stateOf((res.json() as ImportResult).campaign.id)!.state.props ?? []).toEqual([]);
+    // Con props e immagine: id nuovi, immagine rimappata.
+    const good = buildZip({ ...emptyDocs(), "scenes.json": [s], "props.json": [prop()], "assets.json": [a.meta], [`assets/${a.id}.png`]: png });
+    const ok2 = await importZip(t.gm.cookie, good);
+    expect(ok2.statusCode, ok2.body).toBe(201);
+    const st = ctx.app.realtime.stateOf((ok2.json() as ImportResult).campaign.id)!.state;
+    expect(st.props).toHaveLength(1);
+    expect(st.props![0]!.id).not.toBe("p1");
+    expect(st.props![0]!.imageUrl).not.toContain(a.id);
+    expect(st.props![0]!.sceneId).toBe(st.scenes[0]!.id);
+    // Malevoli: scena inesistente, campi extra, url di script, valori fuori limite, troppi oggetti, non array.
+    const bad = async (docs: unknown, code: number) => {
+      const r = await importZip(t.gm.cookie, buildZip({ ...emptyDocs(), "scenes.json": [s], "props.json": docs as object, "assets.json": [a.meta], [`assets/${a.id}.png`]: png }));
+      expect(r.statusCode, r.body).toBe(code);
+    };
+    await bad([prop({ sceneId: "nessuna" })], 400);
+    await bad([prop({ extra: 1 })], 400);
+    await bad([prop({ imageUrl: "javascript:alert(1)" })], 400);
+    await bad([prop({ width: 1e9 })], 400);
+    await bad([prop({ layer: "cielo" })], 400);
+    await bad({ non: "array" }, 400);
+    await bad(Array.from({ length: 3001 }, (_, i) => prop({ id: `p${i}` })), 400);
+    // Immagine dell'oggetto non nell'archivio: oggetto scartato con avviso, il resto si importa.
+    const missing = buildZip({ ...emptyDocs(), "scenes.json": [s], "props.json": [prop({ imageUrl: `/assets/${randomUUID()}.png` })] });
+    const m = await importZip(t.gm.cookie, missing);
+    expect(m.statusCode, m.body).toBe(201);
+    expect(ctx.app.realtime.stateOf((m.json() as ImportResult).campaign.id)!.state.props ?? []).toEqual([]);
   });
 
   it("riferimenti pendenti: token senza scena, nebbia senza scena, membro sconosciuto", async () => {

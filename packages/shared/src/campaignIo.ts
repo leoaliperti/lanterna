@@ -21,7 +21,7 @@ import type { CampaignSummary } from "./api.js";
 
 export const ARCHIVE_FORMAT = "lanterna-campaign";
 /** Cresce quando il formato cambia in modo non compatibile. L'importazione rifiuta versioni più nuove. */
-export const ARCHIVE_FORMAT_VERSION = 1;
+export const ARCHIVE_FORMAT_VERSION = 2;
 
 /** File JSON ammessi nell'archivio (oltre a `assets/<uuid>.<ext>`). */
 export const ARCHIVE_JSON_FILES = [
@@ -32,6 +32,8 @@ export const ARCHIVE_JSON_FILES = [
   "tokens.json",
   "fog.json",
   "walls.json",
+  /** Dalla versione 2; facoltativo (gli archivi della versione 1 non lo hanno). */
+  "props.json",
   "combats.json",
   "groups.json",
   "sheets.json",
@@ -68,6 +70,8 @@ export const ArchiveCountsSchema = z.strictObject({
   scenes: z.number().int().min(0),
   tokens: z.number().int().min(0),
   walls: z.number().int().min(0),
+  /** Dalla versione 2 (assente negli archivi vecchi). */
+  props: z.number().int().min(0).optional(),
   fogs: z.number().int().min(0),
   combats: z.number().int().min(0),
   groups: z.number().int().min(0),

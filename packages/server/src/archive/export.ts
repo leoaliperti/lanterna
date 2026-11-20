@@ -180,6 +180,7 @@ export async function planExport(db: Db, config: AppConfig, campaignId: string, 
   };
   for (const s of state.scenes) if (s.map) wanted.add(s.map.assetId);
   for (const t of state.tokens) noteUrl(t.imageUrl);
+  for (const p of state.props ?? []) noteUrl(p.imageUrl);
   for (const i of library) noteUrl(i.imageUrl);
   const assetRows =
     wanted.size === 0 ? [] : await db.select().from(assetTable).where(inArray(assetTable.id, [...wanted]));
@@ -206,6 +207,7 @@ export async function planExport(db: Db, config: AppConfig, campaignId: string, 
     scenes: state.scenes.length,
     tokens: tokens.length,
     walls: state.walls?.length ?? 0,
+    props: state.props?.length ?? 0,
     fogs: fogs.length,
     combats: state.combats?.length ?? 0,
     groups: state.groups?.length ?? 0,
@@ -222,6 +224,7 @@ export async function planExport(db: Db, config: AppConfig, campaignId: string, 
     json("tokens.json", tokens),
     json("fog.json", fogs),
     json("walls.json", state.walls ?? []),
+    json("props.json", state.props ?? []),
     json("combats.json", state.combats ?? []),
     json("groups.json", state.groups ?? []),
     json("sheets.json", sheets),

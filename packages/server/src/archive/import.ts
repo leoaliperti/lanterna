@@ -22,6 +22,7 @@ import {
   ImportOptionsSchema,
   LIMITS,
   ManifestSchema,
+  PropSchema,
   PROTOCOL_VERSION,
   SceneSchema,
   TokenSchema,
@@ -53,6 +54,7 @@ import {
   content as contentTable,
   fog as fogTable,
   libraryItem,
+  prop as propTable,
   scene as sceneTable,
   token as tokenTable,
   tokenGroup,
@@ -83,6 +85,7 @@ export interface StagedArchive {
   tokens: z.infer<typeof TokenSchema>[];
   fogs: z.infer<typeof FogSchema>[];
   walls: z.infer<typeof WallSchema>[];
+  props: z.infer<typeof PropSchema>[];
   combats: z.infer<typeof CombatSchema>[];
   groups: z.infer<typeof GroupSchema>[];
   sheets: { kind: "pc" | "monster"; ownerRef: string | null; tokenId: string | null; doc: SheetDoc }[];
@@ -94,7 +97,7 @@ export interface StagedArchive {
 }
 
 const JSON_NAMES = new Set<string>(ARCHIVE_JSON_FILES);
-const REQUIRED = ARCHIVE_JSON_FILES.filter((n) => n !== "chat.json" && n !== "manifest.json");
+const REQUIRED = ARCHIVE_JSON_FILES.filter((n) => n !== "chat.json" && n !== "props.json" && n !== "manifest.json");
 
 function issuesOf(file: string, error: z.ZodError): ArchiveError {
   const details = error.issues.slice(0, 5).map((i) => `${file}: ${i.path.join(".") || "(radice)"}: ${i.message}`);
@@ -194,6 +197,8 @@ export async function stageArchive(zipPath: string, stagingDir: string, config: 
   const tokens = parseWith("tokens.json", z.array(TokenSchema).max(LIMITS.maxTokens), get("tokens.json"));
   const fogs = parseWith("fog.json", z.array(FogSchema).max(LIMITS.maxScenes), get("fog.json"));
   const walls = parseWith("walls.json", z.array(WallSchema).max(LIMITS.maxWalls), get("walls.json"));
+  // Archivi della versione 1: nessun props.json.
+  const props = docs.has("props.json") ? parseWith("props.json", z.array(PropSchema).max(LIMITS.maxProps), get("props.json")) : [];
   const combats = parseWith("combats.json", z.array(CombatSchema).max(LIMITS.maxScenes), get("combats.json"));
   const groups = parseWith("groups.json", z.array(GroupSchema).max(LIMITS.maxGroups), get("groups.json"));
   const library = parseWith("library.json", z.array(ArchiveLibraryItemSchema).max(2000), get("library.json"));
@@ -240,7 +245,7 @@ export async function stageArchive(zipPath: string, stagingDir: string, config: 
   }
   if (staged.length !== images.size) throw new ArchiveError(400, "Archivio non valido: immagini non elencate in assets.json.");
 
-  return { manifest, campaign, members, scenes, tokens, fogs, walls, combats, groups, sheets, content, library, chat, images: staged, unpackedBytes: unpacked };
+  return { manifest, campaign, members, scenes, tokens, fogs, walls, props, combats, groups, sheets, content, library, chat, images: staged, unpackedBytes: unpacked };
 }
 
 export function countsOf(a: StagedArchive): ArchiveCounts {
@@ -249,6 +254,7 @@ export function countsOf(a: StagedArchive): ArchiveCounts {
     scenes: a.scenes.length,
     tokens: a.tokens.length,
     walls: a.walls.length,
+    props: a.props.length,
     fogs: a.fogs.length,
     combats: a.combats.length,
     groups: a.groups.length,
@@ -349,6 +355,7 @@ export async function commitImport(
   const sceneIds = new Map(a.scenes.map((s) => [s.id, randomUUID()]));
   const tokenIds = new Map(a.tokens.map((t) => [t.id, randomUUID()]));
   const wallIds = new Map(a.walls.map((w) => [w.id, randomUUID()]));
+  const propIds = new Map(a.props.map((p) => [p.id, randomUUID()]));
   const groupIds = new Map(a.groups.map((g) => [g.id, randomUUID()]));
   const assetIds = new Map(a.images.map((i) => [i.meta.id, { id: randomUUID(), ext: i.info.ext }]));
   const need = <T>(m: ReadonlyMap<string, T>, k: string, what: string): T => {
@@ -417,6 +424,12 @@ export async function commitImport(
     return { ...f, sceneId: need(sceneIds, f.sceneId, "nebbia"), players };
   });
   const walls = a.walls.map((w) => ({ ...w, id: need(wallIds, w.id, "muro"), sceneId: need(sceneIds, w.sceneId, "muro") }));
+  // Un oggetto la cui immagine non è nell'archivio sarebbe vuoto: si scarta (remapUrl avvisa).
+  const props = a.props.flatMap((p) => {
+    const imageUrl = remapUrl(p.imageUrl);
+    if (imageUrl === null) return [];
+    return [{ ...p, id: need(propIds, p.id, "oggetto di scena"), sceneId: need(sceneIds, p.sceneId, "oggetto di scena"), imageUrl }];
+  });
   const combats = a.combats.map((c) => ({
     ...c,
     sceneId: need(sceneIds, c.sceneId, "combattimento"),
@@ -434,6 +447,7 @@ export async function commitImport(
     tokens,
     fogs,
     walls,
+    props,
     combats,
     groups,
   });
@@ -533,6 +547,7 @@ export async function commitImport(
       await chunked(state.tokens.map((t, i) => ({ campaignId, id: t.id, sceneId: t.sceneId, sort: i + 1, data: JSON.stringify(t) })), 200, (r) => tx.insert(tokenTable).values(r));
       await chunked((state.fogs ?? []).map((f) => ({ campaignId, sceneId: f.sceneId, data: JSON.stringify(f) })), 100, (r) => tx.insert(fogTable).values(r));
       await chunked((state.walls ?? []).map((w, i) => ({ campaignId, id: w.id, sceneId: w.sceneId, sort: i + 1, data: JSON.stringify(w) })), 200, (r) => tx.insert(wallTable).values(r));
+      await chunked((state.props ?? []).map((p, i) => ({ campaignId, id: p.id, sceneId: p.sceneId, sort: i + 1, data: JSON.stringify(p) })), 200, (r) => tx.insert(propTable).values(r));
       await chunked((state.combats ?? []).map((c) => ({ campaignId, sceneId: c.sceneId, data: JSON.stringify(c) })), 100, (r) => tx.insert(combatTable).values(r));
       await chunked((state.groups ?? []).map((g, i) => ({ campaignId, id: g.id, sort: i + 1, data: JSON.stringify(g) })), 100, (r) => tx.insert(tokenGroup).values(r));
       await chunked(sheetRows, 100, (r) => tx.insert(characterSheet).values(r));
