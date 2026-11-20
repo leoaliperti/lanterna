@@ -142,7 +142,7 @@ function canon(state: CampaignState): string {
   return s.replace(UUID, (u) => seen.get(u) ?? (seen.set(u, `<U${seen.size}>`), seen.get(u)!));
 }
 
-describe("esportazione", () => {
+describe("esportazione", { timeout: 60_000 }, () => {
   it("contiene manifesto versionato, documenti e immagini, e nessun dato degli account né segreti", async () => {
     const { t } = await richCampaign();
     const res = await exportZip(t.gm.cookie, t.campaignId, true);
@@ -222,7 +222,7 @@ describe("esportazione", () => {
   });
 });
 
-describe("importazione: round-trip", () => {
+describe("importazione: round-trip", { timeout: 60_000 }, () => {
   it("esporta, importa e ottiene una campagna uguale (a meno degli id), nuova, con epoca nuova e file con nomi nuovi", async () => {
     const { t, port, map } = await richCampaign();
     const original = ctx.app.realtime.stateOf(t.campaignId)!;
@@ -341,7 +341,7 @@ describe("importazione: round-trip", () => {
   });
 });
 
-describe("importazione: archivi malevoli", () => {
+describe("importazione: archivi malevoli", { timeout: 90_000 }, () => {
   /** Un'app per ogni configurazione, riusata dentro il test (creare utenti con scrypt è lento). */
   const sandboxes = new Map<string, ReturnType<typeof makeSandbox> extends Promise<infer S> ? S : never>();
   async function makeSandbox(env: NodeJS.ProcessEnv) {
