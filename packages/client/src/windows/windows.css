@@ -20,12 +20,17 @@
 .w-view__panel:focus-visible, .w-view__body:focus-visible { outline-offset: calc(var(--space-1) * -1); }
 .w-view__content { width: 100%; max-width: 46rem; margin: 0 auto; display: grid; gap: var(--space-3); align-content: start; }
 
-/* Pillola con nome della vista e connessione: in alto a sinistra, sopra il contenuto. */
+/* La chat riempie l'altezza della finestra: il log scorre, il compositore resta in fondo. */
+.w-view__panel:has(.w-view__chat) { display: flex; overflow: hidden; }
+.w-view__chat { flex: 1; min-height: 0; display: flex; }
+.w-view__chat > .a-chat { flex: 1; }
+
+/* Pillola con nome della vista e connessione: in alto a destra (a sinistra c'e' la barra della nebbia del GM). */
 .w-view__bar {
   position: absolute;
   z-index: var(--z-bar);
   top: max(var(--space-3), var(--safe-top));
-  left: max(var(--space-3), var(--safe-left));
+  right: max(var(--space-3), var(--safe-right));
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -61,7 +66,7 @@
 .w-view__as > span:first-of-type { overflow: hidden; text-overflow: ellipsis; }
 .w-view__ro { padding: var(--space-1) var(--space-2); border-radius: var(--radius-full); background: var(--tint-bg); color: var(--tint-text); }
 /* Su finestre strette il banner scende sotto la pillola. */
-@media (max-width: 48rem) {
+@media (max-width: 64rem) {
   .w-view__as { top: calc(max(var(--space-3), var(--safe-top)) + var(--hit-min) + var(--space-2)); }
 }
 
