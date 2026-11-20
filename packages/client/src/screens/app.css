@@ -1,0 +1,114 @@
+/* Schermate dell'app. Solo token del design system (docs/DESIGN.md): niente colori o durate a mano. */
+
+.a-muted { color: var(--label-secondary); margin: 0; }
+.a-center { display: flex; justify-content: center; padding: var(--space-8) 0; }
+.a-gap { margin-bottom: var(--space-4); display: grid; gap: var(--space-3); justify-items: start; }
+.a-gap > .l-banner { justify-self: stretch; }
+
+.a-splash { min-height: 100dvh; display: grid; place-items: center; }
+
+/* Ingressi: solo opacity e transform, brevi. Con movimento ridotto la regola globale li azzera. */
+@keyframes a-enter { from { opacity: 0; transform: translateY(var(--space-2)); } to { opacity: 1; transform: none; } }
+@keyframes a-enter-side { from { opacity: 0; transform: translateX(var(--space-4)); } to { opacity: 1; transform: none; } }
+.a-enter { animation: a-enter var(--dur-slow) var(--ease-out) both; }
+.a-enter-side { animation: a-enter-side var(--dur-base) var(--ease-ios) both; }
+@media (prefers-reduced-motion: reduce) {
+  .a-enter, .a-enter-side { animation: none; }
+}
+
+/* Form */
+.a-form { display: grid; gap: var(--space-4); }
+.a-field-group { display: grid; gap: var(--space-2); }
+
+/* ---------- Login ---------- */
+.a-login {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: max(var(--space-4), var(--safe-top)) max(var(--space-4), var(--safe-right)) max(var(--space-4), var(--safe-bottom)) max(var(--space-4), var(--safe-left));
+  background: var(--bg-grouped);
+}
+.a-login__card {
+  width: min(100%, 24rem);
+  display: grid;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  background: var(--bg-grouped-secondary);
+  border: 0.5px solid var(--hairline);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+.a-login__brand { display: grid; gap: var(--space-1); justify-items: center; text-align: center; }
+.a-login__brand h1 { margin: 0; }
+.a-login__logo { display: grid; place-items: center; width: 4rem; height: 4rem; margin-bottom: var(--space-2); border-radius: var(--radius-lg); background: var(--tint-bg); color: var(--tint-text); }
+.a-login__note { text-align: center; }
+
+/* ---------- Tavolo ---------- */
+.a-table { height: 100dvh; display: grid; grid-template-rows: auto 1fr; overflow: hidden; background: var(--bg); }
+.a-table__body { display: flex; min-height: 0; }
+
+.a-topbar {
+  position: relative;
+  z-index: var(--z-bar);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: calc(var(--hit-min) + var(--space-2));
+  padding: var(--safe-top) max(var(--space-3), var(--safe-right)) 0 max(var(--space-4), var(--safe-left));
+  box-shadow: 0 0.5px 0 var(--separator);
+  border-radius: 0;
+}
+.a-topbar__title { display: grid; min-width: 0; line-height: 1.15; }
+.a-topbar__campaign { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.a-topbar__actions { display: flex; align-items: center; gap: var(--space-1); }
+
+.a-map {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6) max(var(--space-4), var(--safe-left)) max(var(--space-6), var(--safe-bottom));
+  background-color: var(--bg-secondary);
+  background-image: radial-gradient(circle, var(--separator) 0.0625rem, transparent 0.0625rem);
+  background-size: 1.75rem 1.75rem;
+}
+.a-map:focus-visible { outline-offset: calc(var(--space-1) * -1); }
+.a-map__badge { position: absolute; left: var(--space-4); bottom: max(var(--space-4), var(--safe-bottom)); display: inline-flex; align-items: center; gap: var(--space-1); }
+
+.a-side {
+  width: 22rem;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+  border-left: 0.5px solid var(--separator);
+  padding: var(--space-3) max(var(--space-3), var(--safe-right)) max(var(--space-3), var(--safe-bottom)) var(--space-3);
+  overflow-y: auto;
+}
+.a-side__tabs { flex: 1; }
+
+/* Skip link */
+.a-skip {
+  position: absolute; left: var(--space-3); top: var(--space-3); z-index: var(--z-popover);
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-md);
+  background: var(--tint-solid); color: var(--on-tint);
+  transform: translateY(-300%);
+}
+.a-skip:focus-visible { transform: none; }
+
+/* ---------- Stato vuoto ---------- */
+.a-empty { display: grid; justify-items: center; gap: var(--space-2); max-width: 20rem; margin: 0 auto; padding: var(--space-8) var(--space-4); text-align: center; }
+.a-empty p { margin: 0; }
+.a-empty__icon { display: grid; place-items: center; width: 4.5rem; height: 4.5rem; margin-bottom: var(--space-2); border-radius: var(--radius-lg); background: var(--fill-tertiary); color: var(--label-secondary); }
+
+/* ---------- Pagina (gestione utenti) ---------- */
+.a-page { min-height: 100dvh; background: var(--bg-grouped); }
+.a-page__content {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: var(--space-2) max(var(--space-4), var(--safe-right)) max(var(--space-8), var(--safe-bottom)) max(var(--space-4), var(--safe-left));
+}
+.a-page__intro { margin-bottom: var(--space-5) !important; }
+.a-row-actions { display: inline-flex; align-items: center; gap: var(--space-1); }
