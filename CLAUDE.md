@@ -119,6 +119,15 @@ Dettagli e formato in `docs/PROTOCOL.md` (sezione "Esportazione e importazione d
 - **Libreria** (`src/library/`, tabella `library_item`, migrazione `0007_library`): `LIBRARY_PLAYER_KINDS` (default nessuno); al giocatore mai `stats` né `campaignId`; fuori permesso = 404 identico a "inesistente". Se rebase/merge produce due migrazioni con lo stesso numero, rigenera la tua con `npm run db:generate -w @lanterna/server`.
 - **Client**: `screens/BackupScreen.tsx` (route `#/admin/backup`, voce nel menu utente dell'admin), `library/` (pannello "Libreria", `LibraryPanel`, logica in `libraryLogic.ts`) e "Salva nella libreria" in `table/TokenEditor.tsx`. `#/?campaign=<id>` apre una campagna precisa (non c'è ancora un selettore di campagne). Test: `screens/backup.test.tsx`, `library/library.test.tsx`, e2e `e2e/campaign-io.e2e.test.ts`.
 
+## Finestre multiple e vista giocatore (M9)
+
+Dettagli in `docs/WINDOWS.md`.
+
+- **Solo WebSocket**: ogni finestra è un client autenticato con la sua connessione; niente `BroadcastChannel` né comunicazione fra finestre.
+- **Viste** (`packages/client/src/windows/`): `#/table`, `#/view/map|notes|chat|combat`, `#/view/scene/<id>` e `#/view/player/<userId>` (solo GM). Menu "Apri in nuova finestra" e pulsante nel pannello; disposizione per tipo di vista in `localStorage` (`lanterna.windows.v1`, sempre in try/catch); cornice minimale `ViewFrame`. La sincronizzazione scheda → token gira solo nella finestra del tavolo.
+- **Vista giocatore generata dal server**: `/ws?viewAs=<userId>` (solo GM della campagna, membro guardato; altrimenti 403 all'upgrade o FORBIDDEN + 4403 all'`hello`), attore del membro per ogni filtro (`viewerActor` in `realtime/hub.ts`), sempre in sola lettura. `?readOnly=1` per chiunque. Tessere con `?viewAs=`. Mai ricostruire nel client la vista di un altro utente filtrando quella del GM.
+- **Test**: `server/src/realtime/viewas.test.ts` (stessi frame del giocatore, scritture FORBIDDEN, 403), `client/src/windows/*.test.*`, e2e `client/e2e/windows.e2e.test.ts`. Una nuova richiesta WebSocket che scrive deve passare da `rejectReadOnly`/`roomOf` in `hub.ts`.
+
 ## Regole non negoziabili
 
 1. **Account: solo l'admin li crea.** L'admin coincide con il GM. I ruoli sono due: admin/GM e giocatore. Nessuna registrazione pubblica. Il controllo del ruolo avviene **lato server** su ogni endpoint di creazione/modifica/eliminazione utenti. Nascondere il pulsante nella UI non basta. Ogni funzione di questo tipo deve avere un test che dimostri il rifiuto (403) per un utente non admin.
