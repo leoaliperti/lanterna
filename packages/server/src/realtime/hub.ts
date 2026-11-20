@@ -18,7 +18,20 @@ import {
   type Token,
 } from "@lanterna/shared";
 import type { z } from "zod";
-import type { HelloSchema } from "@lanterna/shared";
+import {
+  MAX_HISTORY_PAGE,
+  canSeeEntry,
+  type ChatLogEntry,
+  type ChatSend,
+  type HelloSchema,
+  type HistoryRequest,
+  type RandomInt,
+  type RollRequest,
+} from "@lanterna/shared";
+import { buildChatEntry, buildRollEntry, type Built, type EntryError } from "../chat/entries.js";
+import { insertEntry, loadPage } from "../chat/store.js";
+import type { AppConfig } from "../config.js";
+import { TokenBucket } from "./rate.js";
 import {
   LOG_CAPACITY,
   campaignIdsOf,
@@ -69,6 +82,24 @@ function errorMessage(requestId: string | null, code: ErrorMessage["code"], mess
   return { type: "error", requestId, code, message };
 }
 
+function entryError(requestId: string, e: EntryError): ErrorMessage {
+  return e.reason
+    ? { type: "error", requestId, code: e.code, message: e.message, reason: e.reason }
+    : errorMessage(requestId, e.code, e.message);
+}
+
+export interface HubOptions {
+  /** Generatore dei tiri. In produzione `crypto.randomInt` (`dice/crypto-rng.ts`); i test possono iniettarne uno. */
+  rng: RandomInt;
+  chat: AppConfig["chat"];
+}
+
+/** Limiti di chat e tiri di un utente (condivisi fra tutte le sue connessioni). */
+interface UserLimits {
+  chat: TokenBucket;
+  roll: TokenBucket;
+}
+
 /**
  * Stanze per campagna: stato in memoria (unica fonte di verità a runtime), salvato su
  * SQLite dopo ogni comando accettato PRIMA di essere applicato e inviato ai client.
@@ -76,11 +107,17 @@ function errorMessage(requestId: string | null, code: ErrorMessage["code"], mess
 export class Hub {
   private readonly rooms = new Map<string, Room>();
   private readonly peers = new Set<Peer>();
+  private readonly limits = new Map<string, UserLimits>();
+  /** Generatore usato per ogni tiro (esposto per i test). */
+  readonly rng: RandomInt;
 
   constructor(
     private readonly db: Db,
     private readonly log: FastifyBaseLogger,
-  ) {}
+    private readonly options: HubOptions,
+  ) {
+    this.rng = options.rng;
+  }
 
   /** Carica tutte le campagne salvate (all'avvio). */
   async loadAll(): Promise<void> {
@@ -145,6 +182,105 @@ export class Hub {
     const { state, log } = room.core;
     peer.send(planResync(state, log, actor, { lastVersion: msg.lastVersion, epoch: msg.epoch }));
     peer.lastSent = state.version;
+    // Poi le ultime voci di chat e tiri visibili, in coda: una voce salvata dopo arriva dopo.
+    void this.enqueue(room, async () => {
+      if (!peer.actor || !room.peers.has(peer)) return;
+      const page = await loadPage(this.db, msg.campaignId, peer.actor, null, this.options.chat.historyOnConnect);
+      if (page) peer.send({ type: "history", requestId: null, entries: page.entries, hasMore: page.hasMore });
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Chat, tiri e cronologia (M4)
+  // -------------------------------------------------------------------------
+
+  private limitsOf(userId: string): UserLimits {
+    let l = this.limits.get(userId);
+    if (!l) {
+      const c = this.options.chat;
+      l = {
+        chat: new TokenBucket(c.messagesPerMinute / 60, c.messageBurst),
+        roll: new TokenBucket(c.rollsPerMinute / 60, c.rollBurst),
+      };
+      this.limits.set(userId, l);
+    }
+    return l;
+  }
+
+  /** Stanza della connessione dopo `hello`, oppure errore già inviato. */
+  private roomOf(peer: Peer, requestId: string): Room | null {
+    const room = peer.campaignId ? this.rooms.get(peer.campaignId) : undefined;
+    if (!room || !peer.actor) {
+      peer.send(errorMessage(requestId, "INVALID", "serve prima hello"));
+      return null;
+    }
+    return room;
+  }
+
+  /** Messaggio di chat (pubblico o whisper). */
+  chat(peer: Peer, msg: ChatSend): Promise<void> {
+    return this.publish(peer, msg.requestId, "chat", (ctx) => buildChatEntry(ctx, msg));
+  }
+
+  /** Tiro: l'esito si calcola qui, con `this.rng` (crypto in produzione). Il client manda solo la formula. */
+  roll(peer: Peer, msg: RollRequest): Promise<void> {
+    return this.publish(peer, msg.requestId, "roll", (ctx) => buildRollEntry(ctx, msg, this.rng));
+  }
+
+  /**
+   * Costruisce la voce con l'attore della connessione, la salva su SQLite e solo dopo la invia
+   * a chi può vederla (`canSeeEntry`). Il `requestId` arriva solo alla connessione richiedente.
+   */
+  private publish(
+    peer: Peer,
+    requestId: string,
+    kind: "chat" | "roll",
+    build: (ctx: { state: CampaignCore["state"]; actor: Actor; id: string; now: number }) => Built<ChatLogEntry>,
+  ): Promise<void> {
+    const room = this.roomOf(peer, requestId);
+    if (!room) return Promise.resolve();
+    if (!this.limitsOf(peer.userId)[kind].take()) {
+      peer.send(
+        errorMessage(requestId, "RATE_LIMITED", kind === "chat" ? "troppi messaggi, riprova tra poco" : "troppi tiri, riprova tra poco"),
+      );
+      return Promise.resolve();
+    }
+    return this.enqueue(room, async () => {
+      if (!peer.actor || !room.peers.has(peer)) return;
+      const r = build({ state: room.core.state, actor: peer.actor, id: randomUUID(), now: Date.now() });
+      if (!r.ok) {
+        peer.send(entryError(requestId, r.error));
+        return;
+      }
+      try {
+        await insertEntry(this.db, room.core.state.campaignId, r.entry);
+      } catch (err) {
+        this.log.error({ err }, "salvataggio del log di sessione non riuscito");
+        peer.send(errorMessage(requestId, "CONFLICT", "salvataggio non riuscito, riprova"));
+        return;
+      }
+      const entry = r.entry;
+      for (const p of room.peers) {
+        if (!p.actor || !canSeeEntry(entry, p.actor)) continue;
+        const rid = p === peer ? requestId : null;
+        p.send(entry.kind === "message" ? { type: "chat.message", requestId: rid, entry } : { type: "roll.result", requestId: rid, entry });
+      }
+    });
+  }
+
+  /** Pagina di cronologia più vecchia di `before`, filtrata per l'utente. */
+  history(peer: Peer, msg: HistoryRequest): Promise<void> {
+    const room = this.roomOf(peer, msg.requestId);
+    if (!room) return Promise.resolve();
+    return this.enqueue(room, async () => {
+      if (!peer.actor || !room.peers.has(peer)) return;
+      const page = await loadPage(this.db, room.core.state.campaignId, peer.actor, msg.before, msg.limit ?? MAX_HISTORY_PAGE);
+      if (!page) {
+        peer.send(errorMessage(msg.requestId, "NOT_FOUND", "voce non trovata"));
+        return;
+      }
+      peer.send({ type: "history", requestId: msg.requestId, entries: page.entries, hasMore: page.hasMore });
+    });
   }
 
   /** Comando / annulla / ripeti, con l'attore della connessione (mai dati del client). */

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import type { PublicUser, UserRole } from "@lanterna/shared";
-import { buildApp } from "../app.js";
+import { buildApp, type BuildAppOptions } from "../app.js";
 import { loadConfig, type AppConfig } from "../config.js";
 
 export const ORIGIN = "http://localhost:3000";
@@ -22,6 +22,8 @@ export async function createTestApp(
   tweak: (config: AppConfig) => void = () => {},
   /** Riusa un database e una cartella di upload esistenti (test di riavvio): non vengono cancellati. */
   persistent?: { dbPath: string; uploadDir: string },
+  /** Opzioni in più per `buildApp` (es. `rng` deterministico per i tiri). */
+  appOptions: Pick<BuildAppOptions, "rng"> = {},
 ): Promise<TestContext> {
   const dbPath = persistent?.dbPath ?? join(tmpdir(), `lanterna-test-${randomUUID()}.db`);
   const uploadDir = persistent?.uploadDir ?? join(tmpdir(), `lanterna-test-uploads-${randomUUID()}`);
@@ -38,7 +40,7 @@ export async function createTestApp(
     ...env,
   });
   tweak(config);
-  const app = await buildApp({ config, logger: false });
+  const app = await buildApp({ config, logger: false, ...appOptions });
   return {
     app,
     config,

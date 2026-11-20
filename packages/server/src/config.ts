@@ -47,7 +47,20 @@ export interface AppConfig {
     /** Raffica massima di messaggi oltre la media. */
     messageBurst: number;
   };
+  chat: {
+    /** Voci di cronologia inviate dopo ogni `hello` (ultime N visibili all'utente). */
+    historyOnConnect: number;
+    /** Messaggi di chat al minuto per utente (media) e raffica massima. */
+    messagesPerMinute: number;
+    messageBurst: number;
+    /** Tiri al minuto per utente (media) e raffica massima. */
+    rollsPerMinute: number;
+    rollBurst: number;
+  };
 }
+
+/** Massimo di voci inviate alla connessione (`CHAT_HISTORY_LIMIT`). */
+export const MAX_HISTORY_ON_CONNECT = 500;
 
 /** Lunghezza minima del segreto: 32 caratteri, come richiesto da Better Auth. */
 export const MIN_SECRET_LENGTH = 32;
@@ -119,6 +132,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       helloTimeoutMs: positiveInt(env.WS_HELLO_TIMEOUT_MS, 10_000),
       messagesPerSecond: positiveInt(env.WS_MESSAGES_PER_SECOND, 30),
       messageBurst: positiveInt(env.WS_MESSAGE_BURST, 60),
+    },
+    chat: {
+      historyOnConnect: Math.min(positiveInt(env.CHAT_HISTORY_LIMIT, 50), MAX_HISTORY_ON_CONNECT),
+      messagesPerMinute: positiveInt(env.CHAT_MESSAGES_PER_MINUTE, 30),
+      messageBurst: positiveInt(env.CHAT_MESSAGE_BURST, 10),
+      rollsPerMinute: positiveInt(env.ROLLS_PER_MINUTE, 30),
+      rollBurst: positiveInt(env.ROLL_BURST, 10),
     },
   };
 }

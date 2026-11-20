@@ -1,7 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
-import type { HealthResponse } from "@lanterna/shared";
+import type { HealthResponse, RandomInt } from "@lanterna/shared";
 import { createAuth } from "./auth/auth.js";
 import { authRoutes } from "./auth/routes.js";
 import "./auth/session.js";
@@ -9,6 +9,8 @@ import { loadConfig, type AppConfig } from "./config.js";
 import { openDatabase, type Database } from "./db/client.js";
 import { originGuard } from "./security.js";
 import { campaignRoutes } from "./campaigns/routes.js";
+import { chatRoutes } from "./chat/routes.js";
+import { randomInt as cryptoRandomInt } from "./dice/crypto-rng.js";
 import { Hub, CLOSE } from "./realtime/hub.js";
 import { attachRealtime } from "./realtime/server.js";
 import { uploadRoutes } from "./media/routes.js";
@@ -26,6 +28,11 @@ declare module "fastify" {
 export interface BuildAppOptions {
   config?: AppConfig;
   logger?: boolean;
+  /**
+   * Generatore dei tiri, solo per i test. In produzione si usa sempre `crypto.randomInt`
+   * (`dice/crypto-rng.ts`): `main.ts` non lo passa mai.
+   */
+  rng?: RandomInt;
 }
 
 export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
@@ -45,7 +52,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   app.decorate("auth", auth);
   app.decorate("users", users);
   // Stanze delle campagne: lo stato salvato si ricarica prima di accettare connessioni.
-  const hub = new Hub(database.db, app.log);
+  const hub = new Hub(database.db, app.log, { rng: options.rng ?? cryptoRandomInt, chat: config.chat });
   await hub.loadAll();
   app.decorate("realtime", hub);
   app.decorateRequest("session", null);
@@ -67,6 +74,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     sessionsRevoked: (id) => hub.closeUser(id, CLOSE.sessionEnded, "sessione terminata"),
   });
   await campaignRoutes(app, hub);
+  await chatRoutes(app, hub);
   await uploadRoutes(app, config);
   attachRealtime(app, hub, config, allowedOrigins);
 

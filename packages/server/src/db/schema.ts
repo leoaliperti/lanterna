@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import type { UserRole } from "@lanterna/shared";
+import type { EntryVisibility, UserRole } from "@lanterna/shared";
 
 // Tabelle richieste da Better Auth (user, session, account, verification) più il campo `role`.
 // Le chiavi TypeScript devono coincidere con i nomi dei campi di Better Auth.
@@ -167,6 +167,31 @@ export const asset = sqliteTable("asset", {
   createdAt: timestamps.createdAt,
 });
 
+/**
+ * Log di sessione (M4): messaggi di chat e tiri, nell'ordine di `seq`. La voce completa sta in
+ * `data` (JSON validato con `LogEntrySchema` in lettura); visibilità, autore e destinatario sono
+ * anche colonne per filtrare in SQL. Autore e destinatario non sono chiavi esterne: il log resta
+ * intatto anche se un utente viene eliminato. `seq` non esce mai dal server (il cursore è `id`).
+ */
+export const chatEntry = sqliteTable(
+  "chat_entry",
+  {
+    seq: integer("seq").primaryKey({ autoIncrement: true }),
+    id: text("id").notNull().unique(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => campaign.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<"message" | "roll">().notNull(),
+    authorId: text("author_id").notNull(),
+    visibility: text("visibility").$type<EntryVisibility>().notNull(),
+    whisperTo: text("whisper_to"),
+    /** Millisecondi dall'epoca Unix. */
+    at: integer("at").notNull(),
+    data: text("data").notNull(),
+  },
+  (t) => [index("chat_entry_campaign_seq_idx").on(t.campaignId, t.seq)],
+);
+
 export const schema = {
   user,
   session,
@@ -178,4 +203,5 @@ export const schema = {
   token,
   campaignEvent,
   asset,
+  chatEntry,
 };
