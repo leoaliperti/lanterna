@@ -23,7 +23,9 @@ export async function authRoutes(app: FastifyInstance, config: AppConfig) {
       headers.set("content-type", "application/json");
     }
     // URL costruito dal baseURL configurato, non dall'header Host.
-    const url = new URL(request.url, app.auth.options.baseURL as string);
+    // Il prefisso dell'API (`/api` in produzione) non fa parte del percorso di Better Auth.
+    const path = request.url.startsWith(config.apiPrefix) ? request.url.slice(config.apiPrefix.length) : request.url;
+    const url = new URL(path, app.auth.options.baseURL as string);
     const response = await app.auth.handler(new Request(url, { method: request.method, headers, body }));
 
     reply.code(response.status);

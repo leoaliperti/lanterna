@@ -13,9 +13,11 @@
     "create-admin": "tsx src/scripts/create-admin.ts"
   },
   "dependencies": {
+    "@fastify/compress": "^9.3.0",
     "@fastify/helmet": "^13.2.0",
     "@fastify/multipart": "^10.1.9",
     "@fastify/rate-limit": "^11.2.2",
+    "@fastify/static": "^10.1.12",
     "@lanterna/shared": "*",
     "@libsql/client": "^0.18.0",
     "better-auth": "^1.7.26",
