@@ -28,7 +28,7 @@ export interface NumInputProps {
 }
 
 /**
- * Campo numerico: mentre si scrive il testo resta libero; il valore passa alla scheda solo se e' un numero valido
+ * Campo numerico: mentre si scrive il testo resta libero; il valore passa alla scheda solo se è un numero valido
  * nell'intervallo (altrimenti il campo mostra l'errore e alla fine torna all'ultimo valore valido).
  */
 export function NumInput({ label, value, onValueChange, min = -Infinity, max = Infinity, step = 1, hideLabel, disabled, className, helper }: NumInputProps) {

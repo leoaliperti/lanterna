@@ -13,18 +13,20 @@ import { SettingsSheet } from "../settings/SettingsSheet";
 import { CampaignSwitcher } from "./CampaignSwitcher";
 
 const WIDE = "(min-width: 56rem)";
+/** Tablet in verticale: il pannello sta in basso, sotto la mappa, invece di coprirla con uno sheet. */
+export const DOCK = "(min-width: 40rem) and (max-width: 55.99rem) and (orientation: portrait)";
 
-function useWide(): boolean {
-  const query = () => (typeof window.matchMedia === "function" ? window.matchMedia(WIDE).matches : false);
+function useMedia(q: string): boolean {
+  const query = () => (typeof window.matchMedia === "function" ? window.matchMedia(q).matches : false);
   const [wide, setWide] = useState(query);
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return;
-    const mq = window.matchMedia(WIDE);
+    const mq = window.matchMedia(q);
     const on = () => setWide(mq.matches);
     on();
     mq.addEventListener?.("change", on);
     return () => mq.removeEventListener?.("change", on);
-  }, []);
+  }, [q]);
   return wide;
 }
 
@@ -69,7 +71,10 @@ export function TableFrame({
 }: TableFrameProps) {
   const { logout } = useSession();
   const toast = useToast();
-  const wide = useWide();
+  const wide = useMedia(WIDE);
+  const dock = useMedia(DOCK);
+  // Pannello fisso (laterale o in basso) oppure sheet modale (telefono).
+  const inline = wide || dock;
   const [panelOpen, setPanelOpen] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -77,7 +82,7 @@ export function TableFrame({
   const tabItems = tabs?.({ closeSheet: () => setSheetOpen(false) });
   const [tab, setTab] = useState<string | undefined>(defaultTab);
   const currentTab = tabItems?.some((t) => t.id === tab) ? tab : tabItems?.[0]?.id;
-  const panelShown = tabs ? (wide ? panelOpen : sheetOpen) : false;
+  const panelShown = tabs ? (inline ? panelOpen : sheetOpen) : false;
 
   useEffect(() => {
     onVisibleTabChange?.(panelShown && currentTab ? currentTab : null);
@@ -89,7 +94,7 @@ export function TableFrame({
   useEffect(() => {
     if (!nonce || !wantedTab) return;
     setTab(wantedTab);
-    if (wide) setPanelOpen(true);
+    if (inline) setPanelOpen(true);
     else setSheetOpen(true);
   }, [nonce]);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -152,15 +157,15 @@ export function TableFrame({
           {actions}
           {tabs ? (
             <IconButton
-              label={wide && panelOpen ? "Nascondi pannello" : panelBadge > 0 ? `Mostra pannello (${panelBadge} nuovi)` : "Mostra pannello"}
+              label={inline && panelOpen ? "Nascondi pannello" : panelBadge > 0 ? `Mostra pannello (${panelBadge} nuovi)` : "Mostra pannello"}
               icon={
                 <span className="a-dotwrap">
                   <PanelRight size={20} />
                   {panelBadge > 0 && !panelShown ? <span className="a-dot" /> : null}
                 </span>
               }
-              aria-pressed={wide ? panelOpen : undefined}
-              onClick={() => (wide ? setPanelOpen((v) => !v) : setSheetOpen(true))}
+              aria-pressed={inline ? panelOpen : undefined}
+              onClick={() => (inline ? setPanelOpen((v) => !v) : setSheetOpen(true))}
             />
           ) : null}
           <Menu
@@ -173,18 +178,18 @@ export function TableFrame({
       </header>
       {banner}
 
-      <div className="a-table__body">
+      <div className={`a-table__body${dock ? " a-table__body--dock" : ""}`}>
         <main id="mappa" tabIndex={-1} className="a-map" aria-label="Mappa">
           {children}
         </main>
-        {sidePanel && wide && panelOpen ? (
-          <aside className="a-side l-material l-material--thick a-enter-side" aria-label="Pannello laterale">
+        {sidePanel && inline && panelOpen ? (
+          <aside className={`a-side l-material l-material--thick a-enter-side${dock ? " a-side--dock" : ""}`} aria-label="Pannello laterale">
             {sidePanel}
           </aside>
         ) : null}
       </div>
 
-      {sidePanel && !wide ? (
+      {sidePanel && !inline ? (
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen} title="Pannello del tavolo">
           {sidePanel}
         </Sheet>

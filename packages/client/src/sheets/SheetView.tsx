@@ -203,7 +203,7 @@ export function SheetView({ sheetId }: SheetViewProps) {
 
   const tabs: TabItem[] = [
     { id: "base", label: "Base", content: <AbilitiesSection {...props} /> },
-    { id: "skills", label: "Abilita'", content: <SkillsSection {...props} /> },
+    { id: "skills", label: "Abilità", content: <SkillsSection {...props} /> },
     { id: "combat", label: "Combattimento", content: <CombatSection {...props} /> },
     { id: "spells", label: "Magia", content: <SpellsSection {...props} /> },
     { id: "inventory", label: "Inventario", content: <InventorySection {...props} /> },
@@ -254,11 +254,11 @@ export function SheetView({ sheetId }: SheetViewProps) {
       </header>
 
       {status === "conflict" ? (
-        <Banner tone="warning" title="La scheda e' cambiata altrove">
+        <Banner tone="warning" title="La scheda è cambiata altrove">
           <p>Qualcun altro l'ha modificata mentre la stavi modificando. Scegli quale versione tenere.</p>
           <div className="s-actions">
             <Button size="sm" variant="gray" onClick={() => void reloadLatest()}>
-              Carica la versione piu' recente
+              Carica la versione più recente
             </Button>
             <Button size="sm" onClick={() => void keepMine()}>
               Tieni le mie modifiche
@@ -274,7 +274,7 @@ export function SheetView({ sheetId }: SheetViewProps) {
         </Banner>
       ) : null}
 
-      <SearchField label="Cerca nella scheda" placeholder="Cerca abilita', oggetti, incantesimi..." value={query} onValueChange={setQuery} />
+      <SearchField label="Cerca nella scheda" placeholder="Cerca abilità, oggetti, incantesimi..." value={query} onValueChange={setQuery} />
       <Tabs aria-label={`Sezioni della scheda di ${doc.sheet.name || "senza nome"}`} tabs={tabs} value={section} onValueChange={setSection} />
     </article>
   );

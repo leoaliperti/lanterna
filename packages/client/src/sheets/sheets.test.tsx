@@ -11,7 +11,7 @@ import { Table } from "../table/Table";
 import { gm, luca, state } from "../table/testState";
 import { ToastProvider } from "../ui";
 
-/* Dati FITTIZI. Il server e' simulato: qui si verifica cio' che fa l'interfaccia (i permessi veri sono nei test del server). */
+/* Dati FITTIZI. Il server è simulato: qui si verifica ciò che fa l'interfaccia (i permessi veri sono nei test del server). */
 
 let sockets: FakeSocket[] = [];
 const cur = () => sockets[sockets.length - 1]!;
@@ -169,10 +169,10 @@ describe("scheda aperta", () => {
     return { api, dialog: within(dialog) };
   }
 
-  it("un clic su un'abilita' invia roll.request con la formula della scheda e lo svantaggio delle condizioni", async () => {
+  it("un clic su un'abilità invia roll.request con la formula della scheda e lo svantaggio delle condizioni", async () => {
     const u = userEvent.setup();
     const { dialog } = await openHero(u);
-    await u.click(dialog.getByRole("tab", { name: "Abilita'" }));
+    await u.click(dialog.getByRole("tab", { name: "Abilità" }));
     await u.click(await dialog.findByRole("button", { name: /Percezione/ }));
     const req = sent("roll.request");
     expect(req).toHaveLength(1);
@@ -180,12 +180,12 @@ describe("scheda aperta", () => {
     expect(String(req[0]!.label)).toContain("Percezione");
   });
 
-  it("la ricerca filtra le abilita'", async () => {
+  it("la ricerca filtra le abilità", async () => {
     const u = userEvent.setup();
     const { dialog } = await openHero(u);
-    await u.click(dialog.getByRole("tab", { name: "Abilita'" }));
+    await u.click(dialog.getByRole("tab", { name: "Abilità" }));
     await u.type(dialog.getByRole("searchbox", { name: "Cerca nella scheda" }), "furt");
-    expect(await dialog.findByRole("button", { name: /Furtivita'/ })).toBeTruthy();
+    expect(await dialog.findByRole("button", { name: /Furtività/ })).toBeTruthy();
     expect(dialog.queryByRole("button", { name: /Percezione/ })).toBeNull();
   });
 
@@ -211,21 +211,21 @@ describe("scheda aperta", () => {
     expect(api.records.get("s1")!.version).toBe(2);
   });
 
-  it("un conflitto mostra la scelta tra la versione piu' recente e le proprie modifiche", async () => {
+  it("un conflitto mostra la scelta tra la versione più recente e le proprie modifiche", async () => {
     const u = userEvent.setup();
     const { api, dialog } = await openHero(u);
     api.conflict = true;
     await u.click(dialog.getByRole("tab", { name: "Combattimento" }));
     await u.click(dialog.getByRole("button", { name: "Danno" }));
-    expect(await dialog.findByText("La scheda e' cambiata altrove", undefined, { timeout: 3000 })).toBeTruthy();
-    expect(dialog.getByRole("button", { name: "Carica la versione piu' recente" })).toBeTruthy();
+    expect(await dialog.findByText("La scheda è cambiata altrove", undefined, { timeout: 3000 })).toBeTruthy();
+    expect(dialog.getByRole("button", { name: "Carica la versione più recente" })).toBeTruthy();
     expect(dialog.getByRole("button", { name: "Tieni le mie modifiche" })).toBeTruthy();
   });
 
-  it("piu' schede aperte insieme: una linguetta per scheda e la chiusura", async () => {
+  it("più schede aperte insieme: una linguetta per scheda e la chiusura", async () => {
     const u = userEvent.setup();
     const { dialog } = await openHero(u, [record("s3", "pc", "Seconda eroina", blankDoc("Seconda eroina"))]);
-    // Riapre l'elenco dal pannello laterale mentre la finestra e' aperta: si chiude la finestra e si apre la seconda.
+    // Riapre l'elenco dal pannello laterale mentre la finestra è aperta: si chiude la finestra e si apre la seconda.
     await u.keyboard("{Escape}");
     await u.click(await side().findByRole("button", { name: /Seconda eroina/ }));
     const dlg = within(await screen.findByRole("dialog", { name: "Schede" }));

@@ -46,8 +46,8 @@ export const SKILL_LABEL: Record<Skill, string> = {
   performance: "Intrattenere",
   persuasion: "Persuasione",
   religion: "Religione",
-  sleightOfHand: "Rapidita' di mano",
-  stealth: "Furtivita'",
+  sleightOfHand: "Rapidità di mano",
+  stealth: "Furtività",
   survival: "Sopravvivenza"
 };
 
@@ -73,7 +73,7 @@ export function signed(n: number): string {
   return n >= 0 ? `+${n}` : `−${Math.abs(n)}`;
 }
 
-/** Testo senza maiuscole ne' accenti, per cercare in modo tollerante. */
+/** Testo senza maiuscole né accenti, per cercare in modo tollerante. */
 export function normalize(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleLowerCase("it").replace(/[']/g, "");
 }
@@ -173,7 +173,7 @@ function signatureOf(s: SheetSummary): string {
 }
 
 /**
- * Regola: la scheda e' la fonte di verita' per PF e condizioni. Quando i PF o le condizioni di una scheda
+ * Regola: la scheda è la fonte di verità per PF e condizioni. Quando i PF o le condizioni di una scheda
  * collegata a un token CAMBIANO (rispetto all'ultima volta che il GM li ha visti), il client del GM li copia sul token.
  * La prima osservazione fissa solo il riferimento: non sovrascrive la barra del token. Se il token non ha ancora
  * una barra della vita, la riceve subito. Le condizioni del token che non sono del motore 5e restano.

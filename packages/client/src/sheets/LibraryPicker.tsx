@@ -14,8 +14,8 @@ export interface LibraryPickerProps {
 }
 
 /**
- * Ricerca nei contenuti importati (`GET /content?kind=&q=`): niente e' incluso nel repo, si trova solo cio' che
- * l'istanza ha importato. Il server decide cosa si puo' vedere: un giocatore non trova mai i mostri.
+ * Ricerca nei contenuti importati (`GET /content?kind=&q=`): niente è incluso nel repo, si trova solo ciò che
+ * l'istanza ha importato. Il server decide cosa si può vedere: un giocatore non trova mai i mostri.
  */
 export function LibraryPicker({ kind, onPick, actionLabel = "Aggiungi" }: LibraryPickerProps) {
   const [query, setQuery] = useState("");

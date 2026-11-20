@@ -20,7 +20,7 @@ export function AbilitiesSection({ doc, derived, roller, change, query }: Sectio
           <strong className="t-title3">{signed(derived.proficiencyBonus)}</strong>
         </li>
         <li>
-          <span className="t-caption1 a-muted">Velocita'</span>
+          <span className="t-caption1 a-muted">Velocità</span>
           <strong className="t-title3">{derived.speed} ft</strong>
         </li>
         <li>
@@ -73,16 +73,16 @@ export function AbilitiesSection({ doc, derived, roller, change, query }: Sectio
   );
 }
 
-/** Abilita' con competenza e maestria. Un clic tira la prova con il vantaggio/svantaggio delle condizioni. */
+/** Abilità con competenza e maestria. Un clic tira la prova con il vantaggio/svantaggio delle condizioni. */
 export function SkillsSection({ derived, roller, query }: SectionProps) {
   const list = (SKILLS as readonly Skill[])
     .filter((s) => matchesQuery(query, SKILL_LABEL[s], ABILITY_LABEL[derived.skills[s].ability], ABILITY_SHORT[derived.skills[s].ability], PROFICIENCY_LABEL[derived.skills[s].proficiency]))
     .sort((a, b) => SKILL_LABEL[a].localeCompare(SKILL_LABEL[b], "it"));
   if (list.length === 0) {
-    return <EmptyState icon={<Dices size={28} />} title="Nessuna abilita'" description="Nessuna abilita' corrisponde alla ricerca." />;
+    return <EmptyState icon={<Dices size={28} />} title="Nessuna abilità" description="Nessuna abilità corrisponde alla ricerca." />;
   }
   return (
-    <List aria-label="Abilita'" footer="Tocca un'abilita' per tirare. Il vantaggio o lo svantaggio vengono dalle condizioni.">
+    <List aria-label="Abilità" footer="Tocca un'abilità per tirare. Il vantaggio o lo svantaggio vengono dalle condizioni.">
       {list.map((s) => {
         const sk = derived.skills[s];
         const note = modeNote(sk.roll);

@@ -22,9 +22,9 @@ function useWide(): boolean {
 }
 
 /**
- * Finestra delle schede: piu' schede aperte insieme, ognuna con la sua linguetta. Su schermi larghi se ne possono
+ * Finestra delle schede: più schede aperte insieme, ognuna con la sua linguetta. Su schermi larghi se ne possono
  * affiancare due; su telefono e tablet stretto se ne vede una alla volta. Le schede aperte restano montate (nascoste)
- * cosi' le bozze non si perdono cambiando linguetta.
+ * così le bozze non si perdono cambiando linguetta.
  */
 export function SheetWorkspace() {
   const { sheets, openIds, activeId, sideId, workspaceOpen, setWorkspaceOpen, activate, close, setSide, user } = useSheets();

@@ -9,7 +9,7 @@ import { gm, luca, state } from "../table/testState";
 import { ToastProvider } from "../ui";
 import { LibraryPanel } from "./LibraryPanel";
 import { libraryPath } from "./libraryApi";
-import { instanceCommand, libraryInputFromDraft } from "./libraryLogic";
+import { dropCommand, instanceCommand, libraryInputFromDraft } from "./libraryLogic";
 
 const goblin: LibraryItem = {
   id: "lib-1",
@@ -165,5 +165,18 @@ describe("logica della libreria", () => {
     const first = instanceCommand(goblin, scene, [], "t1");
     const second = instanceCommand(goblin, scene, [first.type === "token.create" ? first.token : { x: 0, y: 0 }], "t2");
     expect(first.type === "token.create" && second.type === "token.create" && (first.token.x !== second.token.x || first.token.y !== second.token.y)).toBe(true);
+  });
+
+  it("dropCommand: il token sta dove e' stato lasciato, agganciato alla griglia e dentro la mappa", () => {
+    const grid = { cellSize: 70, offsetX: 0, offsetY: 0, snap: true };
+    const scene = { id: "s1", width: 1400, height: 1050, grid };
+    const at = (x: number, y: number, g = grid) => {
+      const c = dropCommand(goblin, { ...scene, grid: g }, { x, y }, "t1");
+      return c.type === "token.create" ? { x: c.token.x, y: c.token.y, id: c.token.id } : null;
+    };
+    expect(at(200, 150)).toEqual({ x: 175, y: 175, id: "t1" });
+    expect(at(-500, 99999)!.x).toBeGreaterThanOrEqual(0);
+    expect(at(-500, 99999)!.y).toBeLessThanOrEqual(1050);
+    expect(at(203, 151, { ...grid, snap: false })).toMatchObject({ x: 203, y: 151 });
   });
 });

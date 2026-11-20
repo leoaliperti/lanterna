@@ -319,3 +319,12 @@ button.l-row:disabled { opacity: 0.4; cursor: default; }
 @keyframes l-indeterminate { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
 @keyframes l-pop { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
 @keyframes l-toast-in { from { opacity: 0; transform: translateY(-1.5rem) scale(0.96); } to { opacity: 1; transform: none; } }
+
+/* Touch (Apple HIG): bersagli di almeno 44 pt anche per i controlli compatti, e niente zoom automatico dei campi su iOS. */
+@media (pointer: coarse) {
+  .l-btn--sm { min-height: var(--hit-min); min-width: var(--hit-min); }
+  .l-chip, .l-segmented__item, .l-tab { min-height: var(--hit-min); }
+  .l-field__input, .l-field__box input, .l-field__box textarea, .l-field__box select { font-size: max(1rem, 16px); }
+}
+/* Sheet e pannelli rispettano la safe area in basso (home indicator) */
+.l-sheet__body { padding-bottom: max(var(--space-4), var(--safe-bottom)); }
