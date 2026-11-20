@@ -187,6 +187,15 @@ export function attachRealtime(
       case "history.request":
         void hub.history(peer, msg);
         return;
+      case "initiative.roll":
+        void hub.initiativeRoll(peer, msg);
+        return;
+      case "ephemeral.show":
+        hub.ephemeralShow(peer, msg);
+        return;
+      case "ephemeral.clear":
+        hub.ephemeralClear(peer, msg);
+        return;
     }
   }
 

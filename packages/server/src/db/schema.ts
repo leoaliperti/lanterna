@@ -172,6 +172,34 @@ export const wall = sqliteTable(
   (t) => [primaryKey({ columns: [t.campaignId, t.id] }), index("wall_scene_idx").on(t.campaignId, t.sceneId)],
 );
 
+/** Combattimento di una scena (M7): una riga per scena, `data` = `Combat` in JSON validato con `CombatSchema`. */
+export const combat = sqliteTable(
+  "combat",
+  {
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => campaign.id, { onDelete: "cascade" }),
+    sceneId: text("scene_id").notNull(),
+    data: text("data").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.campaignId, t.sceneId] })],
+);
+
+/** Gruppi salvati di token (M7): una riga per gruppo, `data` = `TokenGroup` in JSON validato con `GroupSchema`. */
+export const tokenGroup = sqliteTable(
+  "token_group",
+  {
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => campaign.id, { onDelete: "cascade" }),
+    id: text("id").notNull(),
+    /** Ordine di creazione (crescente). */
+    sort: integer("sort").notNull(),
+    data: text("data").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.campaignId, t.id] })],
+);
+
 /** Registro dei cambiamenti per versione (riconnessione con delta anche dopo un riavvio). */
 export const campaignEvent = sqliteTable(
   "campaign_event",
@@ -283,6 +311,8 @@ export const schema = {
   token,
   fog,
   wall,
+  combat,
+  tokenGroup,
   campaignEvent,
   asset,
   chatEntry,

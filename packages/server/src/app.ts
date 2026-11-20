@@ -57,7 +57,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   app.decorate("auth", auth);
   app.decorate("users", users);
   // Stanze delle campagne: lo stato salvato si ricarica prima di accettare connessioni.
-  const hub = new Hub(database.db, app.log, { rng: options.rng ?? cryptoRandomInt, chat: config.chat });
+  const hub = new Hub(database.db, app.log, { rng: options.rng ?? cryptoRandomInt, chat: config.chat, ephemeral: config.ephemeral });
   await hub.loadAll();
   app.decorate("realtime", hub);
   app.decorateRequest("session", null);

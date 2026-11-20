@@ -4,6 +4,8 @@ import type { BatchItem } from "drizzle-orm/batch";
 import { z } from "zod";
 import {
   CampaignStateSchema,
+  CombatSchema,
+  GroupSchema,
   FogSchema,
   SceneSchema,
   StateChangeSchema,
@@ -18,7 +20,7 @@ import {
   type StateChange,
 } from "@lanterna/shared";
 import type { Db } from "../db/client.js";
-import { campaign, campaignEvent, campaignMember, fog, scene, token, user, wall } from "../db/schema.js";
+import { campaign, campaignEvent, campaignMember, combat, fog, scene, token, tokenGroup, user, wall } from "../db/schema.js";
 
 /**
  * Persistenza delle campagne su SQLite (Drizzle + libSQL).
@@ -91,6 +93,8 @@ export async function loadCampaign(db: Db, id: string): Promise<(LoadedCampaign 
   };
   const fogRows = await db.select().from(fog).where(eq(fog.campaignId, id)).orderBy(asc(fog.sceneId));
   const wallRows = await db.select().from(wall).where(eq(wall.campaignId, id)).orderBy(asc(wall.sort));
+  const combatRows = await db.select().from(combat).where(eq(combat.campaignId, id)).orderBy(asc(combat.sceneId));
+  const groupRows = await db.select().from(tokenGroup).where(eq(tokenGroup.campaignId, id)).orderBy(asc(tokenGroup.sort));
   const parsed = CampaignStateSchema.safeParse({
     campaignId: row.id,
     name: row.name,
@@ -101,6 +105,8 @@ export async function loadCampaign(db: Db, id: string): Promise<(LoadedCampaign 
     tokens: tokenRows.map((r) => parse(TokenSchema, r.data, `token ${r.id}`)),
     fogs: fogRows.map((r) => parse(FogSchema, r.data, `nebbia ${r.sceneId}`)),
     walls: wallRows.map((r) => parse(WallSchema, r.data, `muro ${r.id}`)),
+    combats: combatRows.map((r) => parse(CombatSchema, r.data, `combattimento ${r.sceneId}`)),
+    groups: groupRows.map((r) => parse(GroupSchema, r.data, `gruppo ${r.id}`)),
   });
   if (!parsed.success) throw new CampaignStoreError(`stato non valido nel database (campagna ${id})`);
   // Proprietari di token non più membri e maschere di chi non è più giocatore (utente eliminato).
@@ -218,7 +224,7 @@ export async function campaignIdsOf(db: Db, userId: string): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
-const nextSort = (table: typeof scene | typeof token | typeof wall, campaignId: string): SQL =>
+const nextSort = (table: typeof scene | typeof token | typeof wall | typeof tokenGroup, campaignId: string): SQL =>
   sql`(select coalesce(max(${table.sort}), 0) + 1 from ${table} where ${table.campaignId} = ${campaignId})`;
 
 /**
@@ -265,6 +271,7 @@ export async function persistChanges(
           ops.push(db.delete(token).where(and(eq(token.campaignId, id), eq(token.sceneId, c.before.id))));
           ops.push(db.delete(wall).where(and(eq(wall.campaignId, id), eq(wall.sceneId, c.before.id))));
           ops.push(db.delete(fog).where(and(eq(fog.campaignId, id), eq(fog.sceneId, c.before.id))));
+          ops.push(db.delete(combat).where(and(eq(combat.campaignId, id), eq(combat.sceneId, c.before.id))));
           ops.push(db.delete(scene).where(and(eq(scene.campaignId, id), eq(scene.id, c.before.id))));
         }
       } else if (c.before === null) {
@@ -306,8 +313,34 @@ export async function persistChanges(
             .onConflictDoUpdate({ target: [fog.campaignId, fog.sceneId], set: { data } }),
         );
       }
+    } else if (c.type === "combat") {
+      // Un cambiamento solo di visibilità (combattimento invariato) non tocca il database.
+      if (JSON.stringify(c.before) === JSON.stringify(c.after)) continue;
+      if (c.after === null) {
+        ops.push(db.delete(combat).where(and(eq(combat.campaignId, id), eq(combat.sceneId, c.sceneId))));
+      } else {
+        const data = JSON.stringify(c.after);
+        ops.push(
+          db
+            .insert(combat)
+            .values({ campaignId: id, sceneId: c.sceneId, data })
+            .onConflictDoUpdate({ target: [combat.campaignId, combat.sceneId], set: { data } }),
+        );
+      }
+    } else if (c.type === "group") {
+      if (c.after === null) {
+        if (c.before) ops.push(db.delete(tokenGroup).where(and(eq(tokenGroup.campaignId, id), eq(tokenGroup.id, c.before.id))));
+      } else {
+        const data = JSON.stringify(c.after);
+        ops.push(
+          db
+            .insert(tokenGroup)
+            .values({ campaignId: id, id: c.after.id, sort: nextSort(tokenGroup, id), data })
+            .onConflictDoUpdate({ target: [tokenGroup.campaignId, tokenGroup.id], set: { data } }),
+        );
+      }
     }
-    // "activeScene": coperto dall'aggiornamento di `campaign`.
+    // "notice": solo un avviso, niente da salvare. "activeScene": coperto dall'aggiornamento di `campaign`.
   }
   ops.push(
     db.insert(campaignEvent).values({ campaignId: id, version: next.version, changes: JSON.stringify(changes) }),
