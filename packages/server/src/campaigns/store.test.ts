@@ -17,6 +17,8 @@ function fakePeer(userId: string): Peer & { inbox: ServerMessage[] } {
     id: randomUUID(),
     userId,
     sessionId: "s",
+    viewAs: null,
+    readOnly: false,
     actor: null,
     campaignId: null,
     lastSent: 0,
