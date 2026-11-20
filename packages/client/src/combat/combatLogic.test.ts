@@ -48,6 +48,8 @@ describe("tracker: logica pura", () => {
     expect(addTokenCommand("p9", "s1", "t9")).toMatchObject({ type: "combat.add", participant: { tokenId: "t9", name: null, hidden: false } });
     expect(addEntryCommand("p9", "s1", "  Drago  ", 14)).toMatchObject({ participant: { tokenId: null, name: "Drago", initiative: 14 } });
     expect(addEntryCommand("p9", "s1", "   ", null)).toBeNull();
+    expect(addEntryCommand("p9", "s1", "Segreta", 3, true)).toMatchObject({ participant: { hidden: true } });
+    expect(addEntryCommand("p9", "s1", "Visibile", 3)).toMatchObject({ participant: { hidden: false } });
   });
 
   it("interpreta l'iniziativa scritta a mano", () => {

@@ -21,10 +21,11 @@ export function addTokenCommand(id: string, sceneId: string, tokenId: string, in
   return { type: "combat.add", sceneId, participant: { id, tokenId, name: null, initiative, hidden: false, hideInitiative: false } };
 }
 
-export function addEntryCommand(id: string, sceneId: string, name: string, initiative: number | null): Command | null {
+/** Voce libera (trappola, evento). `hidden`: nasce gia' nascosta ai giocatori, senza un istante in cui la vedono. */
+export function addEntryCommand(id: string, sceneId: string, name: string, initiative: number | null, hidden = false): Command | null {
   const clean = name.trim();
   if (!clean || clean.length > LIMITS.nameMaxLength) return null;
-  return { type: "combat.add", sceneId, participant: { id, tokenId: null, name: clean, initiative, hidden: false, hideInitiative: false } };
+  return { type: "combat.add", sceneId, participant: { id, tokenId: null, name: clean, initiative, hidden, hideInitiative: false } };
 }
 
 /**

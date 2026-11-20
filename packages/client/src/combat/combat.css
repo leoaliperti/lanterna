@@ -8,6 +8,7 @@
 .c-tracker__bar { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .c-tracker__section { display: grid; gap: var(--space-2); }
 .c-tracker__row2 { display: grid; grid-template-columns: minmax(0, 1fr) 5rem; gap: var(--space-2); align-items: end; }
+.c-tracker__row2 > :nth-child(n+3) { grid-column: 1 / -1; }
 .c-tracker__roll { display: grid; grid-template-columns: 5rem minmax(0, 1fr); gap: var(--space-2); align-items: end; }
 .c-tracker__empty { margin: 0; padding: var(--space-4) var(--space-2); text-align: center; }
 

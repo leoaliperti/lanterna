@@ -100,7 +100,7 @@ export function TargetsPanel({ view, scene, selected, onSelect, onAction }: Targ
           </Button>
         </div>
         {groups.length === 0 ? <p className="t-caption1 a-muted c-hint">Nessun gruppo. Seleziona dei token e salvali: «Tutti i nemici», «Squadra A».</p> : null}
-        <ul className="c-groups">
+        <ul className="c-groups" aria-label="Elenco dei gruppi">
           {groups.map((g) => {
             const here = recallGroup(g, tokens, scene.id);
             return (
@@ -142,7 +142,7 @@ export function TargetsPanel({ view, scene, selected, onSelect, onAction }: Targ
       <section className="c-targets__section" aria-label="Elenco dei bersagli">
         <SearchField placeholder="Cerca per nome, fazione o tipo" label="Cerca un bersaglio" value={query} onValueChange={setQuery} />
         {shown.length === 0 ? <p className="t-subhead a-muted c-tracker__empty">Nessun token.</p> : null}
-        <ul className="c-targetlist">
+        <ul className="c-targetlist" aria-label="Token della scena">
           {shown.map((t) => {
             const on = selected.includes(t.id);
             return (

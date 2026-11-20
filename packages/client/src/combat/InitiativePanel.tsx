@@ -47,6 +47,7 @@ export function InitiativePanel({ view, scene, selected }: InitiativePanelProps)
   const [sortAfter, setSortAfter] = useState(true);
   const [entryName, setEntryName] = useState("");
   const [entryInit, setEntryInit] = useState("");
+  const [entryHidden, setEntryHidden] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
 
   if (!scene || !sceneId) {
@@ -88,7 +89,7 @@ export function InitiativePanel({ view, scene, selected }: InitiativePanelProps)
       toast.show({ title: "Iniziativa non valida", message: "Un numero, oppure vuoto.", tone: "warning" });
       return;
     }
-    const cmd = addEntryCommand(crypto.randomUUID(), sceneId!, entryName, init);
+    const cmd = addEntryCommand(crypto.randomUUID(), sceneId!, entryName, init, entryHidden);
     if (!cmd) {
       toast.show({ title: "Serve un nome", message: "Scrivi il nome della voce (una trappola, un evento).", tone: "warning" });
       return;
@@ -157,6 +158,7 @@ export function InitiativePanel({ view, scene, selected }: InitiativePanelProps)
             >
               <TextField label="Voce libera" placeholder="Trappola, evento..." value={entryName} onChange={(e) => setEntryName(e.target.value)} autoComplete="off" />
               <TextField label="Iniziativa" inputMode="decimal" value={entryInit} onChange={(e) => setEntryInit(e.target.value)} autoComplete="off" />
+              <Toggle label="Nascosta ai giocatori" checked={entryHidden} onCheckedChange={setEntryHidden} />
               <Button type="submit" size="sm" variant="gray" icon={<Plus size={16} />}>
                 Aggiungi voce
               </Button>
