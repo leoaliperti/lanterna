@@ -253,6 +253,8 @@ export interface TabItem {
   label: string;
   content: ReactNode;
   icon?: ReactNode;
+  /** Contatore (es. nuovi messaggi): pallino numerico accanto all'etichetta, letto dagli screen reader. */
+  badge?: number;
 }
 export interface TabsProps {
   tabs: TabItem[];
@@ -305,6 +307,14 @@ export function Tabs({ tabs, value, defaultValue, onValueChange, className, ...a
           >
             {t.icon ? <span aria-hidden="true">{t.icon}</span> : null}
             {t.label}
+            {t.badge ? (
+              <>
+                <span className="l-badge l-badge--tint l-tabs__badge" aria-hidden="true">
+                  {t.badge > 99 ? "99+" : t.badge}
+                </span>
+                <span className="l-sr-only">{`, ${t.badge} nuovi`}</span>
+              </>
+            ) : null}
           </button>
         ))}
         <span className="l-tabs__indicator" aria-hidden="true" />

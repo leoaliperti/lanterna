@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { KeyRound, LogOut, PanelRight, Users } from "lucide-react";
+import { KeyRound, LogOut, PanelRight, Settings, Users } from "lucide-react";
 import { Avatar, IconButton, Menu, Sheet, Tabs, type MenuItemSpec, type TabItem } from "../ui";
 import type { SessionUser } from "../api/client";
 import { useSession } from "../session/SessionProvider";
 import { navigate } from "../router/hashRouter";
 import { ChangePasswordSheet } from "../screens/ChangePasswordSheet";
+import { SettingsSheet } from "../settings/SettingsSheet";
 
 const WIDE = "(min-width: 56rem)";
 
@@ -33,6 +34,12 @@ export interface TableFrameProps {
   tabs?: (ctx: { closeSheet: () => void }) => TabItem[];
   /** Scheda aperta all'inizio (default: la prima). */
   defaultTab?: string;
+  /** Apre il pannello (o lo sheet) sulla scheda indicata a ogni cambio di `nonce` (scorciatoie da tastiera). */
+  focusRequest?: { tab: string; nonce: number };
+  /** Scheda attualmente visibile all'utente, o `null` se il pannello e' chiuso. */
+  onVisibleTabChange?: (tab: string | null) => void;
+  /** Nuovi elementi da segnalare sul pulsante del pannello quando e' chiuso. */
+  panelBadge?: number;
   children: ReactNode;
 }
 
@@ -40,12 +47,42 @@ export interface TableFrameProps {
  * Cornice del tavolo: barra superiore con menu utente, area centrale e pannello laterale
  * (sidebar su schermi larghi, sheet su telefono e tablet stretto).
  */
-export function TableFrame({ user, title, actions, banner, tabs, defaultTab, children }: TableFrameProps) {
+export function TableFrame({
+  user,
+  title,
+  actions,
+  banner,
+  tabs,
+  defaultTab,
+  focusRequest,
+  onVisibleTabChange,
+  panelBadge = 0,
+  children
+}: TableFrameProps) {
   const { logout } = useSession();
   const wide = useWide();
   const [panelOpen, setPanelOpen] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const tabItems = tabs?.({ closeSheet: () => setSheetOpen(false) });
+  const [tab, setTab] = useState<string | undefined>(defaultTab);
+  const currentTab = tabItems?.some((t) => t.id === tab) ? tab : tabItems?.[0]?.id;
+  const panelShown = tabs ? (wide ? panelOpen : sheetOpen) : false;
+
+  useEffect(() => {
+    onVisibleTabChange?.(panelShown && currentTab ? currentTab : null);
+  }, [panelShown, currentTab, onVisibleTabChange]);
+
+  // Una nuova richiesta di focus apre il pannello sulla scheda richiesta (solo a ogni nonce).
+  const nonce = focusRequest?.nonce ?? 0;
+  const wantedTab = focusRequest?.tab;
+  useEffect(() => {
+    if (!nonce || !wantedTab) return;
+    setTab(wantedTab);
+    if (wide) setPanelOpen(true);
+    else setSheetOpen(true);
+  }, [nonce]);
   const [loggingOut, setLoggingOut] = useState(false);
 
   async function doLogout() {
@@ -55,6 +92,7 @@ export function TableFrame({ user, title, actions, banner, tabs, defaultTab, chi
   }
 
   const items: MenuItemSpec[] = [
+    { id: "settings", label: "Impostazioni", icon: <Settings size={18} />, onSelect: () => setSettingsOpen(true) },
     { id: "password", label: "Cambia password", icon: <KeyRound size={18} />, onSelect: () => setPasswordOpen(true) },
     ...(user.role === "admin"
       ? [{ id: "users", label: "Gestione utenti", icon: <Users size={18} />, onSelect: () => navigate("/admin/users") } satisfies MenuItemSpec]
@@ -63,7 +101,7 @@ export function TableFrame({ user, title, actions, banner, tabs, defaultTab, chi
   ];
 
   const sidePanel = tabs ? (
-    <Tabs aria-label="Pannello del tavolo" className="a-side__tabs" defaultValue={defaultTab} tabs={tabs({ closeSheet: () => setSheetOpen(false) })} />
+    <Tabs aria-label="Pannello del tavolo" className="a-side__tabs" value={currentTab} onValueChange={setTab} tabs={tabItems ?? []} />
   ) : null;
 
   return (
@@ -87,8 +125,13 @@ export function TableFrame({ user, title, actions, banner, tabs, defaultTab, chi
           {actions}
           {tabs ? (
             <IconButton
-              label={wide && panelOpen ? "Nascondi pannello" : "Mostra pannello"}
-              icon={<PanelRight size={20} />}
+              label={wide && panelOpen ? "Nascondi pannello" : panelBadge > 0 ? `Mostra pannello (${panelBadge} nuovi)` : "Mostra pannello"}
+              icon={
+                <span className="a-dotwrap">
+                  <PanelRight size={20} />
+                  {panelBadge > 0 && !panelShown ? <span className="a-dot" /> : null}
+                </span>
+              }
               aria-pressed={wide ? panelOpen : undefined}
               onClick={() => (wide ? setPanelOpen((v) => !v) : setSheetOpen(true))}
             />
@@ -120,6 +163,7 @@ export function TableFrame({ user, title, actions, banner, tabs, defaultTab, chi
         </Sheet>
       ) : null}
       <ChangePasswordSheet open={passwordOpen} onOpenChange={setPasswordOpen} />
+      <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   );
 }

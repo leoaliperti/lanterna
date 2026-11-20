@@ -1,6 +1,6 @@
 # Piano di Lanterna
 
-Stato: M0 completata; M1 backend (auth, ruoli, gestione utenti) in revisione, manca la UI di login e amministrazione. M2/M3 lato server (WebSocket, persistenza SQLite, REST campagne, upload) in revisione; mancano canvas e client WebSocket. M4 lato server (chat con whisper, tiri con esito sul server, tiri segreti, cronologia e log di sessione) in revisione; mancano chat e dadi nel client. Gestore pacchetti: npm workspaces (pnpm non è installato e non serviva). Client in tempo reale collegato al server (tavolo reale, strumenti GM, annulla/ripeti): vedi "Client in tempo reale" in docs/PROTOCOL.md.
+Stato: M0 completata; M1 backend (auth, ruoli, gestione utenti) in revisione, manca la UI di login e amministrazione. M2/M3 lato server (WebSocket, persistenza SQLite, REST campagne, upload) in revisione; mancano canvas e client WebSocket. M4 lato server (chat con whisper, tiri con esito sul server, tiri segreti, cronologia e log di sessione) in revisione; chat e dadi nel client (scheda Chat, barra dadi, overlay 3D, Impostazioni) in revisione: vedi "Chat e dadi nel client" in docs/PROTOCOL.md. Gestore pacchetti: npm workspaces (pnpm non è installato e non serviva). Client in tempo reale collegato al server (tavolo reale, strumenti GM, annulla/ripeti): vedi "Client in tempo reale" in docs/PROTOCOL.md.
 
 ## Decisioni prese
 
