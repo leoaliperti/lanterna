@@ -20,16 +20,21 @@ export interface TestContext {
 export async function createTestApp(
   env: NodeJS.ProcessEnv = {},
   tweak: (config: AppConfig) => void = () => {},
+  /** Riusa un database e una cartella di upload esistenti (test di riavvio): non vengono cancellati. */
+  persistent?: { dbPath: string; uploadDir: string },
 ): Promise<TestContext> {
-  const dbPath = join(tmpdir(), `lanterna-test-${randomUUID()}.db`);
+  const dbPath = persistent?.dbPath ?? join(tmpdir(), `lanterna-test-${randomUUID()}.db`);
+  const uploadDir = persistent?.uploadDir ?? join(tmpdir(), `lanterna-test-uploads-${randomUUID()}`);
   const config = loadConfig({
     NODE_ENV: "test",
     BETTER_AUTH_SECRET: "segreto-di-test-lungo-almeno-trentadue-caratteri",
     BETTER_AUTH_URL: ORIGIN,
     TRUSTED_ORIGINS: "http://localhost:5173",
     DATABASE_URL: `file:${dbPath}`,
+    UPLOAD_DIR: uploadDir,
     RATE_LIMIT_LOGIN_MAX: "1000",
     RATE_LIMIT_CREATE_USER_MAX: "1000",
+    RATE_LIMIT_UPLOAD_MAX: "1000",
     ...env,
   });
   tweak(config);
@@ -39,7 +44,9 @@ export async function createTestApp(
     config,
     async close() {
       await app.close();
+      if (persistent) return;
       for (const suffix of ["", "-wal", "-shm"]) rmSync(dbPath + suffix, { force: true });
+      rmSync(uploadDir, { recursive: true, force: true });
     },
   };
 }

@@ -35,8 +35,21 @@ const idParams = {
   properties: { id: { type: "string", minLength: 1, maxLength: 64 } },
 } as const;
 
+/** Notifiche verso il tempo reale: chiudere le connessioni WebSocket di un utente cambiato. */
+export interface UserEvents {
+  /** Ruolo cambiato o utente eliminato. */
+  userChanged(userId: string): Promise<void>;
+  /** Sessioni revocate (reset password). */
+  sessionsRevoked(userId: string): void;
+}
+
 /** Gestione account: solo admin. Il ruolo è verificato lato server su ogni rotta. */
-export async function adminRoutes(app: FastifyInstance, config: AppConfig, users: UserService) {
+export async function adminRoutes(
+  app: FastifyInstance,
+  config: AppConfig,
+  users: UserService,
+  events: UserEvents,
+) {
   const onlyAdmin = requireRole("admin");
 
   app.get("/admin/users", { onRequest: onlyAdmin }, async (): Promise<ListUsersResponse> => ({
@@ -88,7 +101,9 @@ export async function adminRoutes(app: FastifyInstance, config: AppConfig, users
     },
     async (request, reply) => {
       try {
-        return await users.setRole(request.params.id, request.body.role);
+        const updated = await users.setRole(request.params.id, request.body.role);
+        await events.userChanged(request.params.id);
+        return updated;
       } catch (err) {
         return sendServiceError(reply, err);
       }
@@ -101,6 +116,7 @@ export async function adminRoutes(app: FastifyInstance, config: AppConfig, users
     async (request, reply) => {
       try {
         await users.remove(request.params.id);
+        await events.userChanged(request.params.id);
         return reply.code(204).send();
       } catch (err) {
         return sendServiceError(reply, err);
@@ -120,6 +136,7 @@ export async function adminRoutes(app: FastifyInstance, config: AppConfig, users
     async (request, reply) => {
       try {
         await users.resetPassword(request.params.id, request.body.password);
+        events.sessionsRevoked(request.params.id);
         return reply.code(204).send();
       } catch (err) {
         return sendServiceError(reply, err);
