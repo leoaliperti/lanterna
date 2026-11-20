@@ -1,10 +1,15 @@
 import type {
   ApiError,
+  CampaignSummary,
+  CreateCampaignRequest,
   CreateUserRequest,
+  ListCampaignsResponse,
   ListUsersResponse,
   PublicUser,
   ResetPasswordRequest,
   UpdateUserRoleRequest,
+  UploadKind,
+  UploadResponse,
   UserRole
 } from "@lanterna/shared";
 
@@ -112,7 +117,52 @@ export async function resetUserPassword(id: string, password: string): Promise<v
   await request("POST", `/admin/users/${encodeURIComponent(id)}/password`, { body });
 }
 
+/* ---------------- /api/campaigns ---------------- */
+
+export async function listMyCampaigns(): Promise<CampaignSummary[]> {
+  return (await request<ListCampaignsResponse>("GET", "/campaigns/mine")).campaigns;
+}
+
+export function createCampaign(name: string): Promise<CampaignSummary> {
+  const body: CreateCampaignRequest = { name };
+  return request("POST", "/campaigns", { body });
+}
+
+/* ---------------- /api/uploads ---------------- */
+
+/** Carica un'immagine (solo admin, verificato dal server). L'URL restituito e' relativo all'API (`/assets/...`). */
+export async function uploadImage(kind: UploadKind, file: File): Promise<UploadResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  let response: Response;
+  try {
+    response = await fetch(`${BASE}/uploads/${kind}`, { method: "POST", credentials: "include", body: form });
+  } catch {
+    throw new ApiRequestError(0, "Impossibile raggiungere il server. Controlla la connessione e riprova.");
+  }
+  const data = (await response.json().catch(() => null)) as (Partial<UploadResponse> & { error?: string }) | null;
+  if (!response.ok || !data || typeof data.url !== "string") {
+    if (response.status === 401) unauthorizedHandler?.();
+    throw new ApiRequestError(response.status, data?.error ?? "Caricamento non riuscito.");
+  }
+  return data as UploadResponse;
+}
+
 /* ---------------- Messaggi per l'utente ---------------- */
+
+/** Messaggio leggibile per un caricamento fallito (stati del server: 413, 415, 429...). */
+export function uploadErrorMessage(err: unknown): string {
+  if (err instanceof ApiRequestError) {
+    if (err.status === 0) return err.message;
+    if (err.status === 413) return "L'immagine e' troppo grande (peso o dimensioni in pixel). Riduci l'immagine e riprova.";
+    if (err.status === 415) return "Formato non supportato: usa un'immagine PNG, JPEG o WebP.";
+    if (err.status === 403) return "Solo il GM puo' caricare immagini.";
+    if (err.status === 429) return "Troppi caricamenti. Attendi un minuto e riprova.";
+    if (err.status >= 500) return "Il server ha avuto un problema. Riprova fra poco.";
+    return err.message;
+  }
+  return "Caricamento non riuscito. Riprova.";
+}
 
 /** Messaggio di login: identico per utente inesistente e password errata. */
 export function loginErrorMessage(err: unknown): string {

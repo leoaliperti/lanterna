@@ -1,4 +1,4 @@
-import { forwardRef, useId, useRef, useState, type InputHTMLAttributes, type ReactNode } from "react";
+import { forwardRef, useId, useRef, useState, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 import { Eye, EyeOff, Search, X } from "lucide-react";
 import { cx, useControllable } from "./internal";
 
@@ -33,6 +33,47 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
           {...rest}
         />
         {trailing}
+      </div>
+      {hint ? (
+        <p id={hintId} className="l-field__hint" role={error ? "alert" : undefined}>
+          {hint}
+        </p>
+      ) : null}
+    </div>
+  );
+});
+
+export interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label: string;
+  hideLabel?: boolean;
+  helper?: ReactNode;
+  error?: ReactNode;
+}
+
+/** Testo su piu' righe, con la stessa veste di `TextField`. */
+export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function TextArea(
+  { label, hideLabel, helper, error, className, id, rows = 4, ...rest },
+  ref
+) {
+  const auto = useId();
+  const fid = id ?? auto;
+  const hintId = `${fid}-hint`;
+  const hint = error ?? helper;
+  return (
+    <div className={cx("l-field", error ? "l-field--error" : undefined, className)}>
+      <label htmlFor={fid} className={cx("l-field__label", hideLabel && "l-sr-only")}>
+        {label}
+      </label>
+      <div className="l-field__box l-field__box--area">
+        <textarea
+          ref={ref}
+          id={fid}
+          rows={rows}
+          className="l-field__input l-field__input--area"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={hint ? hintId : undefined}
+          {...rest}
+        />
       </div>
       {hint ? (
         <p id={hintId} className="l-field__hint" role={error ? "alert" : undefined}>
