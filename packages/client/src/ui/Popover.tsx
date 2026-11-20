@@ -239,6 +239,58 @@ export function Picker<T extends string>({ options, value, defaultValue, onValue
   );
 }
 
+/* ---------------- PointMenu ---------------- */
+
+export interface PointMenuProps {
+  /** Dove aprire il menu, in coordinate della finestra; `null` = chiuso. */
+  position: { x: number; y: number } | null;
+  items: MenuItemSpec[];
+  label: string;
+  onClose: () => void;
+}
+
+/**
+ * Menu aperto da codice in un punto (tasto destro o pressione lunga su un elemento disegnato altrove, come
+ * un token sulla mappa). Stessa resa del `ContextMenu`: Esc e click fuori chiudono, frecce per scorrere.
+ */
+export function PointMenu({ position, items, label, onClose }: PointMenuProps) {
+  const { mounted, state } = usePresence(position !== null);
+  const panel = useRef<HTMLDivElement>(null);
+  const last = useRef(position);
+  if (position) last.current = position;
+  const shown = position ?? last.current;
+  const isOpen = position !== null;
+  useEscape(isOpen, onClose);
+  // Il menu si apre da un pointerdown (tasto destro sulla mappa): un listener sul document aggiunto durante quello
+  // stesso evento scatterebbe subito e lo richiuderebbe. Si attiva quindi dal turno successivo.
+  useEffect(() => {
+    if (!isOpen) return;
+    let armed = false;
+    const timer = setTimeout(() => {
+      armed = true;
+    }, 0);
+    const onDown = (e: PointerEvent) => {
+      if (!armed || panel.current?.contains(e.target as Node)) return;
+      onClose();
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("pointerdown", onDown);
+    };
+  }, [isOpen, onClose]);
+  if (!mounted || !shown) return null;
+  const x = Math.max(8, Math.min(shown.x, window.innerWidth - 232));
+  const y = Math.max(8, Math.min(shown.y, window.innerHeight - (items.length * 44 + 16)));
+  return (
+    <Portal>
+      <div ref={panel} data-state={state} className="l-popover l-popover--menu l-popover--fixed l-material l-material--regular" style={{ left: x, top: y }}>
+        <MenuList items={items} label={label} onClose={onClose} />
+      </div>
+    </Portal>
+  );
+}
+
 /* ---------------- ContextMenu ---------------- */
 
 export interface ContextMenuProps {

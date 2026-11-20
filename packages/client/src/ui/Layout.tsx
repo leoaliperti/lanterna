@@ -286,8 +286,10 @@ export function Tabs({ tabs, value, defaultValue, onValueChange, className, ...a
   };
 
   const style = { "--tab-count": tabs.length, "--tab-index": index } as CSSProperties;
+  // Con molte schede e tutte con icona, restano le sole icone (uguali): il nome sta nel titolo e in una didascalia.
+  const compact = tabs.length > 5 && tabs.every((t) => t.icon);
   return (
-    <div className={cx("l-tabs", className)}>
+    <div className={cx("l-tabs", compact && "l-tabs--compact", className)}>
       <div role="tablist" aria-label={aria["aria-label"]} className="l-tabs__list" style={style}>
         {tabs.map((t, i) => (
           <button
@@ -302,11 +304,12 @@ export function Tabs({ tabs, value, defaultValue, onValueChange, className, ...a
             aria-controls={`${base}-panel-${t.id}`}
             tabIndex={i === index ? 0 : -1}
             className="l-tabs__tab"
+            title={compact ? t.label : undefined}
             onClick={() => setCurrent(t.id)}
             onKeyDown={(e) => onKeyDown(e, i)}
           >
             {t.icon ? <span aria-hidden="true">{t.icon}</span> : null}
-            {t.label}
+            {compact ? <span className="l-sr-only">{t.label}</span> : t.label}
             {t.badge ? (
               <>
                 <span className="l-badge l-badge--tint l-tabs__badge" aria-hidden="true">
@@ -319,6 +322,11 @@ export function Tabs({ tabs, value, defaultValue, onValueChange, className, ...a
         ))}
         <span className="l-tabs__indicator" aria-hidden="true" />
       </div>
+      {compact ? (
+        <p className="l-tabs__caption t-footnote" aria-hidden="true">
+          {tabs[index]?.label}
+        </p>
+      ) : null}
       {tabs.map((t, i) => (
         <div
           key={t.id}

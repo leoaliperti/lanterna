@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Library, Trash2 } from "lucide-react";
+import { EffectList } from "../combat/EffectList";
 import type { CampaignView, SceneView } from "@lanterna/shared";
 import { userErrorMessage, uploadErrorMessage, uploadImage } from "../api/client";
 import { createLibraryItem } from "../library/libraryApi";
@@ -22,6 +23,8 @@ export interface TokenEditorProps {
   tokenId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Il GM vuole aggiungere un effetto temporaneo al token (chi apre l'editor lo chiude e apre il modulo dell'effetto). */
+  onAddEffect?: (tokenId: string) => void;
 }
 
 const NO_OWNER = "__none__";
@@ -36,7 +39,7 @@ const KIND_OPTIONS = [
  * Scheda del token. Il GM modifica tutto; il giocatore proprietario solo le condizioni (e vede la
  * propria vita se il server gliel'ha inviata). Il server rifiuta comunque cio' che non spetta.
  */
-export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenEditorProps) {
+export function TokenEditor({ view, scene, tokenId, open, onOpenChange, onAddEffect }: TokenEditorProps) {
   const { run } = useCommands();
   const toast = useToast();
   const token = useMemo(() => (tokenId ? (view.tokens.find((t) => t.id === tokenId) ?? null) : null), [view.tokens, tokenId]);
@@ -177,6 +180,20 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
               />
               <p className="t-caption1 a-muted">Il proprietario sposta il token e ne vede la barra della vita.</p>
             </div>
+            <TextField
+              label="Fazione"
+              value={draft.faction}
+              onChange={(e) => set("faction", e.target.value)}
+              error={err(errors.faction) ?? undefined}
+              helper="Serve a selezionare i token insieme (es. Eroi, Orda). Solo tu la vedi."
+              autoComplete="off"
+              list="fazioni-note"
+            />
+            <datalist id="fazioni-note">
+              {[...new Set(view.tokens.flatMap((t) => (t.faction ? [t.faction] : [])))].map((f) => (
+                <option key={f} value={f} />
+              ))}
+            </datalist>
             <Toggle label="Nascosto ai giocatori" checked={draft.hidden} onCheckedChange={(v) => set("hidden", v)} />
             <Toggle label="Vista e luce (aiuto visivo)" checked={draft.hasVision} onCheckedChange={(v) => set("hasVision", v)} />
             {draft.hasVision ? (
@@ -238,6 +255,8 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
             })}
           </div>
         </fieldset>
+
+        {token ? <EffectList token={token} view={view} canEdit={fields.all} onAdd={() => onAddEffect?.(token.id)} /> : null}
 
         {fields.all && perms.canSeeGmNotes ? (
           <TextArea label="Note del GM (private)" value={draft.gmNotes} onChange={(e) => set("gmNotes", e.target.value)} helper="Solo tu le vedi: il server non le invia ai giocatori." />

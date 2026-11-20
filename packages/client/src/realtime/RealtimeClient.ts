@@ -5,8 +5,12 @@ import {
   type CampaignView,
   type Command,
   type EntryVisibility,
+  type EphemeralAudience,
   type ErrorCode,
-  type ServerMessage
+  type InitiativeMode,
+  type ServerEvent,
+  type ServerMessage,
+  type Shape
 } from "@lanterna/shared";
 
 /**
@@ -50,7 +54,32 @@ export interface RollOptions {
   label?: string;
 }
 
+/** Avviso di combattimento (turno, effetto in scadenza o scaduto): arriva solo ai diretti interessati. */
+export type CombatAlert = Extract<ServerEvent, { type: "combat.turn" | "effect.expiring" | "effect.expired" }>;
+
+export function isCombatAlert(e: ServerEvent): e is CombatAlert {
+  return e.type === "combat.turn" || e.type === "effect.expiring" || e.type === "effect.expired";
+}
+
+/** Forma effimera da mostrare (misura, freccia, ping). `private` non esce dal client. */
+export interface EphemeralOptions {
+  id: string;
+  sceneId: string;
+  audience: EphemeralAudience;
+  shape: Shape;
+  color?: string;
+  ttlMs?: number;
+}
+
+export interface InitiativeRollOptions {
+  sceneId: string;
+  rolls: Array<{ participantId: string; bonus: number; mode?: InitiativeMode }>;
+  sort?: boolean;
+}
+
 export type RealtimeEvent =
+  /** Avviso del combattimento contenuto in un delta (il client decide come mostrarlo). */
+  | { type: "alert"; alert: CombatAlert }
   /** Errore non legato a una richiesta (messaggio illeggibile, rate limit). */
   | { type: "error"; code: ErrorCode; message: string }
   /** Messaggi che il client non interpreta qui (chat, tiri): li ascolta chi ne ha bisogno. */
@@ -314,6 +343,7 @@ export class RealtimeClient {
         }
         this.failures = 0;
         this.set({ view: r.view, status: "connected", attempt: 0 });
+        for (const ev of msg.events) if (isCombatAlert(ev)) this.emit({ type: "alert", alert: ev });
         return;
       }
       case "ack":
@@ -467,6 +497,34 @@ export class RealtimeClient {
       ...(whisperTo ? { whisperTo } : {}),
       ...(label ? { label } : {})
     }));
+  }
+
+  /**
+   * Mostra una forma effimera. Con `audience: "private"` il server risponde solo con una conferma e non la
+   * inoltra: di norma il client non lo chiama nemmeno (le misure private restano locali).
+   */
+  showEphemeral(options: EphemeralOptions): Promise<CommandResult> {
+    const { id, sceneId, audience, shape, color, ttlMs } = options;
+    return this.request((requestId) => ({
+      type: "ephemeral.show",
+      requestId,
+      id,
+      sceneId,
+      audience,
+      shape,
+      ...(color ? { color } : {}),
+      ...(ttlMs ? { ttlMs } : {})
+    }));
+  }
+
+  clearEphemeral(id: string): Promise<CommandResult> {
+    return this.request((requestId) => ({ type: "ephemeral.clear", requestId, id }));
+  }
+
+  /** Chiede al server di tirare l'iniziativa (d20 + bonus): l'esito lo decide lui e arriva come delta. */
+  rollInitiative(options: InitiativeRollOptions): Promise<CommandResult> {
+    const { sceneId, rolls, sort } = options;
+    return this.request((requestId) => ({ type: "initiative.roll", requestId, sceneId, rolls, ...(sort ? { sort } : {}) }));
   }
 
   /** Pagina di cronologia piu' vecchia della voce `before` (id). La pagina arriva come evento `history`. */

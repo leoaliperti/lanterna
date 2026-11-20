@@ -202,6 +202,8 @@
 .l-toast__text { flex: 1; min-width: 0; }
 .l-toast__title { margin: 0; font-size: var(--text-subhead); font-weight: 600; }
 .l-toast__msg { margin: 2px 0 0; font-size: var(--text-footnote); color: var(--label-secondary); }
+.l-toast__action { position: relative; flex: none; align-self: center; min-height: var(--hit-min); padding: 0 var(--space-2); border: 0; background: none; color: var(--tint-text); font: inherit; font-size: var(--text-subhead); font-weight: 600; cursor: pointer; border-radius: var(--radius-md); }
+.l-toast__action:active { opacity: 0.6; }
 .l-toast__close, .l-banner__close { position: relative; flex: none; display: inline-flex; width: 1.75rem; height: 1.75rem; align-items: center; justify-content: center; border: 0; background: var(--fill-tertiary); color: var(--label-secondary); border-radius: 50%; cursor: pointer; padding: 0; }
 .l-toast__close::after, .l-banner__close::after { content: ""; position: absolute; inset: -8px; }
 .l-toast--info .l-toast__icon, .l-banner--info .l-banner__icon { color: var(--tint-text); }
@@ -272,6 +274,8 @@ button.l-row:disabled { opacity: 0.4; cursor: default; }
 .l-tabs__tab { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); flex: 1 0 auto; min-height: var(--hit-min); padding: 0 var(--space-4); border: 0; background: none; color: var(--label-secondary); font-size: var(--text-callout); font-weight: 500; cursor: pointer; transition: color var(--dur-fast) var(--ease-out); }
 .l-tabs__tab[aria-selected="true"] { color: var(--tint-text); font-weight: 600; }
 .l-tabs__indicator { position: absolute; left: 0; bottom: 0; height: 3px; width: calc(100% / var(--tab-count)); background: var(--tint); border-radius: 3px 3px 0 0; transform: translateX(calc(var(--tab-index) * 100%)); transition: transform var(--dur-base) var(--ease-ios); }
+.l-tabs--compact .l-tabs__tab { flex: 1 1 0; min-width: 0; padding: 0 var(--space-2); }
+.l-tabs__caption { margin: var(--space-2) 0 0; text-align: center; color: var(--label-secondary); font-weight: 600; }
 .l-tabs__panel { padding: var(--space-4) 0; }
 .l-tabs__panel[hidden] { display: none; }
 

@@ -57,3 +57,11 @@ Test aggiunti: `tokenDraft.test.ts` (spawn senza sovrapposizioni), `geometry.tes
 - Mappe molto grandi (tessere) e molti token.
 - Lettori di schermo; contrasto misurato a occhio, non con uno strumento.
 - Dietro Cloudflare Tunnel in HTTPS (la prova è su `http://localhost` con `ALLOW_INSECURE_HTTP=true`).
+
+## Combattimento (M7, client)
+
+Verificato in Brave headless via CDP (build di produzione, DB temporaneo, GM e giocatore in profili separati; 1440x900, 820x1180 e 390x844 con touch emulato): tracker, selezione per categoria, danno di gruppo con scorciatoia `D` e "Annulla" dalla notifica, menu contestuale (tasto destro), cono 5e privato, cerchio pubblico ritagliato per la nebbia del giocatore, ping al solo GM, avviso di turno al proprietario.
+
+Difetti trovati e corretti: sette schede nel pannello laterale uscivano dallo schermo (ora `Tabs` compatte con sole icone); il menu contestuale si richiudeva subito nel browser vero (il listener "clic fuori" scattava sullo stesso `pointerdown` che lo apriva: test di regressione in `ui/pointMenu.test.tsx`); gli sheet dell'azione mettevano il focus su "Fine" (ora `Sheet initialFocus`); tracker troppo lungo (aggiunta e tiro in sezioni a comparsa); strumenti di misura coperti dalla scala sul telefono.
+
+Non verificato: dispositivi reali, pressione lunga con dito vero, Safari/Firefox, lettori di schermo, movimento ridotto a occhio (solo nel codice), dissolvenza delle forme in scadenza e mappe con immagine (la prova usava una scena senza mappa).
