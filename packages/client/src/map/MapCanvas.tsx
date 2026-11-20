@@ -1,11 +1,12 @@
-import { type Ref, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { Maximize, Minus, Plus, Ruler } from "lucide-react";
+import { type ReactNode, type Ref, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { ArrowUpRight, Circle, MapPin, Maximize, Minus, Plus, Ruler, Slash, Triangle } from "lucide-react";
 import { Banner, IconButton, Material } from "../ui";
 import "./MapCanvas.css";
 import { MapController, type Tool, type ToolState } from "./controller";
 import type { WallMode } from "./drawTools";
 import type { FogBrush, FogMode } from "../fog/fogLogic";
 import { bindCanvasInput } from "./input";
+import { MEASURE_LABELS, MEASURE_TOOLS, isMeasureTool, type MeasureTool } from "./measure";
 import type { PixiMapView } from "./renderer";
 import type { MapHandlers, MapScene, Point, Viewport } from "./types";
 import { isWebGLAvailable } from "../dice3d/webgl";
@@ -23,6 +24,10 @@ export interface MapCanvasHandle {
   setWallMode(mode: WallMode): void;
   /** Chiude il poligono della nebbia in costruzione. */
   closePolygon(): void;
+  /** Imposta la selezione dei token (elenco dei bersagli, gruppi). */
+  setSelection(ids: readonly string[]): void;
+  /** Toglie la misura in costruzione senza segnalare un annullamento (e' stata consegnata dal padre). */
+  clearMeasure(): void;
 }
 
 export interface MapCanvasProps extends MapScene, MapHandlers {
@@ -38,13 +43,24 @@ export interface MapCanvasProps extends MapScene, MapHandlers {
 
 type Status = "loading" | "ready" | "unavailable";
 
+const MEASURE_ICONS: Record<MeasureTool, ReactNode> = {
+  ruler: <Ruler size={20} />,
+  circle: <Circle size={20} />,
+  cone: <Triangle size={20} />,
+  line: <Slash size={20} />,
+  arrow: <ArrowUpRight size={20} />,
+  ping: <MapPin size={20} />
+};
+const MEASURE_KEYS: Record<MeasureTool, string> = { ruler: "R", circle: "O", cone: "C", line: "L", arrow: "F", ping: "P" };
+
 /**
  * Canvas della mappa (PixiJS, caricato in modo lazy). E' controllato dalle props e non modifica
  * mai i dati: le callback segnalano le richieste dell'utente e il padre decide cosa farne.
  */
 export function MapCanvas({
   ref, className, label = "Mappa di gioco", defaultViewport,
-  background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight,
+  background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight, ephemerals, pulses,
+  onShape, onShapeCancel, onContextMenu, onKey,
   onMoveToken, onResizeToken, onRotateToken, onSelectionChange, onViewportChange,
   onFogShape, onWallAdd, onWallUpdate, onWallRemove, onWallSelect, onToolStateChange
 }: MapCanvasProps) {
@@ -60,10 +76,11 @@ export function MapCanvas({
   const [status, setStatus] = useState<Status>("loading");
   const [tool, setTool] = useState<Tool>("select");
   const [zoom, setZoom] = useState(() => Math.round((defaultViewport?.scale ?? 1) * 100));
+  const [measuresOpen, setMeasuresOpen] = useState(false);
 
   const scene = useMemo<MapScene>(
-    () => ({ background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight }),
-    [background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight]
+    () => ({ background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight, ephemerals, pulses }),
+    [background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight, ephemerals, pulses]
   );
   const toolStateRef = useRef(onToolStateChange);
   toolStateRef.current = onToolStateChange;
@@ -73,6 +90,14 @@ export function MapCanvas({
   // Le callback piu' recenti, senza ricreare nulla.
   useEffect(() => {
     controller.handlers = {
+      onShape, onShapeCancel, onKey,
+      // Il menu si apre in coordinate della finestra: il controller conosce solo quelle del canvas.
+      onContextMenu: onContextMenu
+        ? (x, y, tokenId) => {
+            const r = canvasRef.current?.getBoundingClientRect();
+            onContextMenu(x + (r?.left ?? 0), y + (r?.top ?? 0), tokenId);
+          }
+        : undefined,
       onMoveToken, onResizeToken, onRotateToken, onSelectionChange, onFogShape, onWallAdd, onWallUpdate, onWallRemove, onWallSelect,
       onViewportChange: (vp) => {
         setZoom(Math.round(vp.scale * 100));
@@ -90,6 +115,11 @@ export function MapCanvas({
       setFogBrush: (b) => controller.setFogBrush(b),
       setFogMode: (m) => controller.setFogMode(m),
       setWallMode: (m) => controller.setWallMode(m),
+      setSelection: (ids) => controller.setSelection(ids),
+      clearMeasure: () => {
+        controller.clearShapeDraft(true);
+        controller.setTool("select");
+      },
       closePolygon: () => {
         controller.draw.closePolygon();
         controller.onToolState(controller.toolState);
@@ -205,13 +235,27 @@ export function MapCanvas({
             <IconButton label="Riduci" icon={<Minus size={20} />} onClick={() => controller.zoomBy(0.8)} />
             <IconButton label="Adatta la mappa allo schermo" icon={<Maximize size={20} />} onClick={() => controller.fit()} />
             <IconButton
-              label={tool === "ruler" ? "Righello attivo: premi per uscire" : "Righello"}
-              aria-pressed={tool === "ruler"}
-              variant={tool === "ruler" ? "tinted" : "plain"}
+              label={isMeasureTool(tool) ? `${MEASURE_LABELS[tool]} attivo: apri gli strumenti di misura` : "Misure e segnalazioni"}
+              aria-expanded={measuresOpen}
+              variant={isMeasureTool(tool) ? "tinted" : "plain"}
               icon={<Ruler size={20} />}
-              onClick={() => controller.setTool(tool === "ruler" ? "select" : "ruler")}
+              onClick={() => setMeasuresOpen((v) => !v)}
             />
           </Material>
+          {measuresOpen ? (
+            <Material thickness="regular" className="lanterna-map__group lanterna-map__measures a-enter" role="toolbar" aria-label="Strumenti di misura e segnalazione">
+              {MEASURE_TOOLS.map((m) => (
+                <IconButton
+                  key={m}
+                  label={`${MEASURE_LABELS[m]}${tool === m ? ": attivo, premi per uscire" : ` (${MEASURE_KEYS[m]})`}`}
+                  aria-pressed={tool === m}
+                  variant={tool === m ? "tinted" : "plain"}
+                  icon={MEASURE_ICONS[m]}
+                  onClick={() => controller.setTool(tool === m ? "select" : m)}
+                />
+              ))}
+            </Material>
+          ) : null}
         </div>
         <Material thickness="ultrathin" className="lanterna-map__scale t-caption1">
           <span>1 cella = {scene.scale.unitsPerCell} {unit}</span>
