@@ -61,6 +61,7 @@
 }
 .a-topbar__title { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; line-height: 1.15; }
 .a-topbar__campaign { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.a-topbar__switch { display: inline-flex; align-items: center; gap: 0.25rem; min-width: 0; max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
 .a-topbar__actions { display: flex; align-items: center; gap: var(--space-1); }
 
 .a-map {

@@ -10,6 +10,7 @@ import { useSession } from "../session/SessionProvider";
 import { navigate } from "../router/hashRouter";
 import { ChangePasswordSheet } from "../screens/ChangePasswordSheet";
 import { SettingsSheet } from "../settings/SettingsSheet";
+import { CampaignSwitcher } from "./CampaignSwitcher";
 
 const WIDE = "(min-width: 56rem)";
 
@@ -145,7 +146,7 @@ export function TableFrame({
       <header className="a-topbar l-material l-material--regular">
         <div className="a-topbar__title">
           <span className="a-topbar__app t-caption1 a-muted">Lanterna</span>
-          <h1 className="t-headline a-topbar__campaign">{title}</h1>
+          <CampaignSwitcher title={title} />
         </div>
         <div className="a-topbar__actions">
           {actions}

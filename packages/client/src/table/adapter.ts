@@ -1,5 +1,5 @@
 import type { CampaignView, FogView, SceneView, TokenView } from "@lanterna/shared";
-import type { MapEphemeral, MapFog, MapPulse, MapScene, MapSight, MapToken, MapWall, TokenKind as MapTokenKind } from "../map";
+import type { MapEphemeral, MapFog, MapProp, MapPulse, MapScene, MapSight, MapToken, MapWall, TokenKind as MapTokenKind } from "../map";
 import { availableTiles, geometryOf, tileUrl, viewMask } from "../fog/fogLogic";
 import { API_BASE, assetUrl } from "../realtime/urls";
 
@@ -124,6 +124,25 @@ export function toMapWalls(walls: CampaignView["walls"], sceneId: string): MapWa
   return (walls ?? []).filter((w) => w.sceneId === sceneId).map((w) => ({ id: w.id, door: w.door, open: w.open, segments: w.segments }));
 }
 
+/** Oggetti di scena come li ha inviati il server (il GM anche i nascosti, i giocatori solo i visibili). */
+export function toMapProps(props: CampaignView["props"], sceneId: string): MapProp[] {
+  return (props ?? [])
+    .filter((p) => p.sceneId === sceneId)
+    .map((p) => ({
+      id: p.id,
+      url: assetUrl(p.imageUrl) ?? p.imageUrl,
+      x: p.x,
+      y: p.y,
+      width: p.width,
+      height: p.height,
+      rotation: p.rotation,
+      layer: p.layer,
+      opacity: p.opacity,
+      fade: p.fade,
+      hidden: p.hidden ? true : undefined
+    }));
+}
+
 export interface MapSceneExtras {
   fog?: MapFog | null;
   walls?: readonly MapWall[];
@@ -147,6 +166,7 @@ export function toMapScene(view: CampaignView, scene: SceneView, extras: MapScen
     grid: { ...scene.grid },
     scale: { unitsPerCell: scene.scale.unitsPerCell, unitLabel: scene.scale.unit },
     tokens: tokensOfScene(view, scene.id).map((t) => toMapToken(t, turnTokenId)),
+    objects: toMapProps(view.props, scene.id),
     role: view.viewer.role === "admin" ? "gm" : "player",
     movableTokenIds: movableIds(view, scene.id)
   };

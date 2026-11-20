@@ -160,6 +160,27 @@ export interface MapSight {
 
 export type RulerMode = "euclidean" | "grid";
 
+/** Livello di un oggetto di scena: `background` sotto la griglia, `ground` sotto i token, `above` sopra i token. */
+export type MapPropLayer = "background" | "ground" | "above";
+
+/** Oggetto di scena (M10). */
+export interface MapProp {
+  id: string;
+  url: string;
+  /** Centro e dimensioni in pixel di mappa. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  layer: MapPropLayer;
+  opacity: number;
+  /** Solo `above`: si schiarisce quando un token dell'osservatore e' sotto. */
+  fade: boolean;
+  /** Solo GM: nascosto ai giocatori (disegnato attenuato). */
+  hidden?: boolean;
+}
+
 /** Parte "dati" delle props: tutto cio' che descrive la scena. */
 export interface MapScene {
   background: MapBackground;
@@ -172,6 +193,8 @@ export interface MapScene {
   /** Nebbia di guerra (assente = scena senza nebbia). */
   fog?: MapFog | null;
   walls?: readonly MapWall[];
+  /** Oggetti di scena su livelli (M10). */
+  objects?: readonly MapProp[];
   /** Mostra i muri (il GM puo' nasconderli). Default true. */
   wallsVisible?: boolean;
   /** Aiuto visivo della vista dei token. Assente = nascosto. */

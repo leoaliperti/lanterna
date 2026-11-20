@@ -27,8 +27,9 @@ import {
   type PlayerMask,
 } from "./fog.js";
 import { WallSchema } from "./walls.js";
+import { PropSchema, type Prop, type PropPatch } from "./props.js";
 import type { WallPatch } from "./commands.js";
-import { combatOf, fogOf, wallsOf } from "./schema.js";
+import { combatOf, fogOf, propsOf, wallsOf } from "./schema.js";
 import {
   done,
   findScene,
@@ -235,6 +236,10 @@ function apply(state: CampaignState, cmd: Command, actor: Actor): ApplyResult {
         inverse.push({ type: "token.create", token: t });
       }
       const fog = fogOf(state, scene.id);
+      for (const p of propsOf(state, scene.id)) {
+        changes.push({ type: "prop", before: p, after: null, activeSceneId: s1.activeSceneId, fog });
+        inverse.push({ type: "prop.create", prop: p });
+      }
       for (const w of wallsOf(state, scene.id)) {
         changes.push({ type: "wall", before: w, after: null, activeSceneId: s1.activeSceneId, fog });
         inverse.push({ type: "wall.add", wall: w });
@@ -258,6 +263,7 @@ function apply(state: CampaignState, cmd: Command, actor: Actor): ApplyResult {
         tokens: s1.tokens.filter((t) => t.sceneId !== scene.id),
         ...(state.fogs ? { fogs: state.fogs.filter((f) => f.sceneId !== scene.id) } : {}),
         ...(state.walls ? { walls: state.walls.filter((w) => w.sceneId !== scene.id) } : {}),
+        ...(state.props ? { props: state.props.filter((p) => p.sceneId !== scene.id) } : {}),
       };
       return done(state, s1, changes, inverse);
     }
@@ -280,9 +286,90 @@ function apply(state: CampaignState, cmd: Command, actor: Actor): ApplyResult {
             tokens: target ? state.tokens.filter((t) => t.sceneId === target.id) : [],
             fog: target ? fogOf(state, target.id) : null,
             walls: target ? wallsOf(state, target.id) : [],
+            props: target ? propsOf(state, target.id) : [],
           },
         ],
         [{ type: "scene.activate", sceneId: state.activeSceneId }],
+      );
+    }
+
+    case "scene.duplicate": {
+      if (!gm) return err("FORBIDDEN", MESSAGES.gmOnly);
+      const src = findScene(state, cmd.sceneId);
+      if (!src) return err("NOT_FOUND", MESSAGES.sceneNotFound);
+      const id = cmd.newSceneId;
+      // Id derivati da `newSceneId`: stesso comando, stesso risultato (annulla/ripeti).
+      const subs: Command[] = [{ type: "scene.create", scene: { ...src, id, name: cmd.name } }];
+      state.tokens
+        .filter((t) => t.sceneId === src.id)
+        .forEach((t, i) => {
+          const copy: Token = { ...t, id: `${id}-t${i}`, sceneId: id };
+          delete copy.effects;
+          subs.push({ type: "token.create", token: copy });
+        });
+      wallsOf(state, src.id).forEach((w, i) => subs.push({ type: "wall.add", wall: { ...w, id: `${id}-w${i}`, sceneId: id } }));
+      propsOf(state, src.id).forEach((p, i) => subs.push({ type: "prop.create", prop: { ...p, id: `${id}-p${i}`, sceneId: id } }));
+      const fog = fogOf(state, src.id);
+      if (fog) subs.push({ type: "fog.restore", fog: { ...fog, sceneId: id } });
+      const r = applyCommands(state, subs, actor);
+      if (!r.ok) return r;
+      return { ...r, inverse: [{ type: "scene.delete", sceneId: id }] };
+    }
+
+    // -----------------------------------------------------------------------
+    // Oggetti di scena e livelli (M10): solo GM
+    // -----------------------------------------------------------------------
+
+    case "prop.create": {
+      if (!gm) return err("FORBIDDEN", MESSAGES.gmOnly);
+      const p = cmd.prop;
+      const scene = findScene(state, p.sceneId);
+      if (!scene) return err("NOT_FOUND", MESSAGES.sceneNotFound);
+      const props = state.props ?? [];
+      if (props.some((x) => x.id === p.id)) return err("CONFLICT", MESSAGES.duplicateId);
+      if (props.length >= LIMITS.maxProps) return err("INVALID", MESSAGES.tooMany);
+      if (!isInsideScene(p.x, p.y, scene)) return err("INVALID", MESSAGES.outOfBounds);
+      const next: Prop = { ...p, rotation: normalizeRotation(p.rotation) };
+      return done(
+        state,
+        { ...state, props: [...props, next] },
+        [propChange(state, null, next)],
+        [{ type: "prop.delete", propId: next.id }],
+      );
+    }
+
+    case "prop.update": {
+      if (!gm) return err("FORBIDDEN", MESSAGES.gmOnly);
+      const prop = (state.props ?? []).find((p) => p.id === cmd.propId);
+      if (!prop) return err("NOT_FOUND", MESSAGES.propNotFound);
+      const scene = findScene(state, prop.sceneId);
+      if (!scene) return err("NOT_FOUND", MESSAGES.sceneNotFound);
+      const merged = { ...prop, ...cmd.patch };
+      if (cmd.patch.rotation !== undefined) merged.rotation = normalizeRotation(cmd.patch.rotation);
+      const parsed = PropSchema.safeParse(merged);
+      if (!parsed.success) return err("INVALID", MESSAGES.invalidCommand);
+      const next = parsed.data;
+      if (!isInsideScene(next.x, next.y, scene)) return err("INVALID", MESSAGES.outOfBounds);
+      if (deepEqual(next, prop)) return done(state, state, [], []);
+      const old: Record<string, unknown> = {};
+      for (const k of Object.keys(cmd.patch) as (keyof PropPatch)[]) old[k] = prop[k];
+      return done(
+        state,
+        { ...state, props: (state.props ?? []).map((p) => (p.id === prop.id ? next : p)) },
+        [propChange(state, prop, next)],
+        [{ type: "prop.update", propId: prop.id, patch: old as PropPatch }],
+      );
+    }
+
+    case "prop.delete": {
+      if (!gm) return err("FORBIDDEN", MESSAGES.gmOnly);
+      const prop = (state.props ?? []).find((p) => p.id === cmd.propId);
+      if (!prop) return err("NOT_FOUND", MESSAGES.propNotFound);
+      return done(
+        state,
+        { ...state, props: (state.props ?? []).filter((p) => p.id !== prop.id) },
+        [propChange(state, prop, null)],
+        [{ type: "prop.create", prop }],
       );
     }
 
@@ -519,6 +606,11 @@ function deleteTokenCascade(state: CampaignState, token: Token): { state: Campai
   return { state: tick.state, changes: [...fin.changes, ...tick.notices], inverse: [...inverse, ...fin.inverse] };
 }
 
+function propChange(state: CampaignState, before: Prop | null, after: Prop | null): StateChange {
+  const sceneId = (after ?? before)?.sceneId;
+  return { type: "prop", before, after, activeSceneId: state.activeSceneId, fog: sceneId ? fogOf(state, sceneId) : null };
+}
+
 function isPlayer(state: CampaignState, userId: string): boolean {
   return state.members.some((m) => m.userId === userId && m.role === "player");
 }
@@ -533,6 +625,7 @@ function fogChange(state: CampaignState, sceneId: string, before: Fog | null, af
     scene: findScene(state, sceneId) ?? null,
     tokens: state.tokens.filter((t) => t.sceneId === sceneId),
     walls: wallsOf(state, sceneId),
+    props: propsOf(state, sceneId),
   };
 }
 

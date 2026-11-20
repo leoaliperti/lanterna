@@ -25,6 +25,7 @@ export function err(code: ErrorCode, message: string): { ok: false; error: Comma
 /** Messaggi fissi: non includono mai id o dati presi dallo stato. */
 export const MESSAGES = {
   tokenNotFound: "token non trovato",
+  propNotFound: "oggetto di scena non trovato",
   sceneNotFound: "scena non trovata",
   gmOnly: "azione riservata al GM",
   notOwner: "puoi agire solo sui tuoi token",

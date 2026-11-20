@@ -7,6 +7,7 @@ import type { Actor, CampaignState, Scene, Token } from "./schema.js";
 import { canSeeToken, isGm } from "./view.js";
 import { combatOf, fogOf } from "./schema.js";
 import type { Wall } from "./walls.js";
+import type { Prop } from "./props.js";
 
 /**
  * Annulla/ripeti per utente, come logica pura sopra il riduttore.
@@ -147,6 +148,16 @@ function checkExpect(state: CampaignState, expect: StateChange[], actor: Actor):
     } else if (c.type === "wall") {
       const id = (c.after ?? c.before)?.id;
       const cur: Wall | undefined = (state.walls ?? []).find((w) => w.id === id);
+      if (c.after === null) {
+        if (cur) return { code: "CONFLICT", message: MESSAGES.stale };
+        continue;
+      }
+      if (!cur) return { code: "CONFLICT", message: MESSAGES.stale };
+      const keys = c.before === null ? [] : changedKeys(c.before, c.after);
+      if (keys.some((k) => !deepEqual(cur[k], c.after?.[k]))) return { code: "CONFLICT", message: MESSAGES.stale };
+    } else if (c.type === "prop") {
+      const id = (c.after ?? c.before)?.id;
+      const cur: Prop | undefined = (state.props ?? []).find((p) => p.id === id);
       if (c.after === null) {
         if (cur) return { code: "CONFLICT", message: MESSAGES.stale };
         continue;

@@ -15,6 +15,7 @@ import {
 } from "./schema.js";
 import { FogLightingSchema, FogSchema, FogShapeSchema, FogStateSchema, FogTargetSchema } from "./fog.js";
 import { WallSchema } from "./walls.js";
+import { PropPatchSchema, PropSchema } from "./props.js";
 import {
   CombatSchema,
   EffectInputSchema,
@@ -140,6 +141,25 @@ export const ChangeSceneSchema = z.strictObject({
   type: z.literal("scene.activate"),
   sceneId: IdSchema.nullable(),
 });
+
+/**
+ * Duplica una scena (mappa, griglia, token senza effetti, muri, nebbia, oggetti) in `newSceneId`.
+ * Gli id dei duplicati derivano da `newSceneId`: il comando e' deterministico (annulla/ripeti).
+ */
+export const DuplicateSceneSchema = z.strictObject({
+  type: z.literal("scene.duplicate"),
+  sceneId: IdSchema,
+  newSceneId: IdSchema,
+  name: NameSchema,
+});
+
+// ---------------------------------------------------------------------------
+// Oggetti di scena e livelli (M10): solo GM
+// ---------------------------------------------------------------------------
+
+export const PropCreateSchema = z.strictObject({ type: z.literal("prop.create"), prop: PropSchema });
+export const PropUpdateSchema = z.strictObject({ type: z.literal("prop.update"), propId: IdSchema, patch: PropPatchSchema });
+export const PropDeleteSchema = z.strictObject({ type: z.literal("prop.delete"), propId: IdSchema });
 
 // ---------------------------------------------------------------------------
 // Nebbia di guerra (M6): tutti solo GM
@@ -345,6 +365,10 @@ export const CommandSchema = z.discriminatedUnion("type", [
   SetSceneGridSchema,
   DeleteSceneSchema,
   ChangeSceneSchema,
+  DuplicateSceneSchema,
+  PropCreateSchema,
+  PropUpdateSchema,
+  PropDeleteSchema,
   FogEnableSchema,
   FogDisableSchema,
   FogRestoreSchema,
@@ -358,4 +382,5 @@ export const CommandSchema = z.discriminatedUnion("type", [
   WallRemoveSchema,
 ]);
 export type Command = z.infer<typeof CommandSchema>;
+export type { PropPatch } from "./props.js";
 export type CommandType = Command["type"];

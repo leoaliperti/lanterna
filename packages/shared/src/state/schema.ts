@@ -2,6 +2,7 @@ import { z } from "zod";
 import { CombatSchema, EffectsSchema, GroupSchema, type Combat } from "./combat.js";
 import { FogSchema, type Fog } from "./fog.js";
 import { IdSchema, LIMITS } from "./limits.js";
+import { PropSchema, type Prop } from "./props.js";
 import { WallSchema, type Wall } from "./walls.js";
 
 /**
@@ -160,6 +161,8 @@ export const CampaignStateSchema = z.strictObject({
   walls: z.array(WallSchema).max(LIMITS.maxWalls).optional(),
   /** Combattimenti (M7), al più uno per scena. Facoltativo. */
   combats: z.array(CombatSchema).max(LIMITS.maxScenes).optional(),
+  /** Oggetti di scena su livelli (M10), di tutte le scene. Facoltativo. */
+  props: z.array(PropSchema).max(LIMITS.maxProps).optional(),
   /** Gruppi salvati di token (M7), solo GM. Facoltativo. */
   groups: z.array(GroupSchema).max(LIMITS.maxGroups).optional(),
 });
@@ -213,6 +216,11 @@ export function combatOf(state: Pick<CampaignState, "combats">, sceneId: string)
 /** Muri della scena, nell'ordine dello stato. */
 export function wallsOf(state: Pick<CampaignState, "walls">, sceneId: string): Wall[] {
   return (state.walls ?? []).filter((w) => w.sceneId === sceneId);
+}
+
+/** Oggetti di scena della scena, nell'ordine dello stato (= ordine di disegno nel livello). */
+export function propsOf(state: Pick<CampaignState, "props">, sceneId: string): Prop[] {
+  return (state.props ?? []).filter((p) => p.sceneId === sceneId);
 }
 
 /** Risolve l'attore dai membri della campagna; `null` se l'utente non ne fa parte. */

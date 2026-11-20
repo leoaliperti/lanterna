@@ -172,6 +172,22 @@ export const wall = sqliteTable(
   (t) => [primaryKey({ columns: [t.campaignId, t.id] }), index("wall_scene_idx").on(t.campaignId, t.sceneId)],
 );
 
+/** Oggetti di scena su livelli (M10): una riga per oggetto, `data` = `Prop` in JSON validato con `PropSchema`. */
+export const prop = sqliteTable(
+  "prop",
+  {
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => campaign.id, { onDelete: "cascade" }),
+    id: text("id").notNull(),
+    sceneId: text("scene_id").notNull(),
+    /** Ordine di creazione (crescente) = ordine di disegno nel livello. */
+    sort: integer("sort").notNull(),
+    data: text("data").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.campaignId, t.id] }), index("prop_scene_idx").on(t.campaignId, t.sceneId)],
+);
+
 /** Combattimento di una scena (M7): una riga per scena, `data` = `Combat` in JSON validato con `CombatSchema`. */
 export const combat = sqliteTable(
   "combat",
@@ -329,6 +345,7 @@ export const schema = {
   token,
   fog,
   wall,
+  prop,
   combat,
   tokenGroup,
   campaignEvent,

@@ -42,6 +42,7 @@ export function applyServerEvent(view: CampaignView, event: ServerEvent): Campai
         tokens: event.tokens,
         fogs: event.fog ? [event.fog] : [],
         walls: event.walls ?? [],
+        props: event.props ?? [],
       };
     }
     case "fog.updated": {
@@ -55,6 +56,13 @@ export function applyServerEvent(view: CampaignView, event: ServerEvent): Campai
       return { ...view, walls: (view.walls ?? []).map((w) => (w.id === event.wall.id ? event.wall : w)) };
     case "wall.deleted":
       return { ...view, walls: (view.walls ?? []).filter((w) => w.id !== event.wallId) };
+    case "prop.created":
+      if ((view.props ?? []).some((p) => p.id === event.prop.id)) return view;
+      return { ...view, props: [...(view.props ?? []), event.prop] };
+    case "prop.updated":
+      return { ...view, props: (view.props ?? []).map((p) => (p.id === event.prop.id ? event.prop : p)) };
+    case "prop.deleted":
+      return { ...view, props: (view.props ?? []).filter((p) => p.id !== event.propId) };
     case "combat.updated": {
       const others = (view.combats ?? []).filter((c) => c.sceneId !== event.sceneId);
       return { ...view, combats: event.combat ? [...others, event.combat] : others };

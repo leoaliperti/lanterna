@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CloudFog, Crosshair, Eye, EyeOff, Layers, Library, Map as MapIcon, MessageSquare, Pencil, Redo2, ScrollText, ShieldCheck, Swords, Undo2, Users, WifiOff } from "lucide-react";
+import { CloudFog, Crosshair, Eye, EyeOff, Layers, Library, Map as MapIcon, MessageSquare, Pencil, Redo2, ScrollText, Shapes, ShieldCheck, Swords, Undo2, Users, WifiOff } from "lucide-react";
 import type { CampaignView, FogShape, TokenView, WallPatch } from "@lanterna/shared";
 import type { SessionUser } from "../api/client";
 import { MapCanvas, type MapCanvasHandle, type Point } from "../map";
@@ -26,6 +26,7 @@ import { FogToolbar } from "./FogToolbar";
 import { useSight } from "./useSight";
 import { permissionsFor } from "./permissions";
 import { SceneForm } from "./SceneForm";
+import { PropsPanel } from "./PropsPanel";
 import { ScenePanel } from "./ScenePanel";
 import { useHistoryShortcuts } from "./shortcuts";
 import { TableFrame } from "./TableFrame";
@@ -342,6 +343,12 @@ function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
             label: "Nebbia",
             icon: <CloudFog size={16} />,
             content: <FogPanel view={view} scene={scene} controls={controls} />
+          },
+          {
+            id: "props",
+            label: "Oggetti",
+            icon: <Shapes size={16} />,
+            content: <PropsPanel view={view} scene={scene} />
           }
         ]
       : []),

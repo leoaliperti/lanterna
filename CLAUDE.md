@@ -128,6 +128,15 @@ Dettagli in `docs/WINDOWS.md`.
 - **Vista giocatore generata dal server**: `/ws?viewAs=<userId>` (solo GM della campagna, membro guardato; altrimenti 403 all'upgrade o FORBIDDEN + 4403 all'`hello`), attore del membro per ogni filtro (`viewerActor` in `realtime/hub.ts`), sempre in sola lettura. `?readOnly=1` per chiunque. Tessere con `?viewAs=`. Mai ricostruire nel client la vista di un altro utente filtrando quella del GM.
 - **Test**: `server/src/realtime/viewas.test.ts` (stessi frame del giocatore, scritture FORBIDDEN, 403), `client/src/windows/*.test.*`, e2e `client/e2e/windows.e2e.test.ts`. Una nuova richiesta WebSocket che scrive deve passare da `rejectReadOnly`/`roomOf` in `hub.ts`.
 
+## Livelli, oggetti di scena e scene (M10, parte A)
+
+Dettagli in `docs/PROTOCOL.md` (sezione "Livelli, oggetti di scena e gestione scene"). Modello in `packages/shared/src/state/props.ts`.
+
+- **Oggetti**: `state.props` (facoltativo), livelli `background`/`ground`/(token)/`above`, comandi solo GM `prop.create/update/delete` e `scene.duplicate`, ciascuno con inverso esatto. Un nuovo comando va nella matrice di `shared/src/state/props.test.ts` e `server/src/props/props.test.ts`.
+- **Filtro**: `canSeeProp`/`projectProp` (lista bianca; mai `name`/`hidden` ai giocatori, nebbia come per i token). Un nuovo tipo di `StateChange` va gestito anche in `history.ts` (`checkExpect`).
+- **Client**: `map/propLayer.ts` (tre contenitori Pixi, dissolvenza degli `above` in `propLogic.ts`), scheda "Oggetti" (`table/PropsPanel.tsx`, solo GM, posizione e dimensioni da campi numerici), "Duplica" in `ScenePanel`, selettore di campagne nel titolo (`table/CampaignSwitcher.tsx`, `#/?campaign=<id>`).
+- Migrazione `0008_props`. Esportazione/importazione di campagna non copre ancora gli oggetti.
+
 ## Regole non negoziabili
 
 1. **Account: solo l'admin li crea.** L'admin coincide con il GM. I ruoli sono due: admin/GM e giocatore. Nessuna registrazione pubblica. Il controllo del ruolo avviene **lato server** su ogni endpoint di creazione/modifica/eliminazione utenti. Nascondere il pulsante nella UI non basta. Ogni funzione di questo tipo deve avere un test che dimostri il rifiuto (403) per un utente non admin.
