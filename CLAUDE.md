@@ -42,6 +42,16 @@ Le migrazioni (in `packages/server/drizzle/`) si applicano da sole all'avvio del
 - **Sicurezza:** password con scrypt (default Better Auth), minimo 12 caratteri; rate limit per IP su login, cambio password e creazione utenti (`@fastify/rate-limit`); cookie `HttpOnly`, `SameSite=Lax`, `Secure` in produzione; `TRUST_PROXY` per leggere l'IP reale dietro Cloudflare Tunnel; ogni POST/PATCH/DELETE deve avere Origin (o Referer) fra le origini ammesse; header di sicurezza con `@fastify/helmet`; login errato e utente inesistente danno la stessa risposta. In produzione `BETTER_AUTH_SECRET` e `BETTER_AUTH_URL` sono obbligatori.
 - **Test:** ogni nuova rotta protetta va aggiunta alla tabella `endpoints` in `src/users/admin.test.ts` (o equivalente) con i casi anonimo 401, giocatore 403, admin ok.
 
+## Tempo reale, campagne e upload (M2/M3, server)
+
+Dettagli completi in `docs/PROTOCOL.md` (sezione "Server").
+
+- **WebSocket** su `/ws` (in sviluppo `ws://localhost:5173/api/ws` tramite il proxy Vite, che deve avere `ws: true`): libreria `ws` agganciata all'evento `upgrade` di Fastify (`src/realtime/server.ts`). Origin non ammesso → 403 e niente sessione → 401, **prima** dell'handshake. Stanze per campagna in `src/realtime/hub.ts`: comandi in coda, attore sempre dalla sessione, salvataggio in transazione **prima** di inviare i delta filtrati con `deltaFor`/`planResync`. Keep-alive, rate limit, limite di 64 KiB e chiusura delle connessioni quando cambiano ruolo, membri o sessione.
+- **Persistenza** (`src/campaigns/store.ts`, migrazione `0001_campaigns`): campagne, membri, scene e token (JSON validato con Zod in lettura), registro eventi per i delta anche dopo un riavvio. Se il database contiene dati non validi il server non parte.
+- **REST**: `/campaigns` (admin), `/campaigns/mine` (autenticato), `/campaigns/:id/members` (admin). Ogni nuova rotta protetta va aggiunta alla tabella `adminEndpoints` di `src/campaigns/campaigns.test.ts` (o equivalente).
+- **Upload** (`src/media/`, non `uploads/` perché è in `.gitignore`): `POST /uploads/map|token` solo admin, tipo dai magic bytes (PNG/JPEG/WebP, niente SVG), limiti di byte e pixel, file in `UPLOAD_DIR` con nome UUID, `GET /assets/:uuid.:ext` solo autenticati. Nessuna miniatura (servirebbero dipendenze native).
+- **Test**: `npm test -w @lanterna/server`. I test di `src/realtime/realtime.test.ts` avviano il server su una porta vera con GM e giocatori connessi via `ws` e cercano i dati segreti nel traffico ricevuto; helper in `src/test/` (`ws.ts`, `campaign.ts`, `images.ts`).
+
 ## Regole non negoziabili
 
 1. **Account: solo l'admin li crea.** L'admin coincide con il GM. I ruoli sono due: admin/GM e giocatore. Nessuna registrazione pubblica. Il controllo del ruolo avviene **lato server** su ogni endpoint di creazione/modifica/eliminazione utenti. Nascondere il pulsante nella UI non basta. Ogni funzione di questo tipo deve avere un test che dimostri il rifiuto (403) per un utente non admin.

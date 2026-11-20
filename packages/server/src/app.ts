@@ -8,6 +8,10 @@ import "./auth/session.js";
 import { loadConfig, type AppConfig } from "./config.js";
 import { openDatabase, type Database } from "./db/client.js";
 import { originGuard } from "./security.js";
+import { campaignRoutes } from "./campaigns/routes.js";
+import { Hub, CLOSE } from "./realtime/hub.js";
+import { attachRealtime } from "./realtime/server.js";
+import { uploadRoutes } from "./media/routes.js";
 import { adminRoutes } from "./users/routes.js";
 import { createUserService, type UserService } from "./users/service.js";
 
@@ -15,6 +19,7 @@ declare module "fastify" {
   interface FastifyInstance {
     database: Database;
     users: UserService;
+    realtime: Hub;
   }
 }
 
@@ -39,6 +44,10 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   app.decorate("database", database);
   app.decorate("auth", auth);
   app.decorate("users", users);
+  // Stanze delle campagne: lo stato salvato si ricarica prima di accettare connessioni.
+  const hub = new Hub(database.db, app.log);
+  await hub.loadAll();
+  app.decorate("realtime", hub);
   app.decorateRequest("session", null);
   app.addHook("onClose", async () => database.close());
 
@@ -53,7 +62,13 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   app.get("/health", async (): Promise<HealthResponse> => ({ status: "ok" }));
   await authRoutes(app, config);
-  await adminRoutes(app, config, users);
+  await adminRoutes(app, config, users, {
+    userChanged: (id) => hub.userChanged(id),
+    sessionsRevoked: (id) => hub.closeUser(id, CLOSE.sessionEnded, "sessione terminata"),
+  });
+  await campaignRoutes(app, hub);
+  await uploadRoutes(app, config);
+  attachRealtime(app, hub, config, allowedOrigins);
 
   return app;
 }

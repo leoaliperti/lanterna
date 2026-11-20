@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** `false`, `true` (sconsigliato) o un elenco di IP/subnet fidati, es. `loopback` o `127.0.0.1,::1`. */
@@ -24,6 +25,27 @@ export interface AppConfig {
   rateLimit: {
     login: RateLimitRule;
     createUser: RateLimitRule;
+    upload: RateLimitRule;
+  };
+  /** Cartella (assoluta) dei file caricati, fuori dalla webroot statica. */
+  uploadDir: string;
+  upload: {
+    /** Dimensione massima di un file in byte. */
+    maxBytes: number;
+    /** Lato massimo in pixel. */
+    maxSide: number;
+    /** Area massima in pixel (larghezza x altezza). */
+    maxPixels: number;
+  };
+  realtime: {
+    /** Intervallo dei ping WebSocket; una connessione che non risponde entro il ping successivo viene chiusa. */
+    heartbeatMs: number;
+    /** Tempo massimo per ricevere `hello` dopo l'apertura del socket. */
+    helloTimeoutMs: number;
+    /** Messaggi al secondo concessi a ogni connessione (media). */
+    messagesPerSecond: number;
+    /** Raffica massima di messaggi oltre la media. */
+    messageBurst: number;
   };
 }
 
@@ -84,6 +106,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     rateLimit: {
       login: { max: positiveInt(env.RATE_LIMIT_LOGIN_MAX, 5), timeWindowMs: 60_000 },
       createUser: { max: positiveInt(env.RATE_LIMIT_CREATE_USER_MAX, 10), timeWindowMs: 60_000 },
+      upload: { max: positiveInt(env.RATE_LIMIT_UPLOAD_MAX, 30), timeWindowMs: 60_000 },
+    },
+    uploadDir: resolve(env.UPLOAD_DIR ?? "./uploads"),
+    upload: {
+      maxBytes: positiveInt(env.UPLOAD_MAX_BYTES, 25 * 1024 * 1024),
+      maxSide: positiveInt(env.UPLOAD_MAX_SIDE, 16_384),
+      maxPixels: positiveInt(env.UPLOAD_MAX_PIXELS, 100_000_000),
+    },
+    realtime: {
+      heartbeatMs: positiveInt(env.WS_HEARTBEAT_MS, 30_000),
+      helloTimeoutMs: positiveInt(env.WS_HELLO_TIMEOUT_MS, 10_000),
+      messagesPerSecond: positiveInt(env.WS_MESSAGES_PER_SECOND, 30),
+      messageBurst: positiveInt(env.WS_MESSAGE_BURST, 60),
     },
   };
 }

@@ -1,6 +1,6 @@
 # Piano di Lanterna
 
-Stato: M0 completata; M1 backend (auth, ruoli, gestione utenti) in revisione, manca la UI di login e amministrazione. Gestore pacchetti: npm workspaces (pnpm non è installato e non serviva).
+Stato: M0 completata; M1 backend (auth, ruoli, gestione utenti) in revisione, manca la UI di login e amministrazione. M2/M3 lato server (WebSocket, persistenza SQLite, REST campagne, upload) in revisione; mancano canvas e client WebSocket. Gestore pacchetti: npm workspaces (pnpm non è installato e non serviva).
 
 ## Decisioni prese
 
@@ -19,6 +19,9 @@ Stato: M0 completata; M1 backend (auth, ruoli, gestione utenti) in revisione, ma
 | Sistema di regole | D&D 5e, edizione 2024, tutto tranne i punti esperienza. Le regole si implementano come logica nostra; i testi (mostri, incantesimi, manuali) non entrano nel repo. |
 | Stack | PixiJS, Fastify, `ws`, Better Auth, confermati. |
 | Driver SQLite | `@libsql/client` con file locale: binari precompilati, nessuno script di installazione (npm 11 li blocca; `better-sqlite3` richiederebbe compilazione nativa). `node:sqlite` scartato perché in Node 22 è ancora sperimentale e Drizzle non lo supporta ufficialmente. |
+| WebSocket sul server | `ws` direttamente sull'evento `upgrade` di Fastify (niente `@fastify/websocket`): rifiuto 401/403 esplicito prima dell'handshake. |
+| Persistenza campagne | Scene e token come JSON validato con Zod in lettura; registro eventi salvato per i delta dopo un riavvio. |
+| Miniature delle mappe | Rimandate: `sharp` richiede binari nativi e script d'installazione (bloccati da npm 11). |
 | Audio | Fuori ambito iniziale (si usa Discord). |
 | MVP | Lista dell'autore, più caricamento mappa e salvataggio automatico. |
 

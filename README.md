@@ -31,6 +31,8 @@ Ogni libreria o snippet copiato va elencato qui con licenza e fonte.
 | @libsql/client | MIT | https://github.com/tursodatabase/libsql-client-ts | driver SQLite senza compilazione nativa |
 | @fastify/rate-limit | MIT | https://github.com/fastify/fastify-rate-limit | rate limit su login e creazione utenti |
 | @fastify/helmet | MIT | https://github.com/fastify/fastify-helmet | header di sicurezza HTTP |
+| ws | MIT | https://github.com/websockets/ws | server WebSocket (`packages/server/src/realtime`) e client nei test |
+| @fastify/multipart (con @fastify/busboy) | MIT | https://github.com/fastify/fastify-multipart | upload di mappe e immagini dei token |
 
 Il design system del client (`packages/client/src/ui`) e' scritto da zero in CSS puro e React, senza librerie di animazione ne' primitive esterne; segue le Human Interface Guidelines di Apple come ispirazione, senza includere font, icone o asset Apple (si usa lo stack di sistema `-apple-system, system-ui`). Dettagli in [`docs/DESIGN.md`](docs/DESIGN.md); la gallery e' su `#/ui` in sviluppo.
 
