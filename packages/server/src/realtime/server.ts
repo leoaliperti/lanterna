@@ -61,7 +61,7 @@ export function attachRealtime(
     } catch {
       return rejectUpgrade(socket, 400, "Richiesta non valida");
     }
-    if (pathname !== WS_PATH) return rejectUpgrade(socket, 404, "Non trovato");
+    if (pathname !== config.apiPrefix + WS_PATH) return rejectUpgrade(socket, 404, "Non trovato");
     // Anti cross-site WebSocket hijacking: il browser manda sempre Origin; senza o diverso => 403.
     if (!isAllowedOrigin({ origin: req.headers.origin }, allowedOrigins)) {
       return rejectUpgrade(socket, 403, "Origine non ammessa");

@@ -14,9 +14,13 @@ coverage/
 *.db
 data/
 uploads/
+backups/
 # contenuti di gioco importati nell'istanza (mai nel repo)
-content/
-imports/
+# (ancorati: il codice in packages/server/src/content/ è nel repo)
+/content/
+/imports/
+/packages/server/content/
+/packages/server/imports/
 # editor e strumenti locali
 .idea/
 .vscode/

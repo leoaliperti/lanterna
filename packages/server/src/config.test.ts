@@ -34,6 +34,41 @@ describe("loadConfig", () => {
     expect(c.trustedOrigins).toEqual(["http://localhost:5173"]);
   });
 
+  describe("produzione insicura: il server non parte", () => {
+    const ok = { NODE_ENV: "production", BETTER_AUTH_SECRET: SECRET, BETTER_AUTH_URL: "https://l.example" };
+    it("configurazione di base valida", () => {
+      expect(() => loadConfig(ok)).not.toThrow();
+    });
+    it("URL pubblico http", () => {
+      expect(() => loadConfig({ ...ok, BETTER_AUTH_URL: "http://l.example" })).toThrow(/https/);
+      expect(() => loadConfig({ ...ok, BETTER_AUTH_URL: "http://localhost:3000", ALLOW_INSECURE_HTTP: "true" })).not.toThrow();
+    });
+    it("TRUST_PROXY=true", () => {
+      expect(() => loadConfig({ ...ok, TRUST_PROXY: "true" })).toThrow(/TRUST_PROXY/);
+      expect(() => loadConfig({ ...ok, TRUST_PROXY: "loopback" })).not.toThrow();
+    });
+    it("database in memoria", () => {
+      expect(() => loadConfig({ ...ok, DATABASE_URL: ":memory:" })).toThrow(/memoria/);
+    });
+    it("segreto corto", () => {
+      expect(() => loadConfig({ ...ok, BETTER_AUTH_SECRET: "corto" })).toThrow(/32/);
+    });
+    it("prefisso API non valido o client senza prefisso", () => {
+      expect(() => loadConfig({ ...ok, API_PREFIX: "api" })).toThrow(/API_PREFIX/);
+      expect(() => loadConfig({ ...ok, API_PREFIX: "" })).toThrow(/prefisso|API_PREFIX/);
+    });
+  });
+
+  it("prefisso API: vuoto in sviluppo, /api in produzione (con client servito)", () => {
+    const dev = loadConfig({});
+    expect(dev.apiPrefix).toBe("");
+    expect(dev.clientDir).toBeNull();
+    const prod = loadConfig({ NODE_ENV: "production", BETTER_AUTH_SECRET: SECRET, BETTER_AUTH_URL: "https://l.example" });
+    expect(prod.apiPrefix).toBe("/api");
+    expect(prod.clientDir).toMatch(/client[\\/]dist$/);
+    expect(loadConfig({ API_PREFIX: "/v1/" }).apiPrefix).toBe("/v1");
+  });
+
   it("chat: default, valori da env e cronologia iniziale limitata", () => {
     expect(loadConfig({}).chat).toEqual({
       historyOnConnect: 50,

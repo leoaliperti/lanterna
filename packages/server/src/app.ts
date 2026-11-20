@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import compress from "@fastify/compress";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import type { HealthResponse, RandomInt } from "@lanterna/shared";
@@ -10,10 +11,12 @@ import { openDatabase, type Database } from "./db/client.js";
 import { originGuard } from "./security.js";
 import { campaignRoutes } from "./campaigns/routes.js";
 import { chatRoutes } from "./chat/routes.js";
+import { contentRoutes } from "./content/routes.js";
 import { randomInt as cryptoRandomInt } from "./dice/crypto-rng.js";
 import { Hub, CLOSE } from "./realtime/hub.js";
 import { attachRealtime } from "./realtime/server.js";
 import { uploadRoutes } from "./media/routes.js";
+import { API_CSP, pageCsp, registerClient } from "./web.js";
 import { adminRoutes } from "./users/routes.js";
 import { createUserService, type UserService } from "./users/service.js";
 
@@ -58,25 +61,42 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   app.decorateRequest("session", null);
   app.addHook("onClose", async () => database.close());
 
-  // Header di sicurezza di base. È un'API JSON: CSP restrittiva.
+  // Header di sicurezza: CSP della pagina del client (le risposte dell'API la restringono, vedi sotto).
   await app.register(helmet, {
-    contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } },
+    contentSecurityPolicy: false,
+    // Il client e l'API sono sulla stessa origine: le immagini caricate si usano dalla pagina.
+    crossOriginResourcePolicy: { policy: "same-origin" },
   });
+  app.addHook("onSend", async (_request, reply) => {
+    if (!reply.hasHeader("content-security-policy")) reply.header("content-security-policy", pageCsp(config));
+  });
+  await app.register(compress, { threshold: 1024, encodings: ["br", "gzip"] });
   await app.register(rateLimit, { global: false });
 
   const allowedOrigins = new Set([config.baseURL, ...config.trustedOrigins]);
   app.addHook("onRequest", originGuard(allowedOrigins));
 
-  app.get("/health", async (): Promise<HealthResponse> => ({ status: "ok" }));
-  await authRoutes(app, config);
-  await adminRoutes(app, config, users, {
-    userChanged: (id) => hub.userChanged(id),
-    sessionsRevoked: (id) => hub.closeUser(id, CLOSE.sessionEnded, "sessione terminata"),
-  });
-  await campaignRoutes(app, hub);
-  await chatRoutes(app, hub);
-  await uploadRoutes(app, config);
+  // Tutta l'API sotto il prefisso (`/api` in produzione, vuoto in sviluppo e nei test).
+  await app.register(
+    async (api) => {
+      api.addHook("onSend", async (_request, reply) => {
+        reply.header("content-security-policy", API_CSP);
+      });
+      api.get("/health", async (): Promise<HealthResponse> => ({ status: "ok" }));
+      await authRoutes(api, config);
+      await adminRoutes(api, config, users, {
+        userChanged: (id) => hub.userChanged(id),
+        sessionsRevoked: (id) => hub.closeUser(id, CLOSE.sessionEnded, "sessione terminata"),
+      });
+      await campaignRoutes(api, hub);
+      await chatRoutes(api, hub);
+      await uploadRoutes(api, config);
+      await contentRoutes(api, config);
+    },
+    { prefix: config.apiPrefix },
+  );
   attachRealtime(app, hub, config, allowedOrigins);
+  await registerClient(app, config);
 
   return app;
 }
