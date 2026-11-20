@@ -68,3 +68,15 @@ Da REST (solo admin, con la sessione e l'header `Origin` come per ogni POST; in 
 | `DELETE /content/:id` | admin | 204 |
 
 I dati stanno nella tabella `content` (migrazione `0003_content`) e sono inclusi nel backup del database (`npm run backup -w @lanterna/server`).
+
+## Campi riconosciuti dalle schede (M8)
+
+Il formato di `data` resta libero. Quando si crea una scheda dalla libreria il client riconosce solo questi campi (tutto il resto non viene copiato; testi lunghi tagliati ai limiti della scheda):
+
+| Tipo | Campi | Uso |
+|---|---|---|
+| `monster` | `hp` (numero o `{ average }`), `ac`, `speed`, caratteristiche (`abilities: { str, dex, con, int, wis, cha }` oppure al primo livello; nomi inglesi o italiani), `text` | crea lo statblock: PF e CA derivati coincidono con i valori importati; `text` va nel testo dello statblock |
+| `spell` | `level` (0-9), `text` | aggiunge l'incantesimo alla scheda |
+| `item` | `weight` (libbre), `text`, `armor: { category: "light"\|"medium"\|"heavy", baseAc }` | aggiunge l'oggetto all'inventario; con `armor` si può indossare e la CA si ricalcola |
+
+I mostri sono visibili solo al GM (404 per i giocatori, come per ogni altro `monster`).

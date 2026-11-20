@@ -88,6 +88,15 @@ Dettagli in `docs/FOG.md`. La UI del client non c'è ancora (elenco di cosa fare
 - **Persistenza**: tabelle `fog` e `wall` (migrazione `0004_fog`); chi esce dalla campagna perde la maschera (`withMembers`).
 - **Test**: `shared/src/state/fogstate.test.ts`, `fog.test.ts`, `vision.test.ts` (con benchmark), fuzz in `fuzz.test.ts`; server `src/fog/fog.test.ts` (GM + 2 giocatori, tessere, riavvio).
 
+## Schede personaggio e statblock (M8)
+
+Dettagli e matrice dei permessi in `docs/PROTOCOL.md` (sezione "Schede personaggio e statblock"). Modello in `packages/shared/src/rules5e/doc.ts`.
+
+- **REST, non WebSocket** (`src/sheets/`, tabella `character_sheet`, migrazione `0005_sheets`): `/campaigns/:id/sheets`. GM tutto; il giocatore solo le proprie `pc` (altre e statblock: 404 identico a "inesistente"); proprietario e legame col token solo GM (403). `SheetDoc` validato con Zod a ogni lettura e scrittura; `version` + `PUT` condizionato → 409 `CONFLICT`. Ogni nuova rotta va nella matrice di `src/sheets/sheets.test.ts`.
+- **PF/condizioni**: la scheda è la fonte di verità; il client del GM copia i cambiamenti sul token collegato (`planTokenSync`), niente modifiche a protocollo/stato. Il giocatore non riceve mai `tokenId`.
+- **Client** (`packages/client/src/sheets/`): elenco nel pannello "Schede", finestra con più schede a linguette (affiancabili su schermi larghi), ricerca per sezione, libreria importata (`GET /content?kind=`). I tiri inviano `roll.request` con la formula di `rollFor`; l'esito è del server. Test: `sheets.test.tsx`, `sheetLogic.test.ts`, e2e `e2e/sheets.e2e.test.ts`.
+- Nessun contenuto di gioco nel repo: i test usano nomi e testi inventati.
+
 ## Regole non negoziabili
 
 1. **Account: solo l'admin li crea.** L'admin coincide con il GM. I ruoli sono due: admin/GM e giocatore. Nessuna registrazione pubblica. Il controllo del ruolo avviene **lato server** su ogni endpoint di creazione/modifica/eliminazione utenti. Nascondere il pulsante nella UI non basta. Ogni funzione di questo tipo deve avere un test che dimostri il rifiuto (403) per un utente non admin.

@@ -244,6 +244,34 @@ export const content = sqliteTable(
   (t) => [index("content_kind_name_idx").on(t.kind, t.name), index("content_campaign_idx").on(t.campaignId)],
 );
 
+/**
+ * Schede personaggio e statblock (M8). `data` = `SheetDoc` (scheda di regole + extra) in JSON, validato
+ * con `sheetDocSchema` a ogni lettura e scrittura. `name` è una copia di `data.sheet.name` per l'elenco.
+ * `ownerUserId`: giocatore proprietario (solo schede `pc`). `tokenId`: legame opzionale con un token
+ * (non è una chiave esterna: i token stanno in una tabella con chiave composta e si cancellano con i comandi).
+ * `version` cresce a ogni scrittura: l'aggiornamento è condizionato alla versione letta (concorrenza).
+ */
+export const characterSheet = sqliteTable(
+  "character_sheet",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => campaign.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<"pc" | "monster">().notNull(),
+    ownerUserId: text("owner_user_id").references(() => user.id, { onDelete: "set null" }),
+    tokenId: text("token_id"),
+    name: text("name").notNull(),
+    data: text("data").notNull(),
+    version: integer("version").notNull().default(1),
+    ...timestamps,
+  },
+  (t) => [
+    index("character_sheet_campaign_idx").on(t.campaignId),
+    index("character_sheet_owner_idx").on(t.campaignId, t.ownerUserId),
+  ],
+);
+
 export const schema = {
   user,
   session,
@@ -259,4 +287,5 @@ export const schema = {
   asset,
   chatEntry,
   content,
+  characterSheet,
 };

@@ -16,6 +16,7 @@ import { randomInt as cryptoRandomInt } from "./dice/crypto-rng.js";
 import { Hub, CLOSE } from "./realtime/hub.js";
 import { attachRealtime } from "./realtime/server.js";
 import { uploadRoutes } from "./media/routes.js";
+import { sheetRoutes } from "./sheets/routes.js";
 import { API_CSP, pageCsp, registerClient } from "./web.js";
 import { TileService } from "./media/tiles.js";
 import { adminRoutes } from "./users/routes.js";
@@ -93,6 +94,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       await chatRoutes(api, hub);
       await uploadRoutes(api, config, hub, new TileService({ uploadDir: config.uploadDir }));
       await contentRoutes(api, config);
+      await sheetRoutes(api, hub);
     },
     { prefix: config.apiPrefix },
   );
