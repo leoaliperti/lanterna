@@ -3,26 +3,37 @@ import { App } from "./App";
 import { SessionProvider } from "./session/SessionProvider";
 import { ToastProvider } from "./ui";
 
-// In produzione la costante e' null e il chunk della gallery non entra nel bundle.
+// In produzione le costanti sono null e i chunk delle pagine di prova non entrano nel bundle.
 const Gallery = import.meta.env.DEV ? lazy(() => import("./ui/Gallery").then((m) => ({ default: m.Gallery }))) : null;
+const MapDemo = import.meta.env.DEV ? lazy(() => import("./map/MapDemo").then((m) => ({ default: m.MapDemo }))) : null;
 
-function isGalleryHash(): boolean {
-  return window.location.hash === "#/ui";
+function currentRoute(): "ui" | "map" | "app" {
+  const hash = window.location.hash;
+  if (hash === "#/ui") return "ui";
+  if (hash === "#/map" || hash.startsWith("#/map?")) return "map";
+  return "app";
 }
 
-/** Router minimo: la gallery del design system e' raggiungibile con #/ui solo in sviluppo. */
+/** Router minimo: la gallery del design system (#/ui) e la prova della mappa (#/map) esistono solo in sviluppo. */
 export function Root() {
-  const [gallery, setGallery] = useState(isGalleryHash);
+  const [route, setRoute] = useState(currentRoute);
   useEffect(() => {
-    const on = () => setGallery(isGalleryHash());
+    const on = () => setRoute(currentRoute());
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []);
 
-  if (Gallery && gallery) {
+  if (Gallery && route === "ui") {
     return (
       <Suspense fallback={null}>
         <Gallery />
+      </Suspense>
+    );
+  }
+  if (MapDemo && route === "map") {
+    return (
+      <Suspense fallback={null}>
+        <MapDemo />
       </Suspense>
     );
   }

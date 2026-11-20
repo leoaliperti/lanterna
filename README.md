@@ -20,6 +20,7 @@ Ogni libreria o snippet copiato va elencato qui con licenza e fonte.
 |---|---|---|---|
 | DiceGen (dadi 3D) | MIT | https://git.aliperti.me/alipe/DiceGen.git (stesso autore) | base dell'animazione dei dadi (`packages/client/src/dice3d`), riscritta in TypeScript con esito deciso dal server |
 | Three.js 0.187.0 | MIT | https://github.com/mrdoob/three.js | rendering 3D dei dadi |
+| PixiJS 8.23.0 (`pixi.js`) | MIT | https://github.com/pixijs/pixijs | canvas della mappa (`packages/client/src/map`), caricato in modo lazy; dettagli in [`docs/MAP.md`](docs/MAP.md) |
 | Zod | MIT | https://github.com/colinhacks/zod | validazione dello schema `CharacterSheet` (`packages/shared`) |
 | System Reference Document 5.2 (SRD 5.2) | CC-BY-4.0 | https://www.dndbeyond.com/srd | formule e tabelle numeriche del motore di regole 5e 2024 (`packages/shared/src/rules5e`); nessun testo copiato |
 | Lucide (`lucide-react`) | ISC | https://github.com/lucide-icons/lucide | icone del design system (client). Non si usano SF Symbols: la licenza Apple ne vieta l'uso fuori dalle piattaforme Apple |
