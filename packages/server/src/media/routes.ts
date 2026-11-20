@@ -5,11 +5,13 @@ import { join, resolve, sep } from "node:path";
 import multipart from "@fastify/multipart";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply } from "fastify";
-import type { UploadKind, UploadResponse } from "@lanterna/shared";
+import { IdSchema, type UploadKind, type UploadResponse } from "@lanterna/shared";
 import { requireRole, requireSession } from "../auth/session.js";
 import type { AppConfig } from "../config.js";
 import { asset } from "../db/schema.js";
 import { sniffImage } from "./image.js";
+import type { Hub } from "../realtime/hub.js";
+import type { TileService } from "./tiles.js";
 
 /** Nome pubblico di un file: `<uuid>.<estensione>`. Qualsiasi altra forma => 404. */
 const ASSET_NAME = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(png|jpg|webp)$/;
@@ -28,7 +30,7 @@ function fail(reply: FastifyReply, status: number, error: string) {
  * - nessuna miniatura: servirebbe una libreria di decodifica (sharp ha binari nativi e script
  *   di installazione, bloccati da npm 11); vedi docs/PROTOCOL.md.
  */
-export async function uploadRoutes(app: FastifyInstance, config: AppConfig) {
+export async function uploadRoutes(app: FastifyInstance, config: AppConfig, hub: Hub, tiles: TileService) {
   const { uploadDir, upload } = config;
   await mkdir(uploadDir, { recursive: true });
   const root = resolve(uploadDir);
@@ -111,6 +113,11 @@ export async function uploadRoutes(app: FastifyInstance, config: AppConfig) {
       const [, id, ext] = match;
       const row = await app.database.db.query.asset.findFirst({ where: eq(asset.id, id!) });
       if (!row || row.ext !== ext) return fail(reply, 404, "Non trovato");
+      // Nebbia (M6): la mappa di una scena con nebbia non si serve intera ai giocatori.
+      const user = request.session!.user;
+      if (user.role !== "admin" && !hub.assetAllowed(user.id, row.id, `${ASSETS_PATH}/${row.id}.${row.ext}`)) {
+        return fail(reply, 404, "Non trovato");
+      }
       const path = resolve(root, `${row.id}.${row.ext}`);
       // Difesa in profondità contro il path traversal (il nome è già un UUID validato).
       if (!path.startsWith(root + sep)) return fail(reply, 404, "Non trovato");
@@ -131,6 +138,43 @@ export async function uploadRoutes(app: FastifyInstance, config: AppConfig) {
         .header("Content-Security-Policy", "default-src 'none'; sandbox")
         .header("Cache-Control", "private, max-age=31536000, immutable")
         .send(stream);
+    },
+  );
+
+  /**
+   * Tessere della mappa di una scena (M6). Giocatore: solo scena attiva con nebbia e solo tessere
+   * con almeno una cella rivelata a lui, con le celle coperte oscurate. GM: tutte, intere.
+   * Ogni rifiuto (campagna o scena inesistente, non membro, tessera coperta o fuori mappa) dà lo
+   * stesso 404: non si distingue una tessera coperta da una inesistente.
+   */
+  app.get<{ Params: { campaignId: string; sceneId: string; col: string; row: string } }>(
+    "/campaigns/:campaignId/scenes/:sceneId/tiles/:col/:row",
+    { onRequest: requireSession },
+    async (request, reply) => {
+      const { campaignId, sceneId, col, row } = request.params;
+      const notFound = () => fail(reply, 404, "Non trovato");
+      if (!IdSchema.safeParse(campaignId).success || !IdSchema.safeParse(sceneId).success) return notFound();
+      if (!/^[0-9]{1,5}$/.test(col) || !/^[0-9]{1,5}$/.test(row)) return notFound();
+      const ctx = hub.tileContext(request.session!.user.id, campaignId, sceneId);
+      if (!ctx || !ctx.scene.map) return notFound();
+      const assetRow = await app.database.db.query.asset.findFirst({ where: eq(asset.id, ctx.scene.map.assetId) });
+      if (!assetRow) return notFound();
+      let tile;
+      try {
+        tile = await tiles.render(assetRow, ctx.scene, ctx.fog, ctx.mask, Number(col), Number(row));
+      } catch (err) {
+        request.log.warn({ err }, "tessera della mappa non generata");
+        return notFound();
+      }
+      if (!tile) return notFound();
+      reply
+        .header("ETag", tile.etag)
+        .header("X-Content-Type-Options", "nosniff")
+        .header("Content-Security-Policy", "default-src 'none'; sandbox")
+        // Sempre rivalidata: se la nebbia cambia, cambia l'ETag (o la tessera sparisce: 404).
+        .header("Cache-Control", "private, no-cache");
+      if (request.headers["if-none-match"] === tile.etag) return reply.code(304).send();
+      return reply.header("Content-Type", tile.mime).header("Content-Length", tile.body.length).send(tile.body);
     },
   );
 }
