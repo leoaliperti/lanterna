@@ -82,7 +82,13 @@ describe("login", () => {
   });
 
   it("in produzione il cookie è Secure", async () => {
-    ctx = await createTestApp({ NODE_ENV: "production", ALLOW_INSECURE_HTTP: "true", API_PREFIX: "", SERVE_CLIENT: "false" });
+    ctx = await createTestApp({
+      NODE_ENV: "production",
+      BETTER_AUTH_URL: "https://lanterna.example.com",
+      TRUSTED_ORIGINS: "http://localhost:3000",
+      API_PREFIX: "",
+      SERVE_CLIENT: "false",
+    });
     const user = await createUser(ctx.app, "player");
     const res = await signIn(ctx.app, user.email);
     expect(res.statusCode).toBe(200);

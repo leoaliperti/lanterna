@@ -12,6 +12,8 @@ export const CLIENT_IP_HEADER = "x-lanterna-client-ip";
 export const AUTH_BASE_PATH = "/auth";
 
 export function createAuth(config: AppConfig, db: Db) {
+  // Secure solo in produzione e con URL https (la prova in LAN su http, con ALLOW_INSECURE_HTTP, non lo ammette).
+  const secureCookies = config.production && config.baseURL.startsWith("https:");
   return betterAuth({
     appName: "Lanterna",
     baseURL: config.baseURL,
@@ -46,9 +48,9 @@ export function createAuth(config: AppConfig, db: Db) {
     rateLimit: { enabled: false },
     telemetry: { enabled: false },
     advanced: {
-      useSecureCookies: config.production,
+      useSecureCookies: secureCookies,
       cookiePrefix: "lanterna",
-      defaultCookieAttributes: { httpOnly: true, sameSite: "lax", secure: config.production },
+      defaultCookieAttributes: { httpOnly: true, sameSite: "lax", secure: secureCookies },
       ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
     },
   });
