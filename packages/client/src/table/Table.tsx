@@ -6,6 +6,7 @@ import { MapCanvas, type MapCanvasHandle } from "../map";
 import { Button, IconButton, Material, Spinner } from "../ui";
 import { EmptyState } from "../screens/EmptyState";
 import { useCommands, useRealtimeState } from "../realtime/RealtimeProvider";
+import { ChatLive, ChatPanel, ChatProvider, DiceOverlay, useChat, useChatShortcuts, useChatStore } from "../chat";
 import { sceneToShow, tokensOfScene, toMapScene } from "./adapter";
 import { ConnectionBanner, ConnectionDot } from "./ConnectionStatus";
 import { permissionsFor } from "./permissions";
@@ -25,6 +26,14 @@ export interface TableProps {
 
 /** Il tavolo reale: stato dal server, mappa, pannello token e scene, annulla/ripeti. */
 export function Table({ user, campaignName }: TableProps) {
+  return (
+    <ChatProvider selfId={user.id}>
+      <TableContent user={user} campaignName={campaignName} />
+    </ChatProvider>
+  );
+}
+
+function TableContent({ user, campaignName }: TableProps) {
   const { view, status, failure } = useRealtimeState();
   const commands = useCommands();
   const connected = status === "connected";
@@ -68,6 +77,12 @@ function LiveTable({ user, view, actions }: LiveProps) {
   const [editor, setEditor] = useState<{ open: boolean; tokenId: string | null }>({ open: false, tokenId: null });
   const [sceneForm, setSceneForm] = useState<"create" | "edit" | null>(null);
   const mapRef = useRef<MapCanvasHandle>(null);
+  const chatStore = useChatStore();
+  const chat = useChat();
+  const focusChat = useCallback(() => chatStore.requestFocus(), [chatStore]);
+  useChatShortcuts(focusChat);
+  const onVisibleTab = useCallback((tab: string | null) => chatStore.setPanelVisible(tab === "chat"), [chatStore]);
+  const focusRequest = useMemo(() => ({ tab: "chat", nonce: chat.focusNonce }), [chat.focusNonce]);
 
   // Il GM guarda la scena che sceglie; senza scelta (e senza scena in gioco) la prima.
   const wanted = viewedId ?? (view.activeSceneId ? null : (view.scenes[0]?.id ?? null));
@@ -100,7 +115,8 @@ function LiveTable({ user, view, actions }: LiveProps) {
       id: "chat",
       label: "Chat",
       icon: <MessageSquare size={16} />,
-      content: <EmptyState icon={<MessageSquare size={28} />} title="Nessun messaggio" description="Qui compariranno i messaggi e i tiri di dado della partita." />
+      badge: chat.unread,
+      content: <ChatPanel user={user} />
     },
     {
       id: "token",
@@ -135,7 +151,19 @@ function LiveTable({ user, view, actions }: LiveProps) {
   ];
 
   return (
-    <TableFrame user={user} title={view.name} actions={actions} banner={<ConnectionBanner />} tabs={tabs} defaultTab="token">
+    <TableFrame
+      user={user}
+      title={view.name}
+      actions={actions}
+      banner={<ConnectionBanner />}
+      tabs={tabs}
+      defaultTab="token"
+      focusRequest={focusRequest}
+      onVisibleTabChange={onVisibleTab}
+      panelBadge={chat.unread}
+    >
+      <ChatLive />
+      <DiceOverlay />
       {mapScene && scene ? (
         <div className="a-map__live">
           <MapCanvas
