@@ -51,7 +51,7 @@ export const ShapeSchema = z.discriminatedUnion("kind", [
     label: z
       .string()
       // niente caratteri di controllo né segni di markup: il client mostra comunque solo testo
-      .regex(/^[^\u0000-\u001f\u007f<>]*$/, "etichetta non valida")
+      .refine((s) => ![...s].some((ch) => ch.charCodeAt(0) < 32 || ch === "\u007f" || ch === "<" || ch === ">"), "etichetta non valida")
       .max(32)
       .optional(),
   }),

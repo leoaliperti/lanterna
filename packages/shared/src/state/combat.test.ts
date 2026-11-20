@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Command } from "./commands.js";
 import { rollInitiative, sortByInitiative, type Participant } from "./combat.js";
-import { GM, MAIN, P1, PREP, baseState, deepFreeze, token } from "./fixtures.test-utils.js";
+import { GM, MAIN, PREP, baseState, deepFreeze, token } from "./fixtures.test-utils.js";
 import { createHistory, execute, redo, undo } from "./history.js";
 import { checkInvariants } from "./invariants.js";
 import { applyCommand } from "./reducer.js";

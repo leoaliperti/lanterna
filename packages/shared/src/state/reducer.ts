@@ -1,6 +1,6 @@
 import type { StateChange } from "./changes.js";
 import { CommandSchema, type Command, type ScenePatch, type TokenPatch } from "./commands.js";
-import { err, MESSAGES, type CommandError } from "./errors.js";
+import { err, MESSAGES } from "./errors.js";
 import { clampToScene, isInsideScene, normalizeRotation, snapToGrid } from "./grid.js";
 import {
   GridSchema,
@@ -10,7 +10,7 @@ import {
   type Scene,
   type Token,
 } from "./schema.js";
-import { canSeeToken, isGm } from "./view.js";
+import { isGm } from "./view.js";
 import { deepEqual } from "./filter.js";
 import {
   COVERED_MASK,
@@ -37,7 +37,6 @@ import {
   replaceToken,
   tokenChange,
   type ApplyResult,
-  type Ok,
 } from "./reducer-util.js";
 import { Tick, applyCombatCommand, removeParticipant } from "./combat-reducer.js";
 import { damagePatch, healPatch, resolveTarget, tempHpPatch, withCondition, withoutCondition } from "./combat-ops.js";

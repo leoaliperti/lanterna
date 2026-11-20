@@ -97,6 +97,16 @@ Dettagli e matrice dei permessi in `docs/PROTOCOL.md` (sezione "Schede personagg
 - **Client** (`packages/client/src/sheets/`): elenco nel pannello "Schede", finestra con più schede a linguette (affiancabili su schermi larghi), ricerca per sezione, libreria importata (`GET /content?kind=`). I tiri inviano `roll.request` con la formula di `rollFor`; l'esito è del server. Test: `sheets.test.tsx`, `sheetLogic.test.ts`, e2e `e2e/sheets.e2e.test.ts`.
 - Nessun contenuto di gioco nel repo: i test usano nomi e testi inventati.
 
+## Combattimento e azioni sulla mappa (M7, logica e server)
+
+Dettagli in `docs/COMBAT.md` e `docs/PROTOCOL.md`. La UI del client non c'è ancora (elenco in fondo a `docs/COMBAT.md`).
+
+- **Stato**: `state.combats` (uno per scena, partecipanti ordinati, `round`, `turnId`), `state.groups` (solo GM), `token.effects` e `token.faction` (facoltativi). Moduli: `shared/src/state/combat.ts` (schemi), `combat-reducer.ts` (iniziativa, turni, effetti, gruppi), `combat-ops.ts` (danno/cura con `rules5e/hp`, `resolveTarget`), `reducer-util.ts` (`done` deriva da solo i cambiamenti di combattimenti e gruppi confrontando gli stati), `shapes.ts` (geometria).
+- **Regole**: tutti i comandi di combattimento, effetto e gruppo sono solo GM (FORBIDDEN prima di guardare lo stato); `group.apply` è una macro di comandi ordinari (atomica, annullabile in un colpo, stessi permessi). Un nuovo comando di combattimento deve avere inverso esatto e voce nella matrice di `combat-access.test.ts`.
+- **Filtro**: tracker ricalcolato per utente (`projectCombat`, anche al cambio di nebbia/token/scena); avvisi `combat.turn`/`effect.*` solo a GM e proprietario; gruppi, fazione e effetti segreti mai ai giocatori.
+- **Effimeri**: `ephemeral.show/clear` mai persistiti; ogni destinatario riceve la forma ritagliata per la sua nebbia (`shapeForViewer`); le misure private non passano dal server. Iniziativa: `initiative.roll` con RNG del server (`hub.rng`).
+- **Test**: `shared/src/state/combat*.test.ts`, `shapes.test.ts`, fuzz in `combat-fuzz.test.ts`; server `src/combat/combat.test.ts` (GM + 2 giocatori, nebbia, riavvio). Migrazione `0006_combat`; nuove variabili in `.env.example`.
+
 ## Regole non negoziabili
 
 1. **Account: solo l'admin li crea.** L'admin coincide con il GM. I ruoli sono due: admin/GM e giocatore. Nessuna registrazione pubblica. Il controllo del ruolo avviene **lato server** su ogni endpoint di creazione/modifica/eliminazione utenti. Nascondere il pulsante nella UI non basta. Ogni funzione di questo tipo deve avere un test che dimostri il rifiuto (403) per un utente non admin.
