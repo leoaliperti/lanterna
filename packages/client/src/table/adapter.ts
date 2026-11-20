@@ -1,6 +1,7 @@
-import type { CampaignView, SceneView, TokenView } from "@lanterna/shared";
-import type { MapScene, MapToken, TokenKind as MapTokenKind } from "../map";
-import { assetUrl } from "../realtime/urls";
+import type { CampaignView, FogView, SceneView, TokenView } from "@lanterna/shared";
+import type { MapFog, MapScene, MapSight, MapToken, MapWall, TokenKind as MapTokenKind } from "../map";
+import { availableTiles, geometryOf, tileUrl, viewMask } from "../fog/fogLogic";
+import { API_BASE, assetUrl } from "../realtime/urls";
 
 /**
  * Adattatore stato condiviso -> props di `MapCanvas`. Mostra esattamente cio' che il server ha
@@ -80,8 +81,50 @@ export function toMapToken(token: TokenView): MapToken {
   };
 }
 
-export function toMapScene(view: CampaignView, scene: SceneView): MapScene {
+/** Nebbia della scena come la vede questo utente (`null` = scena senza nebbia). */
+export function fogOfScene(view: CampaignView, sceneId: string): FogView | null {
+  return view.fogs?.find((f) => f.sceneId === sceneId) ?? null;
+}
+
+export interface FogDisplay {
+  /** GM: maschera che sta controllando ("tutti" o un giocatore). Ignorato per il giocatore. */
+  viewAs: string | null;
+  /** GM: mostra il velo in trasparenza. */
+  showVeil: boolean;
+}
+
+/**
+ * Nebbia da disegnare. Giocatore: la SUA maschera (l'unica che riceve), velo opaco e sfondo a tessere
+ * (solo quelle con celle rivelate). GM: mappa intera e velo in trasparenza della maschera scelta.
+ */
+export function toMapFog(view: CampaignView, scene: SceneView, display: FogDisplay): MapFog | null {
+  const fog = fogOfScene(view, scene.id);
+  if (!fog) return null;
+  const geometry = geometryOf(fog);
+  if (view.viewer.role === "admin") {
+    return { sceneId: scene.id, geometry, mask: display.showVeil ? viewMask(fog, display.viewAs) : null, opaque: false, tiles: [] };
+  }
+  const tiles = fog.tiles
+    ? availableTiles(fog.tiles, fog.mask, geometry, scene.width, scene.height, (col, row, key) => tileUrl(API_BASE, view.campaignId, scene.id, col, row, key))
+    : [];
+  return { sceneId: scene.id, geometry, mask: fog.mask, opaque: true, tiles };
+}
+
+/** Muri della scena: il GM riceve segmenti interi, il giocatore solo i pezzi che il server gli ha mandato. */
+export function toMapWalls(walls: CampaignView["walls"], sceneId: string): MapWall[] {
+  return (walls ?? []).filter((w) => w.sceneId === sceneId).map((w) => ({ id: w.id, door: w.door, open: w.open, segments: w.segments }));
+}
+
+export interface MapSceneExtras {
+  fog?: MapFog | null;
+  walls?: readonly MapWall[];
+  wallsVisible?: boolean;
+  sight?: readonly MapSight[];
+}
+
+export function toMapScene(view: CampaignView, scene: SceneView, extras: MapSceneExtras = {}): MapScene {
   return {
+    ...extras,
     background: {
       url: scene.map ? (assetUrl(scene.map.url) ?? BLANK_BACKGROUND_URL) : BLANK_BACKGROUND_URL,
       width: scene.width,

@@ -1,4 +1,4 @@
-import { LIMITS, type Command, type Health, type Token, type TokenPatch, type TokenView } from "@lanterna/shared";
+import { LIMITS, type Command, type Health, type Token, type TokenPatch, type TokenView, type TokenVision } from "@lanterna/shared";
 import { parseNumber } from "./NumberField";
 
 /** Bozza di modifica di un token: tutti i campi come li vede il modulo (testo per i numeri). */
@@ -14,6 +14,12 @@ export interface TokenDraft {
   temp: string;
   conditions: Array<{ id: string; name: string }>;
   gmNotes: string;
+  /** Vista e luce (aiuto visivo, mai la nebbia), in unita' di gioco. `visionRange` vuoto = vista illimitata. */
+  hasVision: boolean;
+  visionRange: string;
+  darkvision: string;
+  lightBright: string;
+  lightDim: string;
   /** URL attuale dell'immagine (percorso del server) o `null`. Un nuovo file lo sostituisce al salvataggio. */
   imageUrl: string | null;
 }
@@ -31,6 +37,11 @@ export function emptyDraft(): TokenDraft {
     temp: "0",
     conditions: [],
     gmNotes: "",
+    hasVision: false,
+    visionRange: "",
+    darkvision: "0",
+    lightBright: "0",
+    lightDim: "0",
     imageUrl: null
   };
 }
@@ -48,6 +59,11 @@ export function draftOfToken(t: TokenView): TokenDraft {
     temp: String(t.health?.temp ?? 0),
     conditions: t.conditions.map((c) => ({ id: c.id, name: c.name })),
     gmNotes: t.gmNotes ?? "",
+    hasVision: !!t.vision,
+    visionRange: t.vision?.range == null ? "" : String(t.vision.range),
+    darkvision: String(t.vision?.darkvision ?? 0),
+    lightBright: String(t.vision?.bright ?? 0),
+    lightDim: String(t.vision?.dim ?? 0),
     imageUrl: t.imageUrl
   };
 }
@@ -58,6 +74,7 @@ export interface DraftErrors {
   max: string | null;
   temp: string | null;
   health: string | null;
+  vision: string | null;
 }
 
 export function healthOf(d: TokenDraft): Health | null {
@@ -69,6 +86,17 @@ export function healthOf(d: TokenDraft): Health | null {
   return { current, max, temp };
 }
 
+/** Vista del token dalla bozza (`null` se disattivata o non valida). */
+export function visionOfDraft(d: TokenDraft): TokenVision | null {
+  if (!d.hasVision) return null;
+  const range = d.visionRange.trim() === "" ? null : parseNumber(d.visionRange, 0, LIMITS.visionMaxRange);
+  const darkvision = parseNumber(d.darkvision, 0, LIMITS.visionMaxRange);
+  const bright = parseNumber(d.lightBright, 0, LIMITS.visionMaxRange);
+  const dim = parseNumber(d.lightDim, 0, LIMITS.visionMaxRange);
+  if ((d.visionRange.trim() !== "" && range === null) || darkvision === null || bright === null || dim === null) return null;
+  return { range, darkvision, bright, dim };
+}
+
 export function validateDraft(d: TokenDraft): DraftErrors {
   const range = `Un numero intero tra 0 e ${LIMITS.hpMax}.`;
   const current = parseNumber(d.current, 0, LIMITS.hpMax, true);
@@ -78,7 +106,8 @@ export function validateDraft(d: TokenDraft): DraftErrors {
     current: d.hasHealth && current === null ? range : null,
     max: d.hasHealth && max === null ? range : null,
     temp: d.hasHealth && parseNumber(d.temp, 0, LIMITS.hpMax, true) === null ? range : null,
-    health: d.hasHealth && current !== null && max !== null && current > max ? "La vita attuale non può superare il massimo." : null
+    health: d.hasHealth && current !== null && max !== null && current > max ? "La vita attuale non può superare il massimo." : null,
+    vision: d.hasVision && visionOfDraft(d) === null ? `Raggio e luci: numeri tra 0 e ${LIMITS.visionMaxRange} (il raggio può restare vuoto).` : null
   };
 }
 
@@ -102,6 +131,13 @@ export function diffDraft(token: TokenView, d: TokenDraft, imageUrl: string | nu
   if (d.hidden !== token.hidden) patch.hidden = d.hidden;
   if (imageUrl !== token.imageUrl) patch.imageUrl = imageUrl;
   if ((d.gmNotes ?? "") !== (token.gmNotes ?? "")) patch.gmNotes = d.gmNotes;
+  const vision = visionOfDraft(d);
+  const oldVision = token.vision ?? null;
+  const sameVision =
+    vision === null
+      ? oldVision === null
+      : oldVision !== null && oldVision.range === vision.range && oldVision.darkvision === vision.darkvision && oldVision.bright === vision.bright && oldVision.dim === vision.dim;
+  if (!sameVision) patch.vision = vision;
   const h = healthOf(d);
   const old = token.health;
   const sameHealth = h === null ? old === null : old !== null && old.current === h.current && old.max === h.max && old.temp === h.temp;
@@ -152,7 +188,8 @@ export function createCommand(id: string, sceneId: string, d: TokenDraft, imageU
     hidden: d.hidden,
     conditions: d.conditions,
     health: healthOf(d),
-    gmNotes: d.gmNotes
+    gmNotes: d.gmNotes,
+    vision: visionOfDraft(d)
   };
   return { type: "token.create", token };
 }

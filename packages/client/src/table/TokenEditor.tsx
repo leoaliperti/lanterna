@@ -111,6 +111,7 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
   const title = creating ? "Nuovo token" : readOnlyFields ? `Condizioni di ${token?.name ?? ""}` : "Modifica token";
   const currentImage = imageRemoved ? undefined : assetUrl(draft.imageUrl);
   const err = (e: string | null) => (submitted ? e : null);
+  const unit = scene?.scale.unit ?? "unita'";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title={title}>
@@ -157,6 +158,23 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
               <p className="t-caption1 a-muted">Il proprietario sposta il token e ne vede la barra della vita.</p>
             </div>
             <Toggle label="Nascosto ai giocatori" checked={draft.hidden} onCheckedChange={(v) => set("hidden", v)} />
+            <Toggle label="Vista e luce (aiuto visivo)" checked={draft.hasVision} onCheckedChange={(v) => set("hasVision", v)} />
+            {draft.hasVision ? (
+              <>
+                <div className="a-form__pair">
+                  <NumberField label={`Raggio di vista (${unit})`} value={draft.visionRange} onValueChange={(v) => set("visionRange", v)} min={0} helper="Vuoto = illimitato." />
+                  <NumberField label={`Scurovisione (${unit})`} value={draft.darkvision} onValueChange={(v) => set("darkvision", v)} min={0} />
+                  <NumberField label={`Luce intensa (${unit})`} value={draft.lightBright} onValueChange={(v) => set("lightBright", v)} min={0} />
+                  <NumberField label={`Luce fioca oltre (${unit})`} value={draft.lightDim} onValueChange={(v) => set("lightDim", v)} min={0} />
+                </div>
+                {err(errors.vision) ? (
+                  <p className="t-footnote a-picker__error" role="alert">
+                    {errors.vision}
+                  </p>
+                ) : null}
+                <p className="t-caption1 a-muted">Mostra cosa vede il token (muri compresi) come contorno tratteggiato. Serve solo da aiuto: non scopre mai la nebbia.</p>
+              </>
+            ) : null}
             <Toggle label="Barra della vita" checked={draft.hasHealth} onCheckedChange={(v) => set("hasHealth", v)} />
             {draft.hasHealth ? (
               <>

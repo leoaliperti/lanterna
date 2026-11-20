@@ -108,3 +108,35 @@
 /* Il selettore colore non deve occupare tutta la riga. */
 .a-form .l-field__box:has(input[type="color"]) { width: 5rem; }
 .a-form .l-field__input[type="color"] { padding: var(--space-1) 0; cursor: pointer; }
+
+/* Nebbia di guerra: barra degli strumenti sopra la mappa (compatta, scorre in orizzontale su schermi stretti) */
+.a-fogbar {
+  position: absolute;
+  top: max(var(--space-3), var(--safe-top));
+  left: max(var(--space-3), var(--safe-left));
+  display: grid;
+  gap: var(--space-2);
+  max-width: calc(100% - var(--space-6));
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+.a-fogbar__row { display: flex; align-items: center; gap: var(--space-1); overflow-x: auto; scrollbar-width: none; }
+.a-fogbar__row::-webkit-scrollbar { display: none; }
+.a-fogbar__sep { flex: none; width: 1px; height: var(--space-6); background: var(--separator); margin-inline: var(--space-1); }
+.a-fogbar__mode { flex: none; min-width: 9rem; }
+.a-fogbar__sub { display: grid; gap: var(--space-2); padding: 0 var(--space-1) var(--space-2); }
+.a-fogbar__help { margin: 0; max-width: 22rem; }
+.a-fogbar__wall { flex-wrap: wrap; overflow: visible; }
+
+/* Chip piu' piccole, per i destinatari */
+.a-chips { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: var(--space-1); }
+.a-chips__legend { padding: 0; }
+.a-chips__row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.a-chip--sm { padding: 0 var(--space-3); }
+
+@media (max-width: 40rem) {
+  .a-fogbar { right: max(var(--space-3), var(--safe-right)); max-width: none; }
+  .a-fogbar__mode { min-width: 7.5rem; }
+  .a-fogbar__help { max-width: none; }
+}
