@@ -300,6 +300,24 @@ export const characterSheet = sqliteTable(
   ],
 );
 
+/**
+ * Libreria di token e oggetti riutilizzabili (M10). `campaignId` null = libreria globale (tutte le
+ * campagne). `data` = `LibraryContent` (dimensione, immagine, statistiche, tag) in JSON, validato con
+ * `LibraryContentSchema` a ogni lettura. `kind` e `name` sono colonne per ricerca e filtri in SQL.
+ */
+export const libraryItem = sqliteTable(
+  "library_item",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id").references(() => campaign.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    kind: text("kind").$type<"pc" | "monster" | "object">().notNull(),
+    data: text("data").notNull(),
+    ...timestamps,
+  },
+  (t) => [index("library_item_campaign_idx").on(t.campaignId, t.name)],
+);
+
 export const schema = {
   user,
   session,
@@ -318,4 +336,5 @@ export const schema = {
   chatEntry,
   content,
   characterSheet,
+  libraryItem,
 };

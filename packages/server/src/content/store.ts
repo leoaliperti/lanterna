@@ -24,7 +24,7 @@ export interface ImportResult {
 
 export class UnknownCampaignError extends Error {}
 
-function keyOf(kind: string, name: string, source: string, campaignId: string | null): string {
+export function keyOf(kind: string, name: string, source: string, campaignId: string | null): string {
   return createHash("sha256")
     .update([kind, name.toLowerCase(), source, campaignId ?? ""].join("\u0000"))
     .digest("hex");

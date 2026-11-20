@@ -58,7 +58,7 @@ export function checkData(value: unknown, path = "data", depth = 0): string | nu
   return null;
 }
 
-function findForbiddenKey(value: unknown, depth = 0): string | null {
+export function findForbiddenKey(value: unknown, depth = 0): string | null {
   if (depth > LIMITS.maxDepth + 4 || !value || typeof value !== "object") return null;
   for (const [k, v] of Object.entries(value)) {
     if (FORBIDDEN_KEYS.has(k)) return `chiave non ammessa "${k}"`;
