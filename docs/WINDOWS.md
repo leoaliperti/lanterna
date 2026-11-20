@@ -67,4 +67,4 @@ Per uno schermo condiviso coi giocatori il GM apre "Vista di <giocatore>" (sola 
 - Più finestre aprono più connessioni (massimo 16 per utente, `MAX_CONNECTIONS_PER_USER`).
 - Le viste aprono la stessa campagna della finestra di partenza (`?campaign=<id>` nell'hash, come il tavolo dal M10); senza parametro, la prima campagna dell'utente.
 - Un giocatore che forza `#/view/player/<altro>` torna al tavolo; se forzasse la connessione a mano riceverebbe 403 (il browser lo vede come una caduta e riprova con backoff).
-- Il tracker del combattimento in finestra mostra il combattimento della scena attiva (o il primo) e permette solo avanti/indietro: la gestione completa dell'iniziativa resta da fare (UI del M7).
+- La finestra `#/view/combat` è un tracker grande e leggibile (adatto al proiettore) del combattimento della scena attiva (o il primo), con solo avanti/indietro per il GM; la gestione completa dell'iniziativa resta nel pannello "Iniziativa" del tavolo (UI del M7), che ha anche il pulsante "Apri in nuova finestra".
