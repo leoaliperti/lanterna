@@ -322,3 +322,62 @@ describe("gestione utenti", () => {
     expect(await screen.findByText("Marta (tu)")).toBeTruthy();
   });
 });
+
+describe("scelta della campagna", () => {
+  it("admin senza campagne: flusso guidato per crearne una, poi apre il tavolo", async () => {
+    const u = userEvent.setup();
+    // Il WebSocket vero non serve: dopo la creazione il tavolo si apre in attesa di connessione.
+    vi.stubGlobal(
+      "WebSocket",
+      class {
+        readyState = 0;
+        send() {}
+        close() {}
+        onopen = null;
+        onclose = null;
+        onmessage = null;
+        onerror = null;
+      }
+    );
+    mockFetch({
+      "GET /auth/get-session": session(admin),
+      "GET /campaigns/mine": () => ({ body: { campaigns: [] } }),
+      "POST /campaigns": () => ({ status: 201, body: { id: "c1", name: "Il Drago di Brina", createdAt: "2026-01-01T00:00:00.000Z" } })
+    });
+    renderApp();
+    expect(await screen.findByText("Crea la tua prima campagna")).toBeTruthy();
+    await u.click(screen.getByRole("button", { name: "Crea campagna" }));
+    expect(await screen.findByText("Dai un nome alla campagna.")).toBeTruthy();
+    expect(calls.some((c) => c.method === "POST" && c.path === "/campaigns")).toBe(false);
+    await u.type(screen.getByLabelText("Nome della campagna"), "Il Drago di Brina");
+    await u.click(screen.getByRole("button", { name: "Crea campagna" }));
+    await waitFor(() => expect(calls.find((c) => c.path === "/campaigns" && c.method === "POST")?.body).toEqual({ name: "Il Drago di Brina" }));
+    await waitFor(() => expect(screen.queryByText("Crea la tua prima campagna")).toBeNull());
+    expect(await screen.findByRole("main", { name: "Mappa" })).toBeTruthy();
+  });
+
+  it("giocatore senza campagne: nessun flusso di creazione", async () => {
+    mockFetch({
+      "GET /auth/get-session": session(player),
+      "GET /campaigns/mine": () => ({ body: { campaigns: [] } })
+    });
+    renderApp();
+    expect(await screen.findByText("Nessuna campagna")).toBeTruthy();
+    expect(screen.queryByText("Crea la tua prima campagna")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Crea campagna" })).toBeNull();
+  });
+
+  it("errore nel caricamento delle campagne: messaggio e Riprova", async () => {
+    const u = userEvent.setup();
+    let fail = true;
+    mockFetch({
+      "GET /auth/get-session": session(player),
+      "GET /campaigns/mine": () => (fail ? { status: 500, body: { error: "boom" } } : { body: { campaigns: [] } })
+    });
+    renderApp();
+    expect(await screen.findByText("Non riesco a caricare le campagne")).toBeTruthy();
+    fail = false;
+    await u.click(screen.getByRole("button", { name: "Riprova" }));
+    expect(await screen.findByText("Nessuna campagna")).toBeTruthy();
+  });
+});

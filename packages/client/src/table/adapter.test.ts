@@ -1,52 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_GRID, DEFAULT_SCALE, viewFor, type Actor, type CampaignState, type Token } from "@lanterna/shared";
+import { viewFor, type Actor } from "@lanterna/shared";
 import { BLANK_BACKGROUND_URL, movableIds, sceneToShow, toMapScene, tokenColor } from "./adapter";
 import { permissionsFor } from "./permissions";
-
-const gm: Actor = { userId: "gm", role: "admin" };
-const luca: Actor = { userId: "luca", role: "player" };
-const sara: Actor = { userId: "sara", role: "player" };
-
-function token(over: Partial<Token> & { id: string }): Token {
-  return {
-    sceneId: "s1",
-    name: over.id,
-    imageUrl: null,
-    x: 140,
-    y: 210,
-    size: 1,
-    rotation: 0,
-    ownerUserId: null,
-    kind: "monster",
-    hidden: false,
-    conditions: [],
-    health: null,
-    gmNotes: "",
-    ...over
-  };
-}
-
-const state: CampaignState = {
-  campaignId: "c1",
-  name: "Campagna",
-  version: 7,
-  activeSceneId: "s1",
-  members: [
-    { userId: "gm", displayName: "Marta", role: "admin" },
-    { userId: "luca", displayName: "Luca", role: "player" },
-    { userId: "sara", displayName: "Sara", role: "player" }
-  ],
-  scenes: [
-    { id: "s1", name: "Cripta", map: { assetId: "a1", url: "/assets/aaaa.png" }, width: 1400, height: 1050, grid: { ...DEFAULT_GRID }, scale: { ...DEFAULT_SCALE } },
-    { id: "s2", name: "Bosco", map: null, width: 800, height: 600, grid: { ...DEFAULT_GRID }, scale: { ...DEFAULT_SCALE } }
-  ],
-  tokens: [
-    token({ id: "pg-luca", kind: "pc", ownerUserId: "luca", health: { current: 12, max: 20, temp: 3 }, imageUrl: "/assets/bbbb.webp", conditions: [{ id: "prone", name: "Prono" }] }),
-    token({ id: "pg-sara", kind: "pc", ownerUserId: "sara", health: { current: 8, max: 8, temp: 0 } }),
-    token({ id: "drago", kind: "monster", hidden: true, health: { current: 200, max: 200, temp: 0 }, gmNotes: "segreto del GM" }),
-    token({ id: "altra-scena", sceneId: "s2" })
-  ]
-};
+import { gm, luca, sara, state } from "./testState";
 
 const sceneFor = (actor: Actor, viewed: string | null = null) => {
   const view = viewFor(state, actor);

@@ -1,0 +1,104 @@
+/* Tavolo reale. Solo token del design system (docs/DESIGN.md): niente colori, px o durate a mano. */
+
+/* Mappa a tutta area (al posto dello stato vuoto centrato) */
+.a-map:has(> .a-map__live) { display: block; padding: 0; background-image: none; }
+.a-map__live { position: absolute; inset: 0; }
+.a-map__live .lanterna-map { border-radius: 0; }
+
+.a-map__hint {
+  position: absolute;
+  top: var(--space-3);
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: calc(100% - var(--space-6));
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+.a-map__hint p { margin: 0; }
+
+/* Barra delle azioni sul token selezionato */
+.a-selbar {
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+  bottom: max(var(--space-3), var(--safe-bottom));
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: calc(100% - var(--space-6));
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+.a-selbar__name { max-width: 10rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+/* Sul telefono i controlli di zoom stanno a destra e la scala a sinistra: la barra sale sopra */
+@media (max-width: 40rem) {
+  .a-selbar { bottom: calc(max(var(--space-3), var(--safe-bottom)) + var(--hit-min) + var(--space-3)); }
+}
+
+/* Stato della connessione */
+.a-conn { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-2); color: var(--label-secondary); }
+.a-conn--connected { color: var(--green); }
+.a-conn--reconnecting, .a-conn--connecting, .a-conn--offline { color: var(--orange); }
+.a-conn--failed { color: var(--red); }
+/* Quando e' tutto a posto il testo non serve: resta nel titolo/screen reader */
+.a-conn--connected .a-conn__text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 40rem) {
+  .a-conn__text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+.a-conn-banner { margin: var(--space-2) max(var(--space-3), var(--safe-left)) 0 max(var(--space-3), var(--safe-left)); display: flex; align-items: center; gap: var(--space-2); }
+.a-conn-banner > .l-banner { flex: 1; }
+.a-conn-banner.l-banner { display: flex; }
+
+/* Pannelli laterali */
+.a-panel { display: grid; gap: var(--space-3); padding-top: var(--space-3); align-content: start; }
+.a-panel__bar { display: flex; gap: var(--space-2); }
+.a-panel__section { display: grid; gap: var(--space-2); }
+.a-panel__buttons { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.a-panel__none { padding: var(--space-4) var(--space-2); text-align: center; }
+.a-row-meta { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--label-secondary); }
+.a-row-meta__icon { display: inline-flex; }
+
+/* Moduli nelle sheet */
+.a-form__section { margin: var(--space-2) 0 0; }
+.a-form__pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.a-form__triple { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+.a-form__actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); flex-wrap: wrap; }
+.a-form__spacer { flex: 1; }
+.a-stepper-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+
+/* Immagine con anteprima */
+.a-picker { display: grid; gap: var(--space-2); }
+.a-picker__label, .a-picker p { margin: 0; }
+.a-picker__row { display: flex; align-items: center; gap: var(--space-3); }
+.a-picker__preview {
+  display: grid; place-items: center; flex: none;
+  width: 5rem; height: 5rem; overflow: hidden;
+  border-radius: var(--radius-md); background: var(--fill-tertiary); color: var(--label-secondary);
+}
+.a-picker__preview img { width: 100%; height: 100%; object-fit: cover; }
+.a-picker__actions { display: grid; gap: var(--space-1); justify-items: start; min-width: 0; }
+.a-picker__error { color: var(--red); margin: 0; }
+
+/* Condizioni */
+.a-conditions { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: var(--space-2); }
+.a-conditions legend { padding: 0; margin-bottom: var(--space-2); }
+.a-conditions__grid { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.a-chip {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: var(--hit-min); padding: 0 var(--space-3);
+  border: 0; border-radius: var(--radius-full);
+  background: var(--fill-tertiary); color: var(--label);
+  font-size: var(--text-subhead);
+  transition: background-color var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out);
+}
+.a-chip[aria-pressed="true"] { background: var(--tint-solid); color: var(--on-tint); }
+.a-chip:active { transform: scale(var(--press-scale)); }
+.a-chip:disabled { opacity: 0.5; }
+
+/* Creazione della prima campagna */
+.a-onboard { display: grid; gap: var(--space-4); width: min(100%, 24rem); margin: 0 auto; }

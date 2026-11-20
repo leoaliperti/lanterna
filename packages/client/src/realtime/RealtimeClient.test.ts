@@ -1,41 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PROTOCOL_VERSION, type CampaignView, type Command } from "@lanterna/shared";
-import { RealtimeClient, backoffDelay, type SocketLike } from "./RealtimeClient";
+import { RealtimeClient, backoffDelay } from "./RealtimeClient";
+import { FakeSocket } from "./fakeSocket";
 import { assetUrl, wsUrl } from "./urls";
-
-/** Server finto: tiene i socket aperti dal client e permette di rispondere a mano. */
-class FakeSocket implements SocketLike {
-  readyState = 0;
-  sent: Array<Record<string, unknown>> = [];
-  onopen: SocketLike["onopen"] = null;
-  onmessage: SocketLike["onmessage"] = null;
-  onclose: SocketLike["onclose"] = null;
-  onerror: SocketLike["onerror"] = null;
-  closedWith: number | null = null;
-  constructor(readonly url: string) {}
-  send(data: string) {
-    this.sent.push(JSON.parse(data) as Record<string, unknown>);
-  }
-  close(code?: number) {
-    this.closedWith = code ?? 1000;
-    this.readyState = 3;
-  }
-  /* lato "server" */
-  open() {
-    this.readyState = 1;
-    this.onopen?.({});
-  }
-  push(msg: unknown) {
-    this.onmessage?.({ data: JSON.stringify(msg) });
-  }
-  drop(code = 1006) {
-    this.readyState = 3;
-    this.onclose?.({ code });
-  }
-  last(type: string) {
-    return [...this.sent].reverse().find((m) => m.type === type);
-  }
-}
 
 const view = (version: number, extra: Partial<CampaignView> = {}): CampaignView => ({
   campaignId: "c1",
