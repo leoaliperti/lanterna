@@ -113,7 +113,7 @@ function LiveTable({ user, view, actions }: LiveProps) {
   const sightFocusId = perms.isGm && selected.length === 1 && view.tokens.some((t) => t.id === selected[0] && t.vision) ? selected[0]! : null;
   const sight = useSight(view, scene, controls.sight || sightFocusId !== null, controls.sight ? null : sightFocusId);
   const mapScene = useMemo(
-    () => (scene ? toMapScene(view, scene, { fog: mapFog, walls: mapWalls, wallsVisible: perms.isGm ? controls.walls || wallTool : true, sight }) : null),
+    () => (scene ? toMapScene(view, scene, { fog: mapFog, walls: mapWalls, wallsVisible: perms.isGm ? controls.walls || wallTool : false, sight }) : null),
     [view, scene, mapFog, mapWalls, controls.walls, wallTool, perms.isGm, sight]
   );
   const hasVisionToken = useMemo(() => (scene ? view.tokens.some((t) => t.sceneId === scene.id && t.vision) : false), [view.tokens, scene]);

@@ -355,7 +355,8 @@ export class FogLayer {
         const y1 = s[i + 1]!;
         const x2 = s[i + 2]!;
         const y2 = s[i + 3]!;
-        g.moveTo(x1, y1).lineTo(x2, y2).stroke({ width: w1 + 3 / scale, color: theme.scrim, alpha: 0.55 });
+        // Contorno colorato (tinta del tema): il GM riconosce i muri a colpo d'occhio anche su mappe scure o chiare.
+        g.moveTo(x1, y1).lineTo(x2, y2).stroke({ width: w1 + 4 / scale, color: theme.tint, alpha: 0.85 });
         if (w.door && w.open) {
           const segs = dashedSegments([x1, y1, x2, y2], 7 / scale, 5 / scale, false);
           for (let k = 0; k + 3 < segs.length; k += 4) g.moveTo(segs[k]!, segs[k + 1]!).lineTo(segs[k + 2]!, segs[k + 3]!);
