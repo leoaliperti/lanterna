@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Library, Plus, Trash2 } from "lucide-react";
+import { EllipsisVertical, Library, Plus, Trash2 } from "lucide-react";
 import type { CampaignView, LibraryItem, SceneView, TokenView } from "@lanterna/shared";
-import { Alert, Avatar, Badge, Banner, Button, IconButton, List, ListRow, SearchField, SegmentedControl, Sheet, Spinner, useToast } from "../ui";
+import { Alert, Avatar, Badge, Banner, Button, IconButton, List, ListRow, Menu, SearchField, SegmentedControl, Sheet, Spinner, useToast } from "../ui";
 import { userErrorMessage } from "../api/client";
 import { assetUrl } from "../realtime/urls";
 import { useCommands } from "../realtime/RealtimeProvider";
@@ -170,16 +170,24 @@ export function LibraryPanel({ view, scene, tokens, onAdded }: LibraryPanelProps
               trailing={
                 <span className="a-row-meta">
                   {item.scope === "global" ? <Badge tone="gray">Globale</Badge> : null}
-                  {perms.isGm && hasStats(item) ? (
+                  {perms.isGm && hasStats(item) && item.kind === "monster" && item.contentId ? (
+                    // Con una scheda collegata le azioni vanno nel menu "..." (la riga resta nello spazio disponibile).
+                    <Menu
+                      label={`Azioni per ${item.name}`}
+                      placement="bottom-end"
+                      trigger={<IconButton label={`Azioni per ${item.name}`} icon={<EllipsisVertical size={18} />} />}
+                      items={[
+                        { id: "add", label: "Aggiungi alla scena", icon: <Plus size={16} />, disabled: !scene, onSelect: () => void add(item) },
+                        { id: "relink", label: "Cambia scheda", onSelect: () => setLinking(item) },
+                        { id: "unlink", label: "Scollega scheda", onSelect: () => void link(item, null) },
+                        { id: "delete", label: "Elimina dalla libreria", icon: <Trash2 size={16} />, destructive: true, onSelect: () => setConfirmDelete(item) },
+                      ]}
+                    />
+                  ) : perms.isGm && hasStats(item) ? (
                     <>
                       {item.kind === "monster" ? (
                         <Button size="sm" variant="gray" onClick={() => setLinking(item)} aria-label={`Collega la scheda a ${item.name}`}>
-                          {item.contentId ? "Cambia scheda" : "Collega scheda"}
-                        </Button>
-                      ) : null}
-                      {item.kind === "monster" && item.contentId ? (
-                        <Button size="sm" variant="plain" onClick={() => void link(item, null)} aria-label={`Scollega la scheda da ${item.name}`}>
-                          Scollega
+                          Collega scheda
                         </Button>
                       ) : null}
                       <IconButton label={`Elimina ${item.name} dalla libreria`} icon={<Trash2 size={16} />} onClick={() => setConfirmDelete(item)} />

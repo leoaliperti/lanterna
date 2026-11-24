@@ -122,22 +122,20 @@ describe("schede: client contro server reale", () => {
     // Il GM osserva l'elenco (baseline), poi il giocatore si fa male sulla propria scheda.
     const listFor = async () => ((await rest(t.gm.cookie, "GET", "")).json() as { sheets: SheetSummary[] }).sheets;
     const tokensOf = () => gm.client.getState().view!.tokens;
-    let seen = planTokenSync(new Map(), await listFor(), tokensOf()).next;
 
     const own = (await rest(t.p1.cookie, "GET", `/${rec.id}`)).json() as SheetRecord;
     const hurt = { ...own.doc, sheet: { ...own.doc.sheet, hp: { ...own.doc.sheet.hp, current: 3 }, conditions: ["poisoned" as const] } };
     expect((await rest(t.p1.cookie, "PUT", `/${rec.id}`, { version: own.version, doc: hurt })).status).toBe(200);
 
-    const plan = planTokenSync(seen, await listFor(), tokensOf());
-    seen = plan.next;
-    expect(plan.updates).toHaveLength(1);
-    const u = plan.updates[0]!;
+    const updates = planTokenSync(await listFor(), tokensOf());
+    expect(updates).toHaveLength(1);
+    const u = updates[0]!;
     expect((await gm.client.sendCommand({ type: "token.update", tokenId: u.tokenId, patch: u.patch })).ok).toBe(true);
 
     await until(() => p1.client.getState().view?.tokens.find((x) => x.id === "tok-eroe")?.health?.current === 3, "barra della vita del proprietario");
     const mine = p1.client.getState().view!.tokens.find((x) => x.id === "tok-eroe")!;
     expect(mine.conditions.map((c) => c.id)).toEqual(["poisoned"]);
     // Nessun altro cambiamento al giro successivo.
-    expect(planTokenSync(seen, await listFor(), tokensOf()).updates).toEqual([]);
+    expect(planTokenSync(await listFor(), tokensOf())).toEqual([]);
   }, 30_000);
 });

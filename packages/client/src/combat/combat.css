@@ -103,3 +103,32 @@
 @media (prefers-reduced-motion: reduce) {
   .c-row--dragging { transform: none; }
 }
+
+/* Modalità combattimento: barra dei turni in alto (CombatModeBar). */
+.c-mode-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.12));
+}
+
+/* Registro di gioco (GM): log/GameLogPanel.tsx. */
+.c-log__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.c-log__entry {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--separator, rgba(127, 127, 127, 0.2));
+}
+.c-log__lines {
+  margin: 2px 0 0;
+  padding-left: 16px;
+}

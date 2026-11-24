@@ -20,6 +20,7 @@ import { attachRealtime } from "./realtime/server.js";
 import { uploadRoutes } from "./media/routes.js";
 import { sheetRoutes } from "./sheets/routes.js";
 import { formRoutes } from "./forms/routes.js";
+import { gameLogRoutes } from "./gamelog/routes.js";
 import { API_CSP, pageCsp, registerClient } from "./web.js";
 import { TileService } from "./media/tiles.js";
 import { adminRoutes } from "./users/routes.js";
@@ -99,6 +100,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       await contentRoutes(api, config);
       await sheetRoutes(api, hub);
       await formRoutes(api, config);
+      await gameLogRoutes(api, app.database.db);
       await archiveRoutes(api, config, hub);
       await libraryRoutes(api, config);
     },

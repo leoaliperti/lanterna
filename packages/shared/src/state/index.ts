@@ -15,3 +15,4 @@ export * from "./invariants.js";
 export * from "./combat.js";
 export * from "./combat-ops.js";
 export * from "./shapes.js";
+export * from "./gameLog.js";

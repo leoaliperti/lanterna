@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { FastifyBaseLogger } from "fastify";
 import {
   PROTOCOL_VERSION,
+  describeChanges,
   createEventLog,
   createHistory,
   deltaFor,
@@ -46,6 +47,7 @@ import {
 } from "@lanterna/shared";
 import { buildChatEntry, buildRollEntry, type Built, type EntryError } from "../chat/entries.js";
 import { insertEntry, loadPage } from "../chat/store.js";
+import { writeGameLog } from "../gamelog/store.js";
 import type { AppConfig } from "../config.js";
 import { TokenBucket } from "./rate.js";
 import {
@@ -443,6 +445,16 @@ export class Hub {
         this.log.error({ err }, "salvataggio della campagna non riuscito");
         peer.send(errorMessage(input.requestId, "CONFLICT", "salvataggio non riuscito, riprova"));
         return;
+      }
+      // Registro di gioco (solo GM): una voce per comando. Se la scrittura fallisce il comando resta valido.
+      const lines = describeChanges(r.changes);
+      if (lines.length > 0) {
+        const actor = r.core.state.members.find((m) => m.userId === peer.actor!.userId)?.displayName ?? "Sconosciuto";
+        try {
+          await writeGameLog(this.db, r.core.state.campaignId, r.core.state.version, actor, lines);
+        } catch (err) {
+          this.log.error({ err }, "registro di gioco non salvato");
+        }
       }
     }
     room.core = r.core;

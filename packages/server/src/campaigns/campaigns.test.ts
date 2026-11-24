@@ -28,6 +28,7 @@ const adminEndpoints: Endpoint[] = [
     okStatus: 201,
   },
   { name: "rimozione membro", method: "DELETE", url: (c, u) => `/campaigns/${c}/members/${u}`, okStatus: 204 },
+  { name: "registro di gioco", method: "GET", url: (c) => `/campaigns/${c}/game-log`, okStatus: 200 },
   // L'importazione (multipart) e la libreria hanno i loro casi di ruolo in src/archive e src/library.
   { name: "esportazione campagna", method: "GET", url: (c) => `/campaigns/${c}/export`, okStatus: 200 },
 ];

@@ -578,8 +578,9 @@ export class PixiMapView {
         mask.fill(0xffffff);
         s.mask = mask;
         v.body.addChildAt(s, 1);
+        // Non impostare `mask.renderable = false`: Pixi lo gestisce da solo (la maschera non si disegna
+        // in scena). Con `false` la maschera era vuota e l'immagine non compariva.
         v.body.addChildAt(mask, 2);
-        mask.renderable = false;
         this.requestRender();
       });
     }

@@ -21,6 +21,9 @@ export function defaultTtlMs(shape: Shape): number {
       return 4000;
     case "arrow":
       return 6000;
+    case "ruler":
+      // Il righello è una misura da leggere e lasciare: sparisce in fretta.
+      return 2000;
     default:
       return 10_000;
   }

@@ -149,12 +149,9 @@ export function SheetsProvider({ campaignId, user, children, syncTokens = true }
   // ---- Scheda -> token (solo GM) ----
   const { view } = useRealtimeState();
   const { run } = useCommands();
-  const seen = useRef<Map<string, string>>(new Map());
   useEffect(() => {
     if (!isGm || !view || !syncTokens) return;
-    const { updates, next } = planTokenSync(seen.current, sheets, view.tokens);
-    seen.current = next;
-    for (const u of updates) void run({ type: "token.update", tokenId: u.tokenId, patch: u.patch });
+    for (const u of planTokenSync(sheets, view.tokens)) void run({ type: "token.update", tokenId: u.tokenId, patch: u.patch });
   }, [isGm, view, sheets, run, syncTokens]);
 
   const value = useMemo<SheetsContextValue>(

@@ -174,39 +174,31 @@ export interface TokenSyncUpdate {
 
 const ENGINE_CONDITIONS = new Set<string>(CONDITIONS);
 
-function signatureOf(s: SheetSummary): string {
-  return JSON.stringify([s.hp, s.conditions]);
-}
-
 /**
- * Regola: la scheda è la fonte di verità per PF e condizioni. Quando i PF o le condizioni di una scheda
- * collegata a un token CAMBIANO (rispetto all'ultima volta che il GM li ha visti), il client del GM li copia sul token.
- * La prima osservazione fissa solo il riferimento: non sovrascrive la barra del token. Se il token non ha ancora
- * una barra della vita, la riceve subito. Le condizioni del token che non sono del motore 5e restano.
+ * Regola: la scheda è la fonte di verità per PF e condizioni. La barra e le condizioni del token collegato si
+ * riallineano alla scheda (il GM copia i valori dal client). Le condizioni del token che non sono del motore 5e restano.
  */
-export function planTokenSync(
-  previous: ReadonlyMap<string, string>,
-  sheets: readonly SheetSummary[],
-  tokens: readonly TokenView[]
-): { updates: TokenSyncUpdate[]; next: Map<string, string> } {
-  const next = new Map<string, string>();
+/**
+ * Barra e condizioni dei token collegati a una scheda: la scheda è la fonte, quindi la vita del token si
+ * riallinea sempre alla scheda (anche se il GM l'ha cambiata a mano sul token). Scrive solo ciò che è diverso.
+ */
+export function planTokenSync(sheets: readonly SheetSummary[], tokens: readonly TokenView[]): TokenSyncUpdate[] {
   const updates: TokenSyncUpdate[] = [];
   for (const s of sheets) {
-    const sig = signatureOf(s);
-    next.set(s.id, sig);
     if (!s.tokenId) continue;
     const token = tokens.find((t) => t.id === s.tokenId);
     if (!token) continue;
-    const seen = previous.get(s.id);
-    const changed = seen !== undefined && seen !== sig;
-    if (!changed && token.health) continue;
     const cap = LIMITS.hpMax;
     const max = Math.min(cap, s.hp.max);
     const health = { current: Math.min(max, s.hp.current), max, temp: Math.min(cap, s.hp.temp) };
     const keep = token.conditions.filter((c) => !ENGINE_CONDITIONS.has(c.id));
     const fromSheet = s.conditions.map((id) => ({ id, name: CONDITION_LABELS[id as keyof typeof CONDITION_LABELS] ?? id }));
     const conditions = [...keep, ...fromSheet].slice(0, LIMITS.maxConditions);
+    const sameHealth =
+      token.health !== null && token.health.current === health.current && token.health.max === health.max && token.health.temp === health.temp;
+    const sameConditions = token.conditions.length === conditions.length && token.conditions.every((c, i) => c.id === conditions[i]?.id && c.name === conditions[i]?.name);
+    if (sameHealth && sameConditions) continue;
     updates.push({ tokenId: token.id, patch: { health, conditions } });
   }
-  return { updates, next };
+  return updates;
 }

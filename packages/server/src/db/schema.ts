@@ -220,6 +220,26 @@ export const tokenGroup = sqliteTable(
 );
 
 /** Registro dei cambiamenti per versione (riconnessione con delta anche dopo un riavvio). */
+/**
+ * Registro di gioco (solo GM): una riga per comando applicato, con le frasi che lo descrivono.
+ * Si conservano solo le ultime voci di ogni campagna (vedi `gamelog/store.ts`).
+ */
+export const gameLog = sqliteTable(
+  "game_log",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references(() => campaign.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    at: text("at").notNull(),
+    actor: text("actor").notNull(),
+    /** Frasi in JSON (`string[]`). */
+    lines: text("lines").notNull(),
+  },
+  (t) => [index("game_log_campaign_idx").on(t.campaignId, t.version)],
+);
+
 export const campaignEvent = sqliteTable(
   "campaign_event",
   {
@@ -368,6 +388,7 @@ export const schema = {
   combat,
   tokenGroup,
   campaignEvent,
+  gameLog,
   asset,
   chatEntry,
   content,

@@ -86,33 +86,33 @@ describe("sincronizzazione scheda -> token", () => {
   const token = (over: Partial<TokenView> = {}) =>
     ({ id: "t1", conditions: [{ id: "custom", name: "Benedetto" }], health: { current: 8, max: 8, temp: 0 }, ...over }) as TokenView;
 
-  it("la prima osservazione non sovrascrive la barra del token", () => {
-    const r = planTokenSync(new Map(), [sheet({ hp: { current: 2, max: 8, temp: 0 } })], [token()]);
-    expect(r.updates).toEqual([]);
+  it("la barra del token viene riallineata alla scheda, anche alla prima osservazione", () => {
+    const r = planTokenSync([sheet({ hp: { current: 2, max: 8, temp: 0 } })], [token()]);
+    expect(r).toHaveLength(1);
+    expect(r[0]!.patch.health).toEqual({ current: 2, max: 8, temp: 0 });
   });
 
   it("un cambio di PF o condizioni copia PF e condizioni 5e e conserva quelle personalizzate", () => {
-    const first = planTokenSync(new Map(), [sheet()], [token()]);
-    const r = planTokenSync(first.next, [sheet({ hp: { current: 3, max: 8, temp: 2 }, conditions: ["poisoned"] })], [token()]);
-    expect(r.updates).toEqual([
-      {
-        tokenId: "t1",
-        patch: {
-          health: { current: 3, max: 8, temp: 2 },
-          conditions: [
-            { id: "custom", name: "Benedetto" },
-            { id: "poisoned", name: "Avvelenato" }
-          ]
-        }
-      }
-    ]);
-    // Nessuna ripetizione finché la scheda non cambia di nuovo (il GM può ritoccare la barra).
-    expect(planTokenSync(r.next, [sheet({ hp: { current: 3, max: 8, temp: 2 }, conditions: ["poisoned"] })], [token({ health: { current: 7, max: 8, temp: 0 } })]).updates).toEqual([]);
+    const r = planTokenSync([sheet({ hp: { current: 3, max: 8, temp: 2 }, conditions: ["poisoned"] })], [token()]);
+    expect(r).toHaveLength(1);
+    expect(r[0]!.patch.health).toEqual({ current: 3, max: 8, temp: 2 });
+    // La condizione personalizzata del token resta; quella 5e arriva dalla scheda.
+    expect(r[0]!.patch.conditions!.map((c) => c.id)).toEqual(["custom", "poisoned"]);
+  });
+
+  it("se la barra del token è stata cambiata a mano la scheda la riporta al suo valore", () => {
+    const r = planTokenSync([sheet({ hp: { current: 3, max: 8, temp: 0 } })], [token({ health: { current: 7, max: 8, temp: 0 } })]);
+    expect(r).toHaveLength(1);
+    expect(r[0]!.patch.health).toEqual({ current: 3, max: 8, temp: 0 });
+  });
+
+  it("se token e scheda coincidono non si scrive nulla", () => {
+    expect(planTokenSync([sheet({ hp: { current: 8, max: 8, temp: 0 } })], [token({ health: { current: 8, max: 8, temp: 0 } })])).toEqual([]);
   });
 
   it("un token senza barra la riceve subito; senza token o senza legame non si fa nulla", () => {
-    expect(planTokenSync(new Map(), [sheet()], [token({ health: null })]).updates).toHaveLength(1);
-    expect(planTokenSync(new Map(), [sheet({ tokenId: null })], [token({ health: null })]).updates).toEqual([]);
-    expect(planTokenSync(new Map(), [sheet({ tokenId: "assente" })], [token({ health: null })]).updates).toEqual([]);
+    expect(planTokenSync([sheet()], [token({ health: null })])).toHaveLength(1);
+    expect(planTokenSync([sheet({ tokenId: null })], [token({ health: null })])).toEqual([]);
+    expect(planTokenSync([sheet({ tokenId: "assente" })], [token({ health: null })])).toEqual([]);
   });
 });

@@ -9,6 +9,8 @@ import { Button, IconButton, Material, PointMenu, Spinner, useToast, type MenuIt
 import { ActionButtons } from "../combat/ActionButtons";
 import { ActionSheet, type ActionRequest } from "../combat/ActionSheet";
 import { addTokenCommand, combatOf, tokensToAdd, turnTokenId } from "../combat/combatLogic";
+import { CombatModeBar } from "../combat/CombatModeBar";
+import { GameLogPanel } from "../log/GameLogPanel";
 import { InitiativePanel } from "../combat/InitiativePanel";
 import { ACTION_LABELS, actionForKey, isTypingTarget, type ActionKind } from "../combat/selectionLogic";
 import { TargetsPanel } from "../combat/TargetsPanel";
@@ -146,6 +148,8 @@ function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
   const [editor, setEditor] = useState<{ open: boolean; tokenId: string | null }>({ open: false, tokenId: null });
   const [sceneForm, setSceneForm] = useState<"create" | "edit" | null>(null);
   const [action, setAction] = useState<ActionRequest | null>(null);
+  // Modalità combattimento: barra dei turni sempre visibile in alto (solo in questa finestra).
+  const [combatMode, setCombatMode] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number; tokenId: string } | null>(null);
   const mapRef = useRef<MapCanvasHandle>(null);
   const chatStore = useChatStore();
@@ -335,6 +339,16 @@ function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
       icon: <Swords size={16} />,
       content: <InitiativePanel view={view} scene={scene} selected={selected} />
     },
+    ...(perms.isGm
+      ? [
+          {
+            id: "log",
+            label: "Registro",
+            icon: <ScrollText size={16} />,
+            content: <GameLogPanel campaignId={view.campaignId} />
+          }
+        ]
+      : []),
     ...(perms.isGm && scene
       ? [
           {
@@ -562,6 +576,10 @@ function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
         <>
           {perms.isGm ? <span className="a-role-pill t-caption1"><ShieldCheck size={14} aria-hidden="true" /> GM</span> : null}
           <GameClock clock={view.clock} isGm={perms.isGm} onChange={onClockChange} />
+          <Button size="sm" variant={combatMode ? "tinted" : "gray"} icon={<Swords size={16} />} aria-pressed={combatMode} onClick={() => setCombatMode((m) => !m)}>
+            Combattimento
+          </Button>
+          {combatMode && scene ? <CombatModeBar view={view} sceneId={scene.id} isGm={perms.isGm} /> : null}
         </>
       }
       banner={<ConnectionBanner />}

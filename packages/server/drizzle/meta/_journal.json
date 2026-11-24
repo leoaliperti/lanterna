@@ -78,6 +78,13 @@
       "when": 1795510032738,
       "tag": "0010_form_template",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1795516762238,
+      "tag": "0011_game_log",
+      "breakpoints": true
     }
   ]
 }

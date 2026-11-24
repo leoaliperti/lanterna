@@ -347,7 +347,7 @@ describe("forme effimere (righello, cono, frecce, ping)", () => {
     expect(shown(s.gm)).toHaveLength(1);
     expect(shown(s.p2)).toHaveLength(1);
     expect(shown(s.p1)).toHaveLength(0);
-    expect(shown(s.p2)[0]).toMatchObject({ id: "m1", authorId: s.t.p1.id, sceneId: MAIN, ttlMs: 10_000, shape: { kind: "ruler" } });
+    expect(shown(s.p2)[0]).toMatchObject({ id: "m1", authorId: s.t.p1.id, sceneId: MAIN, ttlMs: 2_000, shape: { kind: "ruler" } });
     // privata: ack ma nessun evento a nessuno
     expect((await request(s.p1, ruler({ id: "m2", audience: "private" }))).type).toBe("ack");
     await settle();
