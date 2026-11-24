@@ -3,6 +3,7 @@ import { CombatSchema, GroupSchema, type Combat, type TokenGroup } from "./comba
 import { FogSchema, type Fog } from "./fog.js";
 import { IdSchema } from "./limits.js";
 import { SceneSchema, TokenSchema, type Scene, type Token } from "./schema.js";
+import { PropSchema, type Prop } from "./props.js";
 import { WallSchema, type Wall } from "./walls.js";
 
 /**
@@ -88,7 +89,9 @@ export type StateChange =
       /** Nebbia e muri della scena diventata attiva (M6). */
       fog?: Fog | null;
       walls?: Wall[];
+      props?: Prop[];
     }
+  | { type: "prop"; before: Prop | null; after: Prop | null; activeSceneId: string | null; fog: Fog | null }
   | { type: "wall"; before: Wall | null; after: Wall | null; activeSceneId: string | null; fog: Fog | null }
   | {
       type: "fog";
@@ -100,6 +103,7 @@ export type StateChange =
       scene: Scene | null;
       tokens: Token[];
       walls: Wall[];
+      props?: Prop[];
     };
 
 /**
@@ -149,6 +153,14 @@ export const StateChangeSchema = z.discriminatedUnion("type", [
     tokens: z.array(TokenSchema),
     fog: FogSchema.nullable().optional(),
     walls: z.array(WallSchema).optional(),
+    props: z.array(PropSchema).optional(),
+  }),
+  z.strictObject({
+    type: z.literal("prop"),
+    before: PropSchema.nullable(),
+    after: PropSchema.nullable(),
+    activeSceneId: IdSchema.nullable(),
+    fog: FogSchema.nullable(),
   }),
   z.strictObject({
     type: z.literal("wall"),
@@ -166,5 +178,6 @@ export const StateChangeSchema = z.discriminatedUnion("type", [
     scene: SceneSchema.nullable(),
     tokens: z.array(TokenSchema),
     walls: z.array(WallSchema),
+    props: z.array(PropSchema).optional(),
   }),
 ]);

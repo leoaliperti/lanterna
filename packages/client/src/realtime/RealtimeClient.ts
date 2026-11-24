@@ -5,8 +5,12 @@ import {
   type CampaignView,
   type Command,
   type EntryVisibility,
+  type EphemeralAudience,
   type ErrorCode,
-  type ServerMessage
+  type InitiativeMode,
+  type ServerEvent,
+  type ServerMessage,
+  type Shape
 } from "@lanterna/shared";
 
 /**
@@ -20,7 +24,7 @@ import {
 export type ConnectionStatus = "connecting" | "connected" | "reconnecting" | "offline" | "failed";
 
 /** Perche' la connessione e' stata abbandonata (nessun nuovo tentativo automatico). */
-export type FailureReason = "session" | "not-member" | "protocol";
+export type FailureReason = "session" | "not-member" | "protocol" | "forbidden";
 
 export interface RealtimeState {
   status: ConnectionStatus;
@@ -50,7 +54,32 @@ export interface RollOptions {
   label?: string;
 }
 
+/** Avviso di combattimento (turno, effetto in scadenza o scaduto): arriva solo ai diretti interessati. */
+export type CombatAlert = Extract<ServerEvent, { type: "combat.turn" | "effect.expiring" | "effect.expired" }>;
+
+export function isCombatAlert(e: ServerEvent): e is CombatAlert {
+  return e.type === "combat.turn" || e.type === "effect.expiring" || e.type === "effect.expired";
+}
+
+/** Forma effimera da mostrare (misura, freccia, ping). `private` non esce dal client. */
+export interface EphemeralOptions {
+  id: string;
+  sceneId: string;
+  audience: EphemeralAudience;
+  shape: Shape;
+  color?: string;
+  ttlMs?: number;
+}
+
+export interface InitiativeRollOptions {
+  sceneId: string;
+  rolls: Array<{ participantId: string; bonus: number; mode?: InitiativeMode }>;
+  sort?: boolean;
+}
+
 export type RealtimeEvent =
+  /** Avviso del combattimento contenuto in un delta (il client decide come mostrarlo). */
+  | { type: "alert"; alert: CombatAlert }
   /** Errore non legato a una richiesta (messaggio illeggibile, rate limit). */
   | { type: "error"; code: ErrorCode; message: string }
   /** Messaggi che il client non interpreta qui (chat, tiri): li ascolta chi ne ha bisogno. */
@@ -86,6 +115,11 @@ export interface RealtimeOptions {
    * (il browser non distingue un 401 dell'upgrade da un'altra caduta) e si smette di riprovare.
    */
   verifySession?: () => Promise<boolean>;
+  /**
+   * Vista come un altro membro (M9): la chiusura 4403 (vista non consentita, membro uscito) e' definitiva
+   * invece di far riconnettere. Default `false`: per le connessioni normali 4403 = permessi cambiati, si riprova.
+   */
+  stopOnForbidden?: boolean;
 }
 
 const OPEN = 1;
@@ -110,6 +144,7 @@ const CLOSE_SESSION = 4401;
 const CLOSE_NOT_MEMBER = 4404;
 const CLOSE_PROTOCOL = 4400;
 const CLOSE_PING_TIMEOUT = 4000;
+const CLOSE_FORBIDDEN = 4403;
 
 type ResolvedOptions = Required<Omit<RealtimeOptions, "verifySession">> & Pick<RealtimeOptions, "verifySession">;
 
@@ -135,6 +170,7 @@ export class RealtimeClient {
       pingIntervalMs: 25_000,
       pongTimeoutMs: 10_000,
       commandTimeoutMs: 10_000,
+      stopOnForbidden: false,
       isOnline: () => (typeof navigator === "undefined" ? true : navigator.onLine !== false),
       ...options
     };
@@ -314,6 +350,7 @@ export class RealtimeClient {
         }
         this.failures = 0;
         this.set({ view: r.view, status: "connected", attempt: 0 });
+        for (const ev of msg.events) if (isCombatAlert(ev)) this.emit({ type: "alert", alert: ev });
         return;
       }
       case "ack":
@@ -359,6 +396,7 @@ export class RealtimeClient {
     if (code === CLOSE_SESSION) return this.fail("session");
     if (code === CLOSE_NOT_MEMBER) return this.fail("not-member");
     if (code === CLOSE_PROTOCOL) return this.fail("protocol");
+    if (code === CLOSE_FORBIDDEN && this.opts.stopOnForbidden) return this.fail("forbidden");
     this.scheduleReconnect();
   }
 
@@ -467,6 +505,34 @@ export class RealtimeClient {
       ...(whisperTo ? { whisperTo } : {}),
       ...(label ? { label } : {})
     }));
+  }
+
+  /**
+   * Mostra una forma effimera. Con `audience: "private"` il server risponde solo con una conferma e non la
+   * inoltra: di norma il client non lo chiama nemmeno (le misure private restano locali).
+   */
+  showEphemeral(options: EphemeralOptions): Promise<CommandResult> {
+    const { id, sceneId, audience, shape, color, ttlMs } = options;
+    return this.request((requestId) => ({
+      type: "ephemeral.show",
+      requestId,
+      id,
+      sceneId,
+      audience,
+      shape,
+      ...(color ? { color } : {}),
+      ...(ttlMs ? { ttlMs } : {})
+    }));
+  }
+
+  clearEphemeral(id: string): Promise<CommandResult> {
+    return this.request((requestId) => ({ type: "ephemeral.clear", requestId, id }));
+  }
+
+  /** Chiede al server di tirare l'iniziativa (d20 + bonus): l'esito lo decide lui e arriva come delta. */
+  rollInitiative(options: InitiativeRollOptions): Promise<CommandResult> {
+    const { sceneId, rolls, sort } = options;
+    return this.request((requestId) => ({ type: "initiative.roll", requestId, sceneId, rolls, ...(sort ? { sort } : {}) }));
   }
 
   /** Pagina di cronologia piu' vecchia della voce `before` (id). La pagina arriva come evento `history`. */

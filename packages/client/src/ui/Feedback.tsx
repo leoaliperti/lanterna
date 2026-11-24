@@ -96,6 +96,8 @@ export interface ToastInput {
   tone?: Tone;
   /** ms; 0 = non si chiude da solo. Default 4000. */
   duration?: number;
+  /** Azione breve accanto al testo (es. "Annulla"): chiude la notifica dopo averla eseguita. */
+  action?: { label: string; onPress: () => void };
 }
 interface ToastItem extends ToastInput { id: number }
 
@@ -155,6 +157,18 @@ function ToastView({ item, onDismiss }: { item: ToastItem; onDismiss: () => void
         <p className="l-toast__title">{item.title}</p>
         {item.message ? <p className="l-toast__msg">{item.message}</p> : null}
       </div>
+      {item.action ? (
+        <button
+          type="button"
+          className="l-toast__action"
+          onClick={() => {
+            item.action?.onPress();
+            onDismiss();
+          }}
+        >
+          {item.action.label}
+        </button>
+      ) : null}
       <button type="button" className="l-toast__close" aria-label="Chiudi notifica" onClick={onDismiss}>
         <X size={16} aria-hidden="true" />
       </button>

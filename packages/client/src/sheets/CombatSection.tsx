@@ -62,7 +62,7 @@ export function CombatSection(props: SectionProps) {
           </button>
         </li>
         <li>
-          <span className="t-caption1 a-muted">Velocita'</span>
+          <span className="t-caption1 a-muted">Velocità</span>
           <strong className="t-title3">{derived.speed} ft</strong>
         </li>
       </ul>
@@ -78,7 +78,7 @@ export function CombatSection(props: SectionProps) {
         </p>
         <ProgressView value={hp.max > 0 ? hp.current / hp.max : 0} label="Punti ferita" />
         <div className="s-row">
-          <NumInput label="Quantita'" value={amount} onValueChange={setAmount} min={0} max={9999} className="s-row__grow" />
+          <NumInput label="Quantità" value={amount} onValueChange={setAmount} min={0} max={9999} className="s-row__grow" />
         </div>
         <div className="s-actions">
           <Button variant="destructive" size="sm" onClick={() => change((d) => applySheetOp(d, (s, c) => damageSheet(s, c, amount)))}>

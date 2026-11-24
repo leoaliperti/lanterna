@@ -43,13 +43,18 @@ export interface SheetsProviderProps {
   campaignId: string;
   user: SessionUser;
   children: ReactNode;
+  /**
+   * Sincronizza PF e condizioni scheda -> token (solo GM). Default `true`. Le finestre secondarie (M9) la
+   * spengono: la fa solo la finestra del tavolo, così più finestre dello stesso GM non inviano comandi doppi.
+   */
+  syncTokens?: boolean;
 }
 
 /**
  * Elenco delle schede visibili all'utente (il server filtra: il giocatore riceve solo le proprie), schede aperte
  * e, per il GM, la sincronizzazione dei PF e delle condizioni dalla scheda al token collegato (vedi `planTokenSync`).
  */
-export function SheetsProvider({ campaignId, user, children }: SheetsProviderProps) {
+export function SheetsProvider({ campaignId, user, children, syncTokens = true }: SheetsProviderProps) {
   const isGm = user.role === "admin";
   const [sheets, setSheets] = useState<SheetSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +78,7 @@ export function SheetsProvider({ campaignId, user, children }: SheetsProviderPro
       if (!mounted.current) return;
       setSheets(next);
       setError(null);
-      // Schede sparite (eliminate o non piu' visibili): si chiudono.
+      // Schede sparite (eliminate o non più visibili): si chiudono.
       const ids = new Set(next.map((s) => s.id));
       setOpenIds((o) => o.filter((id) => ids.has(id)));
       setActiveId((a) => (a && !ids.has(a) ? null : a));
@@ -146,11 +151,11 @@ export function SheetsProvider({ campaignId, user, children }: SheetsProviderPro
   const { run } = useCommands();
   const seen = useRef<Map<string, string>>(new Map());
   useEffect(() => {
-    if (!isGm || !view) return;
+    if (!isGm || !view || !syncTokens) return;
     const { updates, next } = planTokenSync(seen.current, sheets, view.tokens);
     seen.current = next;
     for (const u of updates) void run({ type: "token.update", tokenId: u.tokenId, patch: u.patch });
-  }, [isGm, view, sheets, run]);
+  }, [isGm, view, sheets, run, syncTokens]);
 
   const value = useMemo<SheetsContextValue>(
     () => ({

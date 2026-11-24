@@ -5,6 +5,8 @@ import {
 } from "./geometry";
 import { DrawTools, type WallMode } from "./drawTools";
 import type { FogBrush, FogMode } from "../fog/fogLogic";
+import { isMeasureTool, measureLabel, measureShape, type MeasureTool } from "./measure";
+import type { Shape } from "@lanterna/shared";
 import type { MapHandlers, MapScene, MapToken, Point, Rect, Size, Viewport } from "./types";
 
 /**
@@ -26,7 +28,7 @@ export interface PointerInput {
   alt?: boolean;
 }
 
-export type Tool = "select" | "ruler" | "fog" | "wall";
+export type Tool = "select" | MeasureTool | "fog" | "wall";
 
 /** Stato degli strumenti GM, per la barra fuori dal canvas. */
 export interface ToolState {
@@ -42,6 +44,12 @@ export interface RulerState {
   text: string;
 }
 
+/** Forma di misura in costruzione (cerchio, cono, linea, freccia) con il suo testo. */
+export interface ShapeDraft {
+  shape: Shape;
+  text: string;
+}
+
 export interface HandlePositions {
   tokenId: string;
   rotate: Point;
@@ -53,12 +61,15 @@ const DRAG_THRESHOLD_TOUCH = 8;
 /** Raggio minimo (px schermo) per afferrare token e maniglie: 22 = bersaglio da 44. */
 const MIN_HIT_SCREEN = 22;
 const KEY_PAN = 64;
+/** Pressione prolungata (touch) che apre il menu contestuale di un token. */
+const LONG_PRESS_MS = 500;
 
 type Gesture =
   | { kind: "pan"; id: number; x: number; y: number; moved: boolean; clearOnTap: boolean }
-  | { kind: "token"; id: number; start: Point; grabbed: string; wasSelected: boolean; additive: boolean; started: boolean; origins: Map<string, Point> }
+  | { kind: "token"; id: number; start: Point; grabbed: string; wasSelected: boolean; additive: boolean; started: boolean; longPressed?: boolean; origins: Map<string, Point> }
   | { kind: "marquee"; id: number; start: Point; additive: boolean; base: Set<string>; started: boolean }
   | { kind: "ruler"; id: number }
+  | { kind: "measure"; id: number; tool: MeasureTool; start: Point }
   | { kind: "rotate"; id: number; tokenId: string }
   | { kind: "resize"; id: number; tokenId: string }
   | { kind: "draw"; id: number; tool: "fog" | "wall" }
@@ -88,6 +99,8 @@ export class MapController {
   /** Rettangolo di selezione in coordinate schermo. */
   marquee: Rect | null = null;
   ruler: RulerState | null = null;
+  /** Cerchio, cono, linea o freccia in costruzione. */
+  shapeDraft: ShapeDraft | null = null;
 
   /** Pennelli della nebbia e muri (solo GM). */
   readonly draw = new DrawTools({
@@ -104,6 +117,7 @@ export class MapController {
   private viewportQueued = false;
   private tokensById = new Map<string, MapToken>();
   private defaultViewport: Viewport | null = null;
+  private longPress: ReturnType<typeof setTimeout> | null = null;
 
   /** Viewport iniziale opzionale (altrimenti si adatta la mappa allo schermo alla prima misura). */
   init(defaultViewport?: Viewport) {
@@ -148,6 +162,17 @@ export class MapController {
     this.invalidate();
   }
 
+  /** Selezione impostata dall'esterno (elenco dei bersagli, gruppi): solo token visibili a questo ruolo. */
+  setSelection(ids: readonly string[]) {
+    const next = new Set(ids.filter((id) => {
+      const t = this.tokensById.get(id);
+      return !!t && this.scene !== null && isTokenShown(t, this.scene.role);
+    }));
+    if (next.size === this.selection.size && [...next].every((id) => this.selection.has(id))) return;
+    this.selection = next;
+    this.emitSelection();
+  }
+
   get toolState(): ToolState {
     return { tool: this.tool, fogBrush: this.draw.fogBrush, fogMode: this.draw.fogMode, wallMode: this.draw.wallMode };
   }
@@ -178,6 +203,8 @@ export class MapController {
       this.draw.select(null);
     } else this.draw.cancel();
     if (tool !== "ruler") this.clearRuler();
+    if (!isMeasureTool(tool) || tool === "ruler") this.clearShapeDraft();
+    else if (this.shapeDraft && this.shapeDraft.shape.kind !== tool) this.clearShapeDraft();
     this.updateCursor();
     this.invalidate();
   }
@@ -275,6 +302,15 @@ export class MapController {
     if (this.pointers.size > 2 || this.gesture || !this.scene) return;
 
     const touchLike = e.type !== "mouse";
+    if (e.button === 2) {
+      const hit = this.hitToken(this.toMap(p));
+      if (hit && !this.selection.has(hit.id)) {
+        this.selection = new Set([hit.id]);
+        this.emitSelection();
+      }
+      this.handlers.onContextMenu?.(e.x, e.y, hit?.id ?? null);
+      return;
+    }
     if (e.button === 1 || (e.button === 0 && this.spaceDown)) {
       this.gesture = { kind: "pan", id: e.id, x: e.x, y: e.y, moved: false, clearOnTap: false };
     } else if (e.button === 0) {
@@ -283,9 +319,18 @@ export class MapController {
         if (this.draw.begin(this.tool, e, m)) this.gesture = { kind: "draw", id: e.id, tool: this.tool };
         else if (touchLike) this.gesture = { kind: "pan", id: e.id, x: e.x, y: e.y, moved: false, clearOnTap: false };
       } else if (this.tool === "ruler") {
+        this.clearShapeDraft();
         this.gesture = { kind: "ruler", id: e.id };
         const a = this.rulerPoint(m);
         this.setRuler(a, a);
+      } else if (isMeasureTool(this.tool)) {
+        this.clearRuler();
+        this.clearShapeDraft();
+        this.gesture = { kind: "measure", id: e.id, tool: this.tool, start: m };
+        if (this.tool === "ping") {
+          const shape = measureShape("ping", m, m, this.cell);
+          if (shape) this.handlers.onShape?.(shape, "end");
+        }
       } else {
         const handle = this.hitHandle(m);
         const hit = handle ? null : this.hitToken(m);
@@ -300,6 +345,15 @@ export class MapController {
             this.emitSelection();
           }
           this.gesture = { kind: "token", id: e.id, start: p, grabbed: hit.id, wasSelected, additive, started: false, origins: new Map() };
+          if (touchLike) {
+            this.longPress = setTimeout(() => {
+              this.longPress = null;
+              const g = this.gesture;
+              if (g?.kind !== "token" || g.started || g.id !== e.id) return;
+              g.longPressed = true;
+              this.handlers.onContextMenu?.(p.x, p.y, g.grabbed);
+            }, LONG_PRESS_MS);
+          }
         } else if (this.scene.role === "gm" && this.scene.wallsVisible !== false && this.draw.doorAt(m)) {
           // Un clic su una porta la apre o la chiude (anche con lo strumento di selezione).
           this.gesture = { kind: "doorTap", id: e.id, wallId: this.draw.doorAt(m)!.id, start: p };
@@ -364,6 +418,7 @@ export class MapController {
           if (Math.hypot(e.x - g.start.x, e.y - g.start.y) < threshold) return;
           if (!this.canMove(g.grabbed)) return; // selezionabile ma non spostabile da questo utente
           g.started = true;
+          this.cancelLongPress();
           for (const id of this.selection) {
             const t = this.tokensById.get(id);
             if (t && this.canMove(id)) g.origins.set(id, { x: t.x, y: t.y });
@@ -397,7 +452,22 @@ export class MapController {
         break;
       }
       case "ruler": {
-        if (this.ruler) this.setRuler(this.ruler.a, this.rulerPoint(this.toMap(p)));
+        if (this.ruler) {
+          this.setRuler(this.ruler.a, this.rulerPoint(this.toMap(p)));
+          if (this.ruler.a.x !== this.ruler.b.x || this.ruler.a.y !== this.ruler.b.y) {
+            this.handlers.onShape?.({ kind: "ruler", points: [this.ruler.a, this.ruler.b] }, "draft");
+          }
+        }
+        break;
+      }
+      case "measure": {
+        if (g.tool === "ping") break;
+        const shape = measureShape(g.tool, g.start, this.toMap(p), this.cell);
+        if (!shape || !this.scene) break;
+        this.shapeDraft = { shape, text: measureLabel(shape, this.cell, this.scene.scale) };
+        this.onRuler(this.shapeDraft.text);
+        this.handlers.onShape?.(shape, "draft");
+        this.invalidate();
         break;
       }
       case "rotate": {
@@ -428,6 +498,7 @@ export class MapController {
     }
     if (!g || g.id !== e.id) return;
     this.gesture = null;
+    this.cancelLongPress();
 
     switch (g.kind) {
       case "draw":
@@ -438,6 +509,7 @@ export class MapController {
         if (Math.hypot(e.x - g.start.x, e.y - g.start.y) < DRAG_THRESHOLD_TOUCH) this.draw.toggleDoor(g.wallId);
         break;
       case "token":
+        if (g.longPressed) break;
         if (g.started) {
           for (const [id, pos] of this.preview) {
             const origin = g.origins.get(id)!;
@@ -482,6 +554,12 @@ export class MapController {
         break;
       }
       case "ruler":
+        if (this.ruler && (this.ruler.a.x !== this.ruler.b.x || this.ruler.a.y !== this.ruler.b.y)) {
+          this.handlers.onShape?.({ kind: "ruler", points: [this.ruler.a, this.ruler.b] }, "end");
+        }
+        break;
+      case "measure":
+        if (this.shapeDraft && g.tool !== "ping") this.handlers.onShape?.(this.shapeDraft.shape, "end");
         break;
     }
     this.clearTransient();
@@ -506,6 +584,7 @@ export class MapController {
 
   pointerCancel(e: PointerInput) {
     this.pointers.delete(e.id);
+    this.cancelLongPress();
     if (this.gesture && (this.gesture.kind === "pinch" ? this.pointers.size < 2 : this.gesture.id === e.id)) this.cancelGesture();
   }
 
@@ -556,6 +635,21 @@ export class MapController {
       case "R":
         this.setTool(this.tool === "ruler" ? "select" : "ruler");
         return true;
+      case "o":
+      case "O":
+        return this.toggleMeasure("circle");
+      case "c":
+      case "C":
+        return this.toggleMeasure("cone");
+      case "l":
+      case "L":
+        return this.toggleMeasure("line");
+      case "f":
+      case "F":
+        return this.toggleMeasure("arrow");
+      case "p":
+      case "P":
+        return this.toggleMeasure("ping");
       case "Escape": {
         if (this.tool === "fog" || this.tool === "wall") {
           if (!this.draw.cancel()) this.setTool("select");
@@ -563,9 +657,10 @@ export class MapController {
           this.invalidate();
           return true;
         }
-        const had = this.gesture || this.ruler || this.selection.size;
+        const had = this.gesture || this.ruler || this.shapeDraft || this.selection.size;
         if (this.gesture) this.cancelGesture();
         this.clearRuler();
+        this.clearShapeDraft();
         if (this.selection.size) {
           this.selection = new Set();
           this.emitSelection();
@@ -602,8 +697,13 @@ export class MapController {
         return true;
       }
       default:
-        return false;
+        return this.handlers.onKey?.(key, shift) ?? false;
     }
+  }
+
+  private toggleMeasure(tool: MeasureTool): boolean {
+    this.setTool(this.tool === tool ? "select" : tool);
+    return true;
   }
 
   keyUp(key: string) {
@@ -642,6 +742,27 @@ export class MapController {
     this.onRuler(null);
   }
 
+  /** Toglie righello e forma in costruzione senza segnalare annullamenti (la misura e' stata consegnata altrove). */
+  clearMeasurements() {
+    this.clearRuler();
+    this.clearShapeDraft(true);
+    this.invalidate();
+  }
+
+  private cancelLongPress() {
+    if (this.longPress) clearTimeout(this.longPress);
+    this.longPress = null;
+  }
+
+  /** Toglie la forma in costruzione. `silent`: l'ha gia' consegnata il padre (forma pubblica), non e' un annullamento. */
+  clearShapeDraft(silent = false) {
+    if (!this.shapeDraft) return;
+    this.shapeDraft = null;
+    this.onRuler(null);
+    if (!silent) this.handlers.onShapeCancel?.();
+    this.invalidate();
+  }
+
   private clearTransient() {
     this.preview = new Map();
     this.previewCells = [];
@@ -650,11 +771,15 @@ export class MapController {
   }
 
   private cancelGesture() {
-    const wasRuler = this.gesture?.kind === "ruler";
+    const wasRuler = this.gesture?.kind === "ruler" || this.gesture?.kind === "measure";
+    this.cancelLongPress();
     if (this.gesture?.kind === "draw") this.draw.abortGesture();
     this.gesture = null;
     this.clearTransient();
-    if (wasRuler) this.clearRuler();
+    if (wasRuler) {
+      this.clearRuler();
+      this.clearShapeDraft();
+    }
     this.updateCursor();
     this.invalidate();
   }
@@ -674,7 +799,7 @@ export class MapController {
     if (g?.kind === "pan" || g?.kind === "pinch") c = "grabbing";
     else if (g?.kind === "token" && g.started) c = "grabbing";
     else if (this.spaceDown) c = "grab";
-    else if (this.tool === "ruler" || this.tool === "fog" || this.tool === "wall") c = "crosshair";
+    else if (this.tool !== "select") c = "crosshair";
     this.onCursor(c);
   }
 }

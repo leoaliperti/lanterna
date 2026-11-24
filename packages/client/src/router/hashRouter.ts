@@ -21,6 +21,24 @@ export function navigate(path: string, opts: { replace?: boolean } = {}): void {
   }
 }
 
+/** Parametro della query nell'hash (`#/?campaign=abc` -> `"abc"`), o `null`. */
+export function hashParam(name: string): string | null {
+  const query = window.location.hash.replace(/^#/, "").split("?")[1] ?? "";
+  return new URLSearchParams(query).get(name);
+}
+
+/** Come `hashParam`, ma si aggiorna al cambio dell'hash. */
+export function useHashParam(name: string): string | null {
+  const [value, setValue] = useState(() => hashParam(name));
+  useEffect(() => {
+    const on = () => setValue(hashParam(name));
+    window.addEventListener("hashchange", on);
+    on();
+    return () => window.removeEventListener("hashchange", on);
+  }, [name]);
+  return value;
+}
+
 /** Router a hash minimo, senza dipendenze. */
 export function usePath(): string {
   const [path, setPath] = useState(currentPath);

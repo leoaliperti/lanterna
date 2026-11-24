@@ -10,7 +10,7 @@ import { matchesQuery, newId, patchSheet } from "./sheetLogic";
 
 const ARMOR_LABEL = { light: "Leggera", medium: "Media", heavy: "Pesante" } as const;
 
-/** Inventario e carico: oggetti con quantita' e peso, armatura indossata (la CA si ricalcola), confronto con la capacita'. */
+/** Inventario e carico: oggetti con quantità e peso, armatura indossata (la CA si ricalcola), confronto con la capacità. */
 export function InventorySection({ doc, derived, change, query }: SectionProps) {
   const [mode, setMode] = useState<"none" | "library" | "manual">("none");
   const [name, setName] = useState("");
@@ -32,7 +32,7 @@ export function InventorySection({ doc, derived, change, query }: SectionProps) 
     <div className="s-stack">
       <p className="s-weight" aria-live="polite">
         <Backpack size={16} aria-hidden="true" /> Carico: <strong>{total} lb</strong> su {derived.carrying.carry} lb
-        {derived.carrying.overCapacity ? <Badge tone="orange">Oltre la capacita'</Badge> : null}
+        {derived.carrying.overCapacity ? <Badge tone="orange">Oltre la capacità</Badge> : null}
       </p>
 
       {items.length === 0 ? (
@@ -51,7 +51,7 @@ export function InventorySection({ doc, derived, change, query }: SectionProps) 
               trailing={
                 <span className="s-row">
                   {worn === i.id ? <Badge tone="green">Indossata</Badge> : null}
-                  <Stepper label={`Quantita' di ${i.name}`} value={i.quantity} min={0} max={9999} onValueChange={(n) => patchItem(i.id, { quantity: n })} />
+                  <Stepper label={`Quantità di ${i.name}`} value={i.quantity} min={0} max={9999} onValueChange={(n) => patchItem(i.id, { quantity: n })} />
                   {i.armor ? (
                     <IconButton label={worn === i.id ? `Togli ${i.name}` : `Indossa ${i.name}`} icon={<Shield size={16} />} aria-pressed={worn === i.id} onClick={() => wear(worn === i.id ? null : i.id)} />
                   ) : null}
@@ -91,9 +91,9 @@ export function InventorySection({ doc, derived, change, query }: SectionProps) 
           }}
         >
           <TextField label="Nome dell'oggetto" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} required />
-          <NumInput label="Quantita'" value={qty} onValueChange={setQty} min={0} max={9999} />
+          <NumInput label="Quantità" value={qty} onValueChange={setQty} min={0} max={9999} />
           <NumInput label="Peso di uno (lb)" value={weight} onValueChange={setWeight} min={0} max={10000} step={0.25} />
-          <Toggle label="E' un'armatura" checked={armor !== ""} onCheckedChange={(on) => setArmor(on ? "light" : "")} />
+          <Toggle label="È un'armatura" checked={armor !== ""} onCheckedChange={(on) => setArmor(on ? "light" : "")} />
           {armor ? (
             <>
               <Picker

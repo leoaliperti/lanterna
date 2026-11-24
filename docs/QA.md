@@ -41,13 +41,9 @@ Test aggiunti: `tokenDraft.test.ts` (spawn senza sovrapposizioni), `geometry.tes
 
 | Gravità | Cosa |
 |---|---|
-| Media | Le schede personaggio (`src/sheets`, altro agente) hanno ancora apostrofi ASCII nei testi ("e'", "piu'", "non si puo' annullare"). Da correggere a merge avvenuto. |
-| Bassa | Dadi 3D ancora piccoli (circa 55 px per un d20) rispetto all'area; la scala dipende dalla camera in `dice3d/scene.ts`. |
-| Bassa | Su tablet in verticale (sotto 56 rem) il pannello è uno sheet che copre la mappa: non si può leggere la chat guardando la mappa. Scelta di design da rivalutare. |
 | Bassa | All'apertura di uno sheet il focus va sul pulsante "Fine": con interazione da tastiera mostra l'anello di focus (corretto), meglio sul primo campo. |
 | Bassa | Il tipo predefinito di un nuovo token è "Mostro" (di solito si parte dai personaggi). |
-| Bassa | Il limite di connessioni WebSocket per utente (429) si raggiunge con molte schede aperte; il client riprova in silenzio senza dire il motivo. |
-| Info | Nessuna interfaccia per spostare la campagna selezionata: l'app usa sempre la prima campagna dell'utente. |
+| Info | (risolto in M10) il titolo della campagna è ora un menu per cambiare campagna. |
 
 ## Non verificato
 
@@ -57,3 +53,22 @@ Test aggiunti: `tokenDraft.test.ts` (spawn senza sovrapposizioni), `geometry.tes
 - Mappe molto grandi (tessere) e molti token.
 - Lettori di schermo; contrasto misurato a occhio, non con uno strumento.
 - Dietro Cloudflare Tunnel in HTTPS (la prova è su `http://localhost` con `ALLOW_INSECURE_HTTP=true`).
+
+## Combattimento (M7, client)
+
+Verificato in Brave headless via CDP (build di produzione, DB temporaneo, GM e giocatore in profili separati; 1440x900, 820x1180 e 390x844 con touch emulato): tracker, selezione per categoria, danno di gruppo con scorciatoia `D` e "Annulla" dalla notifica, menu contestuale (tasto destro), cono 5e privato, cerchio pubblico ritagliato per la nebbia del giocatore, ping al solo GM, avviso di turno al proprietario.
+
+Difetti trovati e corretti: sette schede nel pannello laterale uscivano dallo schermo (ora `Tabs` compatte con sole icone); il menu contestuale si richiudeva subito nel browser vero (il listener "clic fuori" scattava sullo stesso `pointerdown` che lo apriva: test di regressione in `ui/pointMenu.test.tsx`); gli sheet dell'azione mettevano il focus su "Fine" (ora `Sheet initialFocus`); tracker troppo lungo (aggiunta e tiro in sezioni a comparsa); strumenti di misura coperti dalla scala sul telefono.
+
+Non verificato: dispositivi reali, pressione lunga con dito vero, Safari/Firefox, lettori di schermo, movimento ridotto a occhio (solo nel codice), dissolvenza delle forme in scadenza e mappe con immagine (la prova usava una scena senza mappa).
+
+## M10 parte B: libreria trascinabile, scorciatoie, mobile
+
+Verificato in Brave headless via CDP (build di produzione, DB temporaneo, 1440x900, 820x1180, 390x844 con touch emulato).
+
+- **Trascinamento dalla libreria**: la riga si trascina sulla mappa (solo GM, HTML5 drag and drop); il token compare dove lo si lascia, con snap alla griglia e riportato dentro la mappa (`dropCommand`). Il tocco continua a usare "Aggiungi". Il trascinamento con il dito non c'e': sul telefono resta il pulsante.
+- **Scorciatoie**: registro unico in `table/shortcutRegistry.ts`, finestra di aiuto con `?`, test anti-conflitto (D/H/K/E/M invariati).
+- **Mobile**: barra azioni del token compatta sul telefono (solo icone da 44 pt, scorre di lato, lascia libero lo zoom); tablet in verticale con il pannello ancorato sotto la mappa invece dello sheet; bersagli sm da 44 pt con puntatore grossolano; campi a 16 px (niente zoom iOS); safe area negli sheet. Pan e pinch esistevano gia' (`controller.test.ts`).
+- **Piccoli difetti**: avviso al 429 (il browser non vede il codice HTTP: dopo 3 tentativi falliti il banner suggerisce di chiudere schede e finestre aperte), "Carica mappa" al centro (non sotto la barra nebbia), apostrofi nelle schede, dadi 3D piu' grandi, riga della libreria che schiacciava il nome, badge "Sei il GM" a destra.
+
+Non verificato: pinch e trascinamento con un dito vero, tastiera virtuale, Safari.

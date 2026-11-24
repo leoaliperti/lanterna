@@ -3,11 +3,14 @@ import "pixi.js/unsafe-eval";
 import { Application, CanvasSource, Container, Graphics, ImageSource, Sprite, Text, Texture } from "pixi.js";
 import { parseCssColor } from "./color";
 import { FogLayer } from "./fogLayer";
+import { PropLayer } from "./propLayer";
 import type { MapController } from "./controller";
 import { isTokenShown, rectsIntersect, tokenRadius, visibleRect } from "./geometry";
 import { type BackgroundPlan, MAX_LOADED_TILES, needsDetail, planBackground, tileRect, tilesToEvict, visibleTiles } from "./tiles";
 import { type MapTheme, healthColor, kindColor, readTheme } from "./theme";
-import type { MapScene, MapToken, Point, Size, TokenShape } from "./types";
+import { cellRects, ephemeralAlpha, measureLabel, outlinePolygon } from "./measure";
+import type { Shape } from "@lanterna/shared";
+import type { MapEphemeral, MapPulse, MapScene, MapToken, Point, Size, TokenShape } from "./types";
 
 /**
  * Resa PixiJS della mappa. Si carica con import() dinamico (vedi MapCanvas) e non conosce React.
@@ -22,6 +25,10 @@ const GRID_MIN_SCREEN_CELL = 6;
 const DECOR_PAD_CELLS = 1.6;
 const TILES_PER_FRAME = 2;
 const EASE_MS = 140;
+/** Dissolvenza finale delle forme effimere e durata del richiamo su un token. */
+const FADE_MS = 700;
+const PULSE_MS = 1100;
+const PULSE_STATIC_MS = 1600;
 
 interface TokenView {
   token: MapToken;
@@ -35,6 +42,7 @@ interface TokenView {
   badges: Container | null;
   /** Testo "attuali/massimi" sotto la barra della vita. */
   hpText: Text | null;
+  effectBadge: Container | null;
   /** Posizione disegnata (puo' essere in transizione verso quella dei dati). */
   x: number;
   y: number;
@@ -95,7 +103,7 @@ function tokenSignature(t: MapToken, role: string, cell: number, theme: MapTheme
   const cond = t.conditions?.map((c) => `${c.id}${c.icon ?? ""}${c.color ?? ""}${c.label}`).join(",") ?? "";
   const shape = t.shape ?? "circle";
   const h = t.health ? `${t.health.current}/${t.health.max}` : "";
-  return [t.size, t.imageUrl ?? "", t.color ?? "", t.label ?? "", t.kind, t.hidden ? 1 : 0, cond, h, shape, t.number ?? "", role, cell, theme.tint].join("|");
+  return [t.size, t.imageUrl ?? "", t.color ?? "", t.label ?? "", t.kind, t.hidden ? 1 : 0, cond, h, shape, t.number ?? "", role, cell, theme.tint, t.turn ? 1 : 0, t.effects ?? 0].join("|");
 }
 
 export class PixiMapView {
@@ -112,6 +120,12 @@ export class PixiMapView {
   private rulerGfx = new Graphics();
   private rulerText: Text;
   private handlesGfx = new Graphics();
+  /** Forme effimere, bozza di misura e richiami: in coordinate di mappa, sopra i token. */
+  private shapesGfx = new Graphics();
+  private pulseGfx = new Graphics();
+  private shapeTexts: Text[] = [];
+  private pulseStart = new Map<string, number>();
+  private pulseInfo = new Map<string, MapPulse>();
 
   private views = new Map<string, TokenView>();
   private textures = new Map<string, TextureEntry>();
@@ -134,6 +148,7 @@ export class PixiMapView {
   private maxTexture = 4096;
 
   private fogLayer: FogLayer;
+  private propLayer: PropLayer;
   private cleanup: (() => void)[] = [];
   private invalidateHook: () => void = () => {};
 
@@ -146,6 +161,10 @@ export class PixiMapView {
     this.theme = readTheme(host);
     this.rulerText = new Text({ text: "", style: { fontFamily: "system-ui, sans-serif", fontSize: 13, fontWeight: "600", fill: this.theme.onTint } });
     this.rulerText.anchor.set(0.5);
+    this.propLayer = new PropLayer({
+      textureFor: (url) => this.textureFor(url),
+      releaseTexture: (url) => this.releaseTexture(url),
+    });
     this.fogLayer = new FogLayer({
       theme: () => this.theme,
       reducedMotion: () => this.reducedMotion,
@@ -182,8 +201,9 @@ export class PixiMapView {
     world.isRenderGroup = true;
     // Ordine: sfondo, tessere (giocatore), griglia, aiuto di vista, velo della nebbia, muri, anteprime, token.
     world.addChild(
-      this.bgLayer, this.fogLayer.tilesLayer, this.gridGfx, this.fogLayer.sightGfx, this.fogLayer.veilLayer, this.fogLayer.wallsGfx,
-      this.cellsGfx, this.fogLayer.previewGfx, this.tokenLayer, this.selectionGfx
+      this.bgLayer, this.fogLayer.tilesLayer, this.propLayer.background, this.gridGfx, this.propLayer.ground, this.fogLayer.sightGfx,
+      this.fogLayer.veilLayer, this.fogLayer.wallsGfx,
+      this.cellsGfx, this.fogLayer.previewGfx, this.tokenLayer, this.propLayer.above, this.shapesGfx, this.pulseGfx, this.selectionGfx
     );
     this.bgLayer.addChild(this.bgFill);
     this.overlay.addChild(this.marqueeGfx, this.rulerGfx, this.rulerText, this.handlesGfx);
@@ -237,8 +257,10 @@ export class PixiMapView {
     if (this.disposed) return;
     this.syncBackground(scene);
     this.fogLayer.sync(scene);
+    this.propLayer.sync(scene);
     this.syncTokens(scene);
     this.syncHover(scene);
+    this.syncPulses(scene.pulses ?? []);
     this.requestRender();
   }
 
@@ -272,6 +294,7 @@ export class PixiMapView {
     this.views.clear();
     this.clearBackground();
     this.fogLayer.dispose();
+    this.propLayer.dispose();
     for (const e of this.textures.values()) void e.texture.then((t) => t?.destroy(true));
     this.textures.clear();
     this.app.destroy({ removeView: false }, { children: true, texture: false });
@@ -499,7 +522,7 @@ export class PixiMapView {
     const body = new Container();
     const decor = new Container();
     root.addChild(body, decor);
-    return { token: t, sig: "", root, body, decor, label: null, barBg: null, barFg: null, badges: null, hpText: null, x: t.x, y: t.y, imageUrl: null, layoutKey: "", shown: true };
+    return { token: t, sig: "", root, body, decor, label: null, barBg: null, barFg: null, badges: null, hpText: null, effectBadge: null, x: t.x, y: t.y, imageUrl: null, layoutKey: "", shown: true };
   }
 
   private destroyView(v: TokenView) {
@@ -514,7 +537,7 @@ export class PixiMapView {
     const theme = this.theme;
     v.body.removeChildren().forEach((ch) => ch.destroy({ children: true }));
     v.decor.removeChildren().forEach((ch) => ch.destroy({ children: true }));
-    v.label = v.barBg = v.barFg = v.badges = v.hpText = null;
+    v.label = v.barBg = v.barFg = v.badges = v.hpText = v.effectBadge = null;
     v.layoutKey = "";
 
     const base = kindColor(theme, t.kind);
@@ -527,6 +550,13 @@ export class PixiMapView {
     // Tacca di orientamento: mostra la rotazione anche senza immagine.
     g.poly([-r * 0.18, -r * 0.78, r * 0.18, -r * 0.78, 0, -r * 1.02]).fill(base);
     v.body.addChild(g);
+    if (t.turn) {
+      // Turno corrente: anello arancione con bordo chiaro, ben visibile anche sopra mappe scure o chiare.
+      const ring = new Graphics();
+      ring.circle(0, 0, r * 1.14).stroke({ width: Math.max(5, r * 0.16), color: theme.onTint, alpha: 0.9 });
+      ring.circle(0, 0, r * 1.14).stroke({ width: Math.max(3, r * 0.09), color: theme.orange });
+      v.body.addChild(ring);
+    }
     v.body.alpha = t.hidden ? 0.5 : 1;
 
     if (v.imageUrl !== (t.imageUrl ?? null)) {
@@ -603,6 +633,14 @@ export class PixiMapView {
       nb.addChild(disc, txt);
       v.decor.addChild(nb);
     }
+    if (t.effects) {
+      v.effectBadge = new Container();
+      v.effectBadge.addChild(new Graphics().circle(0, 0, 9).fill(theme.orange).stroke({ width: 1.5, color: theme.scrim }));
+      const n = new Text({ text: String(t.effects), style: { fontFamily: "system-ui, sans-serif", fontSize: 10, fontWeight: "700", fill: theme.onTint } });
+      n.anchor.set(0.5);
+      v.effectBadge.addChild(n);
+      v.decor.addChild(v.effectBadge);
+    }
     if (t.hidden) {
       // Icona "occhio barrato" per i token nascosti (visibili solo al GM).
       const eye = new Graphics();
@@ -646,6 +684,7 @@ export class PixiMapView {
       v.badges.visible = !small;
       v.badges.position.set(0, -rs - 12);
     }
+    if (v.effectBadge) v.effectBadge.position.set(-rs * 0.7, -rs * 0.7);
     const icon = v.decor.getChildByLabel("hidden-icon");
     if (icon) icon.position.set(rs * 0.7, -rs * 0.7);
     const nb = v.decor.getChildByLabel("number-badge");
@@ -688,6 +727,7 @@ export class PixiMapView {
 
     const pending = this.updateTiles(area, s, now);
     if (this.fogLayer.frame(dt, s, c)) animating = true;
+    if (this.propLayer.frame(dt, this.reducedMotion)) animating = true;
 
     // Token: posizione (con transizione), culling, decorazioni.
     const pad = cell * DECOR_PAD_CELLS;
@@ -723,6 +763,8 @@ export class PixiMapView {
 
     this.drawSelection(s, cell);
     this.drawCells(s);
+    if (this.drawShapes(scene, s, cell)) animating = true;
+    if (this.drawPulses(s, cell, now)) animating = true;
     this.drawOverlay(s);
 
     this.app.renderer.render(this.app.stage);
@@ -733,6 +775,161 @@ export class PixiMapView {
     }
     if (animating || pending) this.requestRender();
   };
+
+  /* ---------------- richiami sui token ---------------- */
+
+  private syncPulses(pulses: readonly MapPulse[]) {
+    const now = performance.now();
+    const live = new Set(pulses.map((p) => p.key));
+    for (const p of pulses) {
+      if (!this.pulseStart.has(p.key)) {
+        this.pulseStart.set(p.key, now);
+        this.pulseInfo.set(p.key, p);
+      }
+    }
+    // Un richiamo gia' finito e non piu' richiesto si dimentica (non puo' ripartire).
+    for (const [key, start] of this.pulseStart) {
+      if (!live.has(key) && now - start > PULSE_STATIC_MS) {
+        this.pulseStart.delete(key);
+        this.pulseInfo.delete(key);
+      }
+    }
+  }
+
+  private drawPulses(scale: number, cell: number, now: number): boolean {
+    const g = this.pulseGfx;
+    g.clear();
+    let animating = false;
+    const th = this.theme;
+    for (const [key, start] of this.pulseStart) {
+      const info = this.pulseInfo.get(key);
+      const v = info ? this.views.get(info.tokenId) : undefined;
+      if (!info || !v || !v.root.visible) continue;
+      const dur = this.reducedMotion ? PULSE_STATIC_MS : PULSE_MS;
+      const t = (now - start) / dur;
+      if (t >= 1) continue;
+      const color = info.kind === "expired" ? th.gray : info.kind === "warn" ? th.orange : th.tint;
+      const base = (v.token.size * cell) / 2;
+      if (this.reducedMotion) {
+        // Niente movimento: un anello fermo che si dissolve.
+        g.circle(v.x, v.y, base * 1.25).stroke({ width: 4 / scale, color, alpha: 0.75 * (1 - t) });
+      } else {
+        const e = 1 - (1 - t) ** 3;
+        g.circle(v.x, v.y, base * (1.1 + 0.9 * e)).stroke({ width: (5 - 3 * t) / scale, color, alpha: 0.85 * (1 - t) });
+        animating = true;
+      }
+    }
+    return animating;
+  }
+
+  /* ---------------- forme effimere e bozza di misura ---------------- */
+
+  private shapeText(i: number): Text {
+    let t = this.shapeTexts[i];
+    if (!t) {
+      t = new Text({ text: "", style: { fontFamily: "system-ui, -apple-system, sans-serif", fontSize: 13, fontWeight: "600", fill: this.theme.label, stroke: { color: this.theme.surface, width: 4 } } });
+      t.anchor.set(0.5);
+      this.overlay.addChild(t);
+      this.shapeTexts[i] = t;
+    }
+    t.style.fill = this.theme.label;
+    t.style.stroke = { color: this.theme.surface, width: 4 };
+    return t;
+  }
+
+  /** Disegna forme effimere e bozza. Ritorna true se serve un altro frame (dissolvenza o ping in corso). */
+  private drawShapes(scene: MapScene, scale: number, cell: number): boolean {
+    const g = this.shapesGfx;
+    g.clear();
+    let textCount = 0;
+    const place = (text: string, mapPoint: Point) => {
+      if (!text) return;
+      const t = this.shapeText(textCount++);
+      t.text = text;
+      const sp = this.toScreen(mapPoint);
+      t.position.set(sp.x, sp.y);
+      t.visible = true;
+    };
+    const now = Date.now();
+    let animating = false;
+    const items: MapEphemeral[] = [...(scene.ephemerals ?? [])];
+    for (const e of items) {
+      const remaining = e.expiresAt - now;
+      if (remaining <= 0) continue;
+      const alpha = ephemeralAlpha(remaining, FADE_MS, this.reducedMotion);
+      const color = e.color ? parseCssColor(e.color).value : this.theme.tint;
+      if (e.shape.kind === "cells") {
+        const geo = scene.fog?.geometry;
+        if (!geo) continue;
+        for (const r of cellRects(e.shape.cells, geo)) {
+          g.rect(r.x, r.y, r.width, r.height).fill({ color, alpha: 0.3 * alpha }).stroke({ width: 1.5 / scale, color, alpha: 0.8 * alpha });
+        }
+      } else {
+        const phase = this.reducedMotion ? 0.5 : (now % 1200) / 1200;
+        this.drawShape(g, e.shape, color, alpha, scale, cell, phase);
+        place(measureLabel(e.shape, cell, scene.scale, scene.rulerMode), this.labelAnchor(e.shape, cell));
+        if (e.shape.kind === "ping" && e.shape.label) place(e.shape.label, { x: e.shape.x, y: e.shape.y + cell * 0.95 });
+      }
+      if (!this.reducedMotion) animating = true;
+    }
+    const draft = this.c.shapeDraft;
+    if (draft) {
+      this.drawShape(g, draft.shape, this.theme.tint, 1, scale, cell, 0.5);
+      place(draft.text, this.labelAnchor(draft.shape, cell));
+    }
+    for (let i = textCount; i < this.shapeTexts.length; i++) this.shapeTexts[i]!.visible = false;
+    return animating;
+  }
+
+  private labelAnchor(shape: Shape, cell: number): Point {
+    switch (shape.kind) {
+      case "ruler": {
+        const a = shape.points[0]!;
+        const b = shape.points[shape.points.length - 1]!;
+        return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - cell * 0.35 };
+      }
+      case "circle":
+        return { x: shape.x, y: shape.y - shape.radius - cell * 0.35 };
+      case "cone": {
+        const d = (shape.direction * Math.PI) / 180;
+        return { x: shape.x + (Math.cos(d) * shape.length) / 2, y: shape.y + (Math.sin(d) * shape.length) / 2 - cell * 0.35 };
+      }
+      case "line":
+        return { x: (shape.x1 + shape.x2) / 2, y: (shape.y1 + shape.y2) / 2 - cell * 0.6 };
+      default:
+        return { x: 0, y: 0 };
+    }
+  }
+
+  private drawShape(g: Graphics, shape: Shape, color: number, alpha: number, scale: number, cell: number, phase: number) {
+    const stroke = { width: 2.5 / scale, color, alpha: 0.95 * alpha };
+    const poly = outlinePolygon(shape);
+    if (poly) {
+      g.poly(poly, true).fill({ color, alpha: 0.2 * alpha }).stroke(stroke);
+      if (shape.kind === "circle") g.circle(shape.x, shape.y, 3 / scale).fill({ color, alpha });
+      return;
+    }
+    if (shape.kind === "ruler") {
+      const pts = shape.points;
+      g.moveTo(pts[0]!.x, pts[0]!.y);
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i]!.x, pts[i]!.y);
+      g.stroke({ width: 3 / scale, color, alpha: 0.95 * alpha });
+      for (const p of pts) g.circle(p.x, p.y, 5 / scale).fill({ color, alpha });
+    } else if (shape.kind === "arrow") {
+      const dx = shape.x2 - shape.x1;
+      const dy = shape.y2 - shape.y1;
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      const head = Math.min(len * 0.5, 18 / scale);
+      g.moveTo(shape.x1, shape.y1).lineTo(shape.x2 - ux * head * 0.6, shape.y2 - uy * head * 0.6).stroke({ width: 4 / scale, color, alpha: 0.9 * alpha });
+      g.poly([shape.x2, shape.y2, shape.x2 - ux * head - uy * head * 0.55, shape.y2 - uy * head + ux * head * 0.55, shape.x2 - ux * head + uy * head * 0.55, shape.y2 - uy * head - ux * head * 0.55]).fill({ color, alpha });
+    } else if (shape.kind === "ping") {
+      const r = cell * (0.3 + 0.5 * phase);
+      g.circle(shape.x, shape.y, cell * 0.12).fill({ color, alpha });
+      g.circle(shape.x, shape.y, r).stroke({ width: 3 / scale, color, alpha: alpha * (1 - 0.6 * phase) });
+    }
+  }
 
   private drawSelection(scale: number, cell: number) {
     const g = this.selectionGfx;

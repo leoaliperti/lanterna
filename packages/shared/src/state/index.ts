@@ -1,6 +1,7 @@
 export * from "./schema.js";
 export * from "./fog.js";
 export * from "./walls.js";
+export * from "./props.js";
 export * from "./vision.js";
 export * from "./grid.js";
 export * from "./commands.js";

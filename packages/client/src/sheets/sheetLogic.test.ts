@@ -13,9 +13,9 @@ function hero(over: Partial<SheetDoc["sheet"]> = {}): SheetDoc {
 describe("ricerca", () => {
   it("ignora maiuscole e accenti e vuole tutte le parole", () => {
     expect(normalize("Rapidità di Mano")).toBe("rapidita di mano");
-    expect(matchesQuery("rapidita", "Rapidita' di mano")).toBe(true);
-    expect(matchesQuery("furt per", "Furtivita'", "Percezione")).toBe(true);
-    expect(matchesQuery("xyz", "Furtivita'")).toBe(false);
+    expect(matchesQuery("rapidita", "Rapidità di mano")).toBe(true);
+    expect(matchesQuery("furt per", "Furtività", "Percezione")).toBe(true);
+    expect(matchesQuery("xyz", "Furtività")).toBe(false);
     expect(matchesQuery("  ", "qualsiasi")).toBe(true);
   });
 });
@@ -44,7 +44,7 @@ describe("formula dei tiri", () => {
 });
 
 describe("operazioni sul documento", () => {
-  it("il danno passa dal motore e si copia solo cio' che cambia", () => {
+  it("il danno passa dal motore e si copia solo ciò che cambia", () => {
     const base = parseSheetDoc({ ...hero(), extras: { inventory: [{ id: "a", name: "Zaino", weight: 5 }] } });
     const next = applySheetOp(base, (s, c) => damageSheet(s, c, 5));
     expect(next.sheet.hp.current).toBe(3);
@@ -106,7 +106,7 @@ describe("sincronizzazione scheda -> token", () => {
         }
       }
     ]);
-    // Nessuna ripetizione finche' la scheda non cambia di nuovo (il GM puo' ritoccare la barra).
+    // Nessuna ripetizione finché la scheda non cambia di nuovo (il GM può ritoccare la barra).
     expect(planTokenSync(r.next, [sheet({ hp: { current: 3, max: 8, temp: 2 }, conditions: ["poisoned"] })], [token({ health: { current: 7, max: 8, temp: 0 } })]).updates).toEqual([]);
   });
 

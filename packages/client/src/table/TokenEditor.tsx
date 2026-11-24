@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Library, Trash2 } from "lucide-react";
+import { EffectList } from "../combat/EffectList";
 import type { CampaignView, SceneView, TokenShape } from "@lanterna/shared";
-import { uploadErrorMessage, uploadImage } from "../api/client";
-import { Alert, Button, Picker, SegmentedControl, Sheet, Stepper, TextArea, TextField, Toggle } from "../ui";
+import { userErrorMessage, uploadErrorMessage, uploadImage } from "../api/client";
+import { createLibraryItem } from "../library/libraryApi";
+import { libraryInputFromDraft } from "../library/libraryLogic";
+import { LIBRARY_CHANGED } from "../library/LibraryPanel";
+import { Alert, Button, Menu, Picker, SegmentedControl, Sheet, Stepper, TextArea, TextField, Toggle, useToast } from "../ui";
 import { assetUrl } from "../realtime/urls";
 import { useCommands } from "../realtime/RealtimeProvider";
 import { CONDITION_LIST, ConditionIcon } from "./conditions";
@@ -19,6 +23,8 @@ export interface TokenEditorProps {
   tokenId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Il GM vuole aggiungere un effetto temporaneo al token (chi apre l'editor lo chiude e apre il modulo dell'effetto). */
+  onAddEffect?: (tokenId: string) => void;
 }
 
 const NO_OWNER = "__none__";
@@ -41,8 +47,9 @@ const KIND_OPTIONS = [
  * Scheda del token. Il GM modifica tutto; il giocatore proprietario solo le condizioni (e vede la
  * propria vita se il server gliel'ha inviata). Il server rifiuta comunque cio' che non spetta.
  */
-export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenEditorProps) {
+export function TokenEditor({ view, scene, tokenId, open, onOpenChange, onAddEffect }: TokenEditorProps) {
   const { run } = useCommands();
+  const toast = useToast();
   const token = useMemo(() => (tokenId ? (view.tokens.find((t) => t.id === tokenId) ?? null) : null), [view.tokens, tokenId]);
   const perms = permissionsFor(view);
   const creating = tokenId === null;
@@ -91,6 +98,22 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
   /** Esaurimento: livello 1-6 (6 = morte, come da regole); il livello 0 lo toglie. */
   function setExhaustion(level: number) {
     setDraft((d) => ({ ...d, conditions: d.conditions.map((c) => (c.id === "exhaustion" ? { ...c, level } : c)) }));
+  }
+
+  /** "Salva nella libreria": un modello dal token com'e' ora nel modulo (immagine: l'ultima salvata). */
+  async function saveToLibrary(global: boolean) {
+    if (hasErrors(errors) || !token) {
+      setSubmitted(true);
+      return;
+    }
+    try {
+      const image = imageRemoved ? null : (token.imageUrl ?? null);
+      await createLibraryItem(libraryInputFromDraft(draft, image, global ? { kind: "global" } : { kind: "campaign", campaignId: view.campaignId }));
+      window.dispatchEvent(new Event(LIBRARY_CHANGED));
+      toast.show({ title: `${draft.name.trim()} salvato nella libreria`, tone: "success" });
+    } catch (err) {
+      toast.show({ title: "Non riesco a salvare nella libreria", message: userErrorMessage(err), tone: "danger" });
+    }
   }
 
   async function submit() {
@@ -183,6 +206,20 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
               />
               <p className="t-caption1 a-muted">Il proprietario sposta il token e ne vede la barra della vita.</p>
             </div>
+            <TextField
+              label="Fazione"
+              value={draft.faction}
+              onChange={(e) => set("faction", e.target.value)}
+              error={err(errors.faction) ?? undefined}
+              helper="Serve a selezionare i token insieme (es. Eroi, Orda). Solo tu la vedi."
+              autoComplete="off"
+              list="fazioni-note"
+            />
+            <datalist id="fazioni-note">
+              {[...new Set(view.tokens.flatMap((t) => (t.faction ? [t.faction] : [])))].map((f) => (
+                <option key={f} value={f} />
+              ))}
+            </datalist>
             <Toggle label="Nascosto ai giocatori" checked={draft.hidden} onCheckedChange={(v) => set("hidden", v)} />
             {creature ? <Toggle label="Vista e luce (aiuto visivo)" checked={draft.hasVision} onCheckedChange={(v) => set("hasVision", v)} /> : null}
             {creature && draft.hasVision ? (
@@ -257,6 +294,8 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
         </fieldset>
         ) : null}
 
+        {token ? <EffectList token={token} view={view} canEdit={fields.all} onAdd={() => onAddEffect?.(token.id)} /> : null}
+
         {fields.all && perms.canSeeGmNotes ? (
           <TextArea label="Note del GM (private)" value={draft.gmNotes} onChange={(e) => set("gmNotes", e.target.value)} helper="Solo tu le vedi: il server non le invia ai giocatori." />
         ) : null}
@@ -266,6 +305,21 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
             <Button variant="destructive" icon={<Trash2 size={16} />} onClick={() => setConfirmDelete(true)} disabled={busy}>
               Elimina
             </Button>
+          ) : null}
+          {!creating && fields.all ? (
+            <Menu
+              label="Salva nella libreria"
+              placement="top-start"
+              items={[
+                { id: "campaign", label: "Libreria della campagna", icon: <Library size={18} />, onSelect: () => void saveToLibrary(false) },
+                { id: "global", label: "Libreria globale", icon: <Library size={18} />, onSelect: () => void saveToLibrary(true) }
+              ]}
+              trigger={
+                <Button variant="gray" icon={<Library size={16} />} disabled={busy}>
+                  Salva nella libreria
+                </Button>
+              }
+            />
           ) : null}
           <span className="a-form__spacer" />
           <Button variant="gray" onClick={() => onOpenChange(false)} disabled={busy}>

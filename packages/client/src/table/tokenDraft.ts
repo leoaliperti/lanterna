@@ -18,6 +18,8 @@ export interface TokenDraft {
   /** Forma sulla mappa e numero del token (solo GM). `number` è testo: vuoto = nessuno. */
   shape: TokenShape;
   number: string;
+  /** Fazione (solo GM): serve alla selezione per categoria. Vuoto = nessuna. */
+  faction: string;
   /** Vista e luce (aiuto visivo, mai la nebbia), in unita' di gioco. `visionRange` vuoto = vista illimitata. */
   hasVision: boolean;
   visionRange: string;
@@ -43,6 +45,7 @@ export function emptyDraft(): TokenDraft {
     gmNotes: "",
     shape: "circle",
     number: "",
+    faction: "",
     hasVision: false,
     visionRange: "",
     darkvision: "0",
@@ -67,6 +70,7 @@ export function draftOfToken(t: TokenView): TokenDraft {
     gmNotes: t.gmNotes ?? "",
     shape: t.shape ?? "circle",
     number: t.number == null ? "" : String(t.number),
+    faction: t.faction ?? "",
     hasVision: !!t.vision,
     visionRange: t.vision?.range == null ? "" : String(t.vision.range),
     darkvision: String(t.vision?.darkvision ?? 0),
@@ -83,6 +87,7 @@ export interface DraftErrors {
   temp: string | null;
   health: string | null;
   vision: string | null;
+  faction: string | null;
 }
 
 export function healthOf(d: TokenDraft): Health | null {
@@ -115,6 +120,7 @@ export function validateDraft(d: TokenDraft): DraftErrors {
     max: d.hasHealth && max === null ? range : null,
     temp: d.hasHealth && parseNumber(d.temp, 0, LIMITS.hpMax, true) === null ? range : null,
     health: d.hasHealth && current !== null && max !== null && current > max ? "La vita attuale non può superare il massimo." : null,
+    faction: d.faction.trim().length > LIMITS.nameMaxLength ? "Fazione troppo lunga." : null,
     vision: d.hasVision && visionOfDraft(d) === null ? `Raggio e luci: numeri tra 0 e ${LIMITS.visionMaxRange} (il raggio può restare vuoto).` : null
   };
 }
@@ -149,6 +155,8 @@ export function diffDraft(token: TokenView, d: TokenDraft, imageUrl: string | nu
   if (numberOf(d) !== (token.number ?? null)) patch.number = numberOf(d);
   if (imageUrl !== token.imageUrl) patch.imageUrl = imageUrl;
   if ((d.gmNotes ?? "") !== (token.gmNotes ?? "")) patch.gmNotes = d.gmNotes;
+  const faction = d.faction.trim() === "" ? null : d.faction.trim();
+  if (faction !== (token.faction ?? null)) patch.faction = faction;
   const vision = visionOfDraft(d);
   const oldVision = token.vision ?? null;
   const sameVision =
@@ -209,7 +217,8 @@ export function createCommand(id: string, sceneId: string, d: TokenDraft, imageU
     number: numberOf(d),
     health: healthOf(d),
     gmNotes: d.gmNotes,
-    vision: visionOfDraft(d)
+    vision: visionOfDraft(d),
+    ...(d.faction.trim() ? { faction: d.faction.trim() } : {})
   };
   return { type: "token.create", token };
 }

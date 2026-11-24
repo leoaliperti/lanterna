@@ -231,6 +231,25 @@ describe("riconnessione", () => {
     expect(b.getState().failure).toBe("protocol");
   });
 
+  it("vista come un altro membro (M9): 4403 e' definitivo, non riprova in loop", () => {
+    const a = make({ stopOnForbidden: true });
+    a.start();
+    cur().open();
+    const before = sockets.length;
+    cur().drop(4403);
+    expect(a.getState()).toMatchObject({ status: "failed", failure: "forbidden" });
+    vi.advanceTimersByTime(60_000);
+    expect(sockets).toHaveLength(before);
+  });
+
+  it("wsUrl: viewAs e sola lettura nel percorso /ws", () => {
+    const loc = { protocol: "https:", host: "dnd.example.org" };
+    expect(wsUrl(loc)).toBe("wss://dnd.example.org/api/ws");
+    expect(wsUrl(loc, { viewAs: "user-a" })).toBe("wss://dnd.example.org/api/ws?viewAs=user-a");
+    expect(wsUrl(loc, { readOnly: true })).toBe("wss://dnd.example.org/api/ws?readOnly=1");
+    expect(wsUrl(loc, { viewAs: "user-a", readOnly: true })).toBe("wss://dnd.example.org/api/ws?viewAs=user-a");
+  });
+
   it("permessi cambiati (4403): riconnette e ricevera' uno snapshot", () => {
     const c = make();
     c.start();

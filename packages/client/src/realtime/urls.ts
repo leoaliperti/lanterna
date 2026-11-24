@@ -19,7 +19,19 @@ export function assetUrl(path: string | null | undefined): string | undefined {
   return path;
 }
 
+/** Parametri della connessione (M9, finestre multiple). */
+export interface WsViewOptions {
+  /** Solo GM: ricevi esattamente cio' che riceve questo membro (sempre in sola lettura). */
+  viewAs?: string | null;
+  /** Nessun comando, chat o tiro da questa connessione (proiettore). */
+  readOnly?: boolean;
+}
+
 /** URL del WebSocket del server, stessa origine della pagina. */
-export function wsUrl(loc: Pick<Location, "protocol" | "host"> = window.location): string {
-  return `${loc.protocol === "https:" ? "wss:" : "ws:"}//${loc.host}${API_BASE}/ws`;
+export function wsUrl(loc: Pick<Location, "protocol" | "host"> = window.location, opts: WsViewOptions = {}): string {
+  const params = new URLSearchParams();
+  if (opts.viewAs) params.set("viewAs", opts.viewAs);
+  else if (opts.readOnly) params.set("readOnly", "1");
+  const query = params.toString();
+  return `${loc.protocol === "https:" ? "wss:" : "ws:"}//${loc.host}${API_BASE}/ws${query ? `?${query}` : ""}`;
 }

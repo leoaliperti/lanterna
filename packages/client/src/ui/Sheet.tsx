@@ -1,4 +1,4 @@
-import { useId, useRef, type PointerEvent as RPointerEvent, type ReactNode } from "react";
+import { useId, useRef, type PointerEvent as RPointerEvent, type ReactNode, type RefObject } from "react";
 import { Portal, cx, useEscape, useFocusTrap, usePresence, useScrollLock } from "./internal";
 import { Button } from "./Button";
 
@@ -15,6 +15,8 @@ export interface SheetProps {
   showTitle?: boolean;
   children: ReactNode;
   className?: string;
+  /** Elemento che riceve il focus all'apertura (default: il primo controllo, di solito "Fine"). */
+  initialFocus?: RefObject<HTMLElement | null>;
 }
 
 interface Sample { y: number; t: number }
@@ -23,7 +25,7 @@ interface Sample { y: number; t: number }
  * Modale dal basso: maniglia, trascinamento per chiudere (con velocita'), molla di ritorno,
  * focus trap, Esc, click sullo sfondo. Il trascinamento parte dalla maniglia/intestazione.
  */
-export function Sheet({ open, onOpenChange, title, showTitle = true, children, className }: SheetProps) {
+export function Sheet({ open, onOpenChange, title, showTitle = true, children, className, initialFocus }: SheetProps) {
   const { mounted, state } = usePresence(open);
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -31,7 +33,7 @@ export function Sheet({ open, onOpenChange, title, showTitle = true, children, c
 
   useScrollLock(open);
   useEscape(open, () => onOpenChange(false));
-  useFocusTrap(panel, open && mounted);
+  useFocusTrap(panel, open && mounted, initialFocus);
 
   if (!mounted) return null;
 

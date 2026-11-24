@@ -1,25 +1,32 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { KeyRound, LogOut, Maximize, Minimize, PanelRight, Settings, Users } from "lucide-react";
-import { Avatar, IconButton, Menu, Sheet, Tabs, type MenuItemSpec, type TabItem } from "../ui";
+import { Archive, ExternalLink, KeyRound, LogOut, Maximize, Minimize, PanelRight, Settings, Users } from "lucide-react";
+import { Avatar, IconButton, Menu, Sheet, Tabs, useToast, type MenuItemSpec, type TabItem } from "../ui";
+import { openViewWindow } from "../windows/layout";
+import { POPUP_BLOCKED } from "../windows/WindowsMenu";
+import type { SecondaryRoute } from "../windows/routes";
+import "../windows/windows.css";
 import type { SessionUser } from "../api/client";
 import { useSession } from "../session/SessionProvider";
 import { navigate } from "../router/hashRouter";
 import { ChangePasswordSheet } from "../screens/ChangePasswordSheet";
 import { SettingsSheet } from "../settings/SettingsSheet";
+import { CampaignSwitcher } from "./CampaignSwitcher";
 
 const WIDE = "(min-width: 56rem)";
+/** Tablet in verticale: il pannello sta in basso, sotto la mappa, invece di coprirla con uno sheet. */
+export const DOCK = "(min-width: 40rem) and (max-width: 55.99rem) and (orientation: portrait)";
 
-function useWide(): boolean {
-  const query = () => (typeof window.matchMedia === "function" ? window.matchMedia(WIDE).matches : false);
+function useMedia(q: string): boolean {
+  const query = () => (typeof window.matchMedia === "function" ? window.matchMedia(q).matches : false);
   const [wide, setWide] = useState(query);
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return;
-    const mq = window.matchMedia(WIDE);
+    const mq = window.matchMedia(q);
     const on = () => setWide(mq.matches);
     on();
     mq.addEventListener?.("change", on);
     return () => mq.removeEventListener?.("change", on);
-  }, []);
+  }, [q]);
   return wide;
 }
 
@@ -28,7 +35,7 @@ export interface TableFrameProps {
   title: string;
   /** Pulsanti accanto al menu utente (annulla, ripeti, stato della connessione). */
   actions?: ReactNode;
-  /** Etichetta di ruolo accanto al titolo (es. "GM"): in barra, mai sopra la mappa. */
+  /** Etichetta accanto al titolo (ruolo, orologio): in barra, mai sopra la mappa. */
   badge?: ReactNode;
   /** Sotto la barra (avvisi di connessione). */
   banner?: ReactNode;
@@ -42,6 +49,8 @@ export interface TableFrameProps {
   onVisibleTabChange?: (tab: string | null) => void;
   /** Nuovi elementi da segnalare sul pulsante del pannello quando e' chiuso. */
   panelBadge?: number;
+  /** Schede che si possono aprire in una finestra a parte (M9), per id della scheda. */
+  tabWindows?: Record<string, SecondaryRoute>;
   children: ReactNode;
 }
 
@@ -60,10 +69,15 @@ export function TableFrame({
   focusRequest,
   onVisibleTabChange,
   panelBadge = 0,
+  tabWindows,
   children
 }: TableFrameProps) {
   const { logout } = useSession();
-  const wide = useWide();
+  const toast = useToast();
+  const wide = useMedia(WIDE);
+  const dock = useMedia(DOCK);
+  // Pannello fisso (laterale o in basso) oppure sheet modale (telefono).
+  const inline = wide || dock;
   const [panelOpen, setPanelOpen] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -71,7 +85,7 @@ export function TableFrame({
   const tabItems = tabs?.({ closeSheet: () => setSheetOpen(false) });
   const [tab, setTab] = useState<string | undefined>(defaultTab);
   const currentTab = tabItems?.some((t) => t.id === tab) ? tab : tabItems?.[0]?.id;
-  const panelShown = tabs ? (wide ? panelOpen : sheetOpen) : false;
+  const panelShown = tabs ? (inline ? panelOpen : sheetOpen) : false;
 
   useEffect(() => {
     onVisibleTabChange?.(panelShown && currentTab ? currentTab : null);
@@ -83,7 +97,7 @@ export function TableFrame({
   useEffect(() => {
     if (!nonce || !wantedTab) return;
     setTab(wantedTab);
-    if (wide) setPanelOpen(true);
+    if (inline) setPanelOpen(true);
     else setSheetOpen(true);
   }, [nonce]);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -98,13 +112,31 @@ export function TableFrame({
     { id: "settings", label: "Impostazioni", icon: <Settings size={18} />, onSelect: () => setSettingsOpen(true) },
     { id: "password", label: "Cambia password", icon: <KeyRound size={18} />, onSelect: () => setPasswordOpen(true) },
     ...(user.role === "admin"
-      ? [{ id: "users", label: "Gestione utenti", icon: <Users size={18} />, onSelect: () => navigate("/admin/users") } satisfies MenuItemSpec]
+      ? [
+          { id: "users", label: "Gestione utenti", icon: <Users size={18} />, onSelect: () => navigate("/admin/users") } satisfies MenuItemSpec,
+          { id: "backup", label: "Backup e importazione", icon: <Archive size={18} />, onSelect: () => navigate("/admin/backup") } satisfies MenuItemSpec
+        ]
       : []),
     { id: "logout", label: "Esci", icon: <LogOut size={18} />, destructive: true, onSelect: () => void doLogout() }
   ];
 
+  const popOut = currentTab ? tabWindows?.[currentTab] : undefined;
+  const popOutLabel = currentTab ? tabItems?.find((t) => t.id === currentTab)?.label : undefined;
   const sidePanel = tabs ? (
-    <Tabs aria-label="Pannello del tavolo" className="a-side__tabs" value={currentTab} onValueChange={setTab} tabs={tabItems ?? []} />
+    <>
+      {popOut ? (
+        <div className="a-side__head">
+          <IconButton
+            label={`Apri ${popOutLabel ?? "il pannello"} in una nuova finestra`}
+            icon={<ExternalLink size={18} />}
+            onClick={() => {
+              if (!openViewWindow(popOut)) toast.show(POPUP_BLOCKED);
+            }}
+          />
+        </div>
+      ) : null}
+      <Tabs aria-label="Pannello del tavolo" className="a-side__tabs" value={currentTab} onValueChange={setTab} tabs={tabItems ?? []} />
+    </>
   ) : null;
 
   return (
@@ -122,7 +154,7 @@ export function TableFrame({
       <header className="a-topbar l-material l-material--regular">
         <div className="a-topbar__title">
           <span className="a-topbar__app t-caption1 a-muted">Lanterna</span>
-          <h1 className="t-headline a-topbar__campaign">{title}</h1>
+          <CampaignSwitcher title={title} />
           {badge}
         </div>
         <div className="a-topbar__actions">
@@ -130,15 +162,15 @@ export function TableFrame({
           <FullscreenButton />
           {tabs ? (
             <IconButton
-              label={wide && panelOpen ? "Nascondi pannello" : panelBadge > 0 ? `Mostra pannello (${panelBadge} nuovi)` : "Mostra pannello"}
+              label={inline && panelOpen ? "Nascondi pannello" : panelBadge > 0 ? `Mostra pannello (${panelBadge} nuovi)` : "Mostra pannello"}
               icon={
                 <span className="a-dotwrap">
                   <PanelRight size={20} />
                   {panelBadge > 0 && !panelShown ? <span className="a-dot" /> : null}
                 </span>
               }
-              aria-pressed={wide ? panelOpen : undefined}
-              onClick={() => (wide ? setPanelOpen((v) => !v) : setSheetOpen(true))}
+              aria-pressed={inline ? panelOpen : undefined}
+              onClick={() => (inline ? setPanelOpen((v) => !v) : setSheetOpen(true))}
             />
           ) : null}
           <Menu
@@ -151,18 +183,18 @@ export function TableFrame({
       </header>
       {banner}
 
-      <div className="a-table__body">
+      <div className={`a-table__body${dock ? " a-table__body--dock" : ""}`}>
         <main id="mappa" tabIndex={-1} className="a-map" aria-label="Mappa">
           {children}
         </main>
-        {sidePanel && wide && panelOpen ? (
-          <aside className="a-side l-material l-material--thick a-enter-side" aria-label="Pannello laterale">
+        {sidePanel && inline && panelOpen ? (
+          <aside className={`a-side l-material l-material--thick a-enter-side${dock ? " a-side--dock" : ""}`} aria-label="Pannello laterale">
             {sidePanel}
           </aside>
         ) : null}
       </div>
 
-      {sidePanel && !wide ? (
+      {sidePanel && !inline ? (
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen} title="Pannello del tavolo">
           {sidePanel}
         </Sheet>
@@ -174,8 +206,8 @@ export function TableFrame({
 }
 
 /**
- * Schermo intero del tavolo (API Fullscreen del browser). Se il browser non lo supporta (es. iPhone
- * in Safari, che lo permette solo per i video) il pulsante non compare.
+ * Schermo intero del tavolo (API Fullscreen del browser). Se il browser non lo supporta il pulsante
+ * non compare.
  */
 function FullscreenButton() {
   const supported = typeof document !== "undefined" && typeof document.documentElement.requestFullscreen === "function";

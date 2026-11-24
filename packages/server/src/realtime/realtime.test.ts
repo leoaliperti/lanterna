@@ -412,7 +412,7 @@ describe("WebSocket: cambi di ruolo e appartenenza", () => {
     p2.skip();
     await command(gm, { type: "scene.activate", sceneId: null });
     const d = await p2.nextOfType("delta");
-    expect(d.events).toEqual([{ type: "scene.activated", sceneId: null, scene: null, tokens: [], fog: null, walls: [] }]);
+    expect(d.events).toEqual([{ type: "scene.activated", sceneId: null, scene: null, tokens: [], fog: null, walls: [], props: [] }]);
     await command(gm, { type: "scene.activate", sceneId: MAIN });
     const d2 = await p2.nextOfType("delta");
     expect(d2.events[0]).toMatchObject({ type: "scene.activated", sceneId: MAIN });

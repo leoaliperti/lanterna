@@ -70,6 +70,12 @@ export function checkInvariants(state: CampaignState): string[] {
     wallIds.add(w.id);
     if (!sceneIds.has(w.sceneId)) problems.push(`muro ${w.id} senza scena`);
   }
+  const propIds = new Set<string>();
+  for (const p of state.props ?? []) {
+    if (propIds.has(p.id)) problems.push(`oggetto di scena duplicato ${p.id}`);
+    propIds.add(p.id);
+    if (!sceneIds.has(p.sceneId)) problems.push(`oggetto di scena ${p.id} senza scena`);
+  }
   // Combattimento (M7).
   const tokenById = new Map(state.tokens.map((t) => [t.id, t]));
   const combatScenes = new Set<string>();

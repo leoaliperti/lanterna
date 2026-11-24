@@ -3,9 +3,11 @@ import { Map as MapIcon, Sparkles } from "lucide-react";
 import { Banner, Button, Spinner, TextField } from "../ui";
 import { userErrorMessage } from "../api/client";
 import { RealtimeProvider } from "../realtime/RealtimeProvider";
+import { navigate, useHashParam } from "../router/hashRouter";
 import { useSession } from "../session/SessionProvider";
 import { Table } from "../table/Table";
 import { TableFrame } from "../table/TableFrame";
+import { CampaignChoiceContext } from "../table/CampaignSwitcher";
 import { useCampaigns } from "../table/useCampaigns";
 import { EmptyState } from "./EmptyState";
 import "./app.css";
@@ -55,15 +57,32 @@ function CreateFirstCampaign({ onCreate }: { onCreate: (name: string) => Promise
 export function TableScreen() {
   const { user, logout } = useSession();
   const { state, reload, create } = useCampaigns();
+  const wanted = useHashParam("campaign");
 
   if (!user) return null;
 
   if (state.status === "ready" && state.campaigns[0]) {
-    const campaign = state.campaigns[0];
+    // `#/?campaign=<id>` apre una campagna precisa (es. quella appena importata); senza, la prima.
+    const campaign = state.campaigns.find((c) => c.id === wanted) ?? state.campaigns[0];
+    const open = (id: string) => navigate(`/?campaign=${encodeURIComponent(id)}`);
+    const choice = {
+      campaigns: state.campaigns,
+      currentId: campaign.id,
+      onSelect: open,
+      onCreate:
+        user.role === "admin"
+          ? async (name: string) => {
+              const created = await create(name);
+              open(created.id);
+            }
+          : undefined
+    };
     return (
-      <RealtimeProvider key={campaign.id} campaignId={campaign.id} onSessionEnded={() => void logout().catch(() => undefined)}>
-        <Table user={user} campaignName={campaign.name} />
-      </RealtimeProvider>
+      <CampaignChoiceContext.Provider value={choice}>
+        <RealtimeProvider key={campaign.id} campaignId={campaign.id} onSessionEnded={() => void logout().catch(() => undefined)}>
+          <Table user={user} campaignName={campaign.name} />
+        </RealtimeProvider>
+      </CampaignChoiceContext.Provider>
     );
   }
 
@@ -81,7 +100,7 @@ export function TableScreen() {
           </Button>
         </div>
       ) : user.role === "admin" ? (
-        <CreateFirstCampaign onCreate={create} />
+        <CreateFirstCampaign onCreate={async (name) => void (await create(name))} />
       ) : (
         <EmptyState
           icon={<MapIcon size={36} />}

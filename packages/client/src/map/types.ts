@@ -1,4 +1,4 @@
-import type { FogMask, FogShape, WallPatch } from "@lanterna/shared";
+import type { FogMask, FogShape, Shape, ShownShape, WallPatch } from "@lanterna/shared";
 import type { FogMode } from "../fog/fogLogic";
 
 /** Tipi pubblici del canvas della mappa. Tutte le coordinate di mappa sono in pixel dell'immagine di sfondo. */
@@ -97,6 +97,27 @@ export interface MapToken {
   conditions?: readonly TokenCondition[];
   /** Mostrata solo se il padre la fornisce (il server la invia solo a GM e proprietario). */
   health?: TokenHealth;
+  /** E' il turno di questo token (combattimento). */
+  turn?: boolean;
+  /** Numero di effetti temporanei attivi che l'utente puo' vedere. */
+  effects?: number;
+}
+
+/** Forma effimera ricevuta (o creata qui) da mostrare finche' non scade: `expiresAt` in `Date.now()`. */
+export interface MapEphemeral {
+  key: string;
+  shape: ShownShape;
+  /** `#rrggbb`; default: il colore d'accento. */
+  color?: string;
+  expiresAt: number;
+  ttlMs: number;
+}
+
+/** Richiamo visivo breve su un token (avvisi di turno e di effetti). `key` identifica l'evento: si anima una volta sola. */
+export interface MapPulse {
+  key: string;
+  tokenId: string;
+  kind: "turn" | "warn" | "expired";
 }
 
 export type MapRole = "gm" | "player";
@@ -145,6 +166,27 @@ export interface MapSight {
 
 export type RulerMode = "euclidean" | "grid";
 
+/** Livello di un oggetto di scena: `background` sotto la griglia, `ground` sotto i token, `above` sopra i token. */
+export type MapPropLayer = "background" | "ground" | "above";
+
+/** Oggetto di scena (M10). */
+export interface MapProp {
+  id: string;
+  url: string;
+  /** Centro e dimensioni in pixel di mappa. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  layer: MapPropLayer;
+  opacity: number;
+  /** Solo `above`: si schiarisce quando un token dell'osservatore e' sotto. */
+  fade: boolean;
+  /** Solo GM: nascosto ai giocatori (disegnato attenuato). */
+  hidden?: boolean;
+}
+
 /** Parte "dati" delle props: tutto cio' che descrive la scena. */
 export interface MapScene {
   background: MapBackground;
@@ -157,19 +199,36 @@ export interface MapScene {
   /** Nebbia di guerra (assente = scena senza nebbia). */
   fog?: MapFog | null;
   walls?: readonly MapWall[];
+  /** Oggetti di scena su livelli (M10). */
+  objects?: readonly MapProp[];
   /** Mostra i muri (il GM puo' nasconderli). Default true. */
   wallsVisible?: boolean;
   /** Aiuto visivo della vista dei token. Assente = nascosto. */
   sight?: readonly MapSight[];
   /** Token sotto il puntatore: solo lì si vedono le condizioni (badge). */
   hoverTokenId?: string | null;
+  /** Forme effimere (misure pubbliche, frecce, ping) con scadenza e dissolvenza. */
+  ephemerals?: readonly MapEphemeral[];
+  /** Richiami visivi sui token. */
+  pulses?: readonly MapPulse[];
   /** Misura del righello: Euclidea (default) o a griglia (diagonali = cella, come in 5e). */
   rulerMode?: RulerMode;
 }
 
+/** `draft` mentre si trascina, `end` al rilascio. */
+export type ShapePhase = "draft" | "end";
+
 export interface MapHandlers {
   /** Token sotto il puntatore (o `null`): il controller lo comunica alla vista per mostrare i badge. */
   onHoverToken?: (id: string | null) => void;
+  /** Una forma di misura o segnalazione e' cambiata (trascinamento) o e' finita (rilascio). Il padre decide chi la vede. */
+  onShape?: (shape: Shape, phase: ShapePhase) => void;
+  /** La forma in costruzione e' stata annullata (Esc, cambio strumento). */
+  onShapeCancel?: () => void;
+  /** Tasto destro o pressione lunga: `x`, `y` in coordinate del canvas; `tokenId` se sopra un token. */
+  onContextMenu?: (x: number, y: number, tokenId: string | null) => void;
+  /** Tasto non gestito dalla mappa (scorciatoie delle azioni). Ritorna true se lo ha usato. */
+  onKey?: (key: string, shift: boolean) => boolean;
   /** Al rilascio, con la posizione del centro gia' agganciata alla cella se `grid.snap`. */
   onMoveToken?: (id: string, x: number, y: number) => void;
   /** Solo GM. `size` in celle. */

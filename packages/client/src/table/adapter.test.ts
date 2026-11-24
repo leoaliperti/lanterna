@@ -71,6 +71,25 @@ describe("adattatore stato condiviso -> props del canvas", () => {
     expect(tokenColor({ id: "x", kind: "pc" })).not.toBe(tokenColor({ id: "x", kind: "monster" }));
   });
 
+  it("segna il token di turno, conta gli effetti e porta forme e richiami alla mappa", () => {
+    const view = viewFor(state, gm);
+    const scene = sceneToShow(view)!;
+    const withEffects = {
+      ...view,
+      tokens: view.tokens.map((t) => (t.id === "drago" ? { ...t, effects: [{ id: "e1", name: "Fiamma", condition: null, remaining: 2, timing: "end" as const }] } : t))
+    };
+    const ephemerals = [{ key: "gm:1", shape: { kind: "ping" as const, x: 1, y: 1 }, expiresAt: 5, ttlMs: 4000 }];
+    const pulses = [{ key: "k", tokenId: "pg-luca", kind: "turn" as const }];
+    const map = toMapScene(withEffects, scene, { turnTokenId: "pg-sara", ephemerals, pulses });
+    expect(map.tokens.find((t) => t.id === "pg-sara")?.turn).toBe(true);
+    expect(map.tokens.find((t) => t.id === "pg-luca")?.turn).toBeUndefined();
+    expect(map.tokens.find((t) => t.id === "drago")?.effects).toBe(1);
+    expect(map.tokens.find((t) => t.id === "pg-luca")?.effects).toBeUndefined();
+    expect(map.ephemerals).toBe(ephemerals);
+    expect(map.pulses).toBe(pulses);
+    expect("turnTokenId" in map).toBe(false);
+  });
+
   it("movableIds: il giocatore non puo' muovere i token degli altri", () => {
     expect(movableIds(viewFor(state, sara), "s1")).toEqual(["pg-sara"]);
   });

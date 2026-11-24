@@ -1,6 +1,6 @@
 # Combattimento e azioni sulla mappa (M7)
 
-Logica condivisa (`packages/shared/src/state/combat*.ts`, `shapes.ts`, `protocol/ephemeral.ts`) e server. La UI del client non c'è ancora: l'elenco di cosa fare è in fondo.
+Logica condivisa (`packages/shared/src/state/combat*.ts`, `shapes.ts`, `protocol/ephemeral.ts`), server e UI del client (sezione "Client" in fondo).
 
 ## Iniziativa
 
@@ -38,11 +38,15 @@ Logica condivisa (`packages/shared/src/state/combat*.ts`, `shapes.ts`, `protocol
 - **Cono 5e: angolo totale 2·atan(1/2) = 53,13°** (la larghezza a una distanza d è d, come da regola del cono), lunghezza misurata radialmente; `angle` permette varianti (es. 90°).
 - Cerchio: raggio; linea: striscia di `width` a estremi piatti; righello/freccia: celle attraversate (campionamento a mezza cella). Distanza del righello: `euclid`, `chebyshev` (diagonale = 1 cella), `alternating` (5-10-5).
 
-## Da fare nel client
+## Client
 
-- Pannello iniziativa: partecipanti (aggiungi token selezionati/voce libera), tiro (`initiative.roll` con bonus e modo), riordino a trascinamento, flag nascosto/iniziativa nascosta, start/next/previous/end; evidenziare `turnId`; mostrare `round`.
-- Gestire `combat.updated`, `group.*`, `token.updated` con `effects`, e gli avvisi `combat.turn`, `effect.expiring`, `effect.expired` in modo discreto (riga nel tracker, lampo sul token), mai un popup obbligato.
-- Effetti sul token: icona/elenco con durata residua, editor (nome, condizione 5e, durata, momento, ancora, segreto).
-- Gruppi: gestione (solo GM), selezione per categoria/fazione (usare `resolveTarget`), barra azioni rapide (danno, cura, PF temporanei, condizioni, effetto, sposta di un offset) con `group.apply`.
-- Righello/cerchio/cono/linea: disegno locale; le misure private non si inviano; pubbliche con `ephemeral.show` (inviare di continuo durante il trascinamento con lo stesso `id`, poi `ephemeral.clear`); mostrare le forme `cells` come celle evidenziate sulla griglia della nebbia; scadere in locale dopo `ttlMs`.
-- Frecce di intenzione e ping dei giocatori (a tutti o solo GM).
+Codice in `packages/client/src/combat/` (tracker, azioni, bersagli, effetti, avvisi, forme effimere) e `src/map/` (strumenti di misura, disegno, menu contestuale). Il client non decide nulla: invia comandi (`combat.*`, `effect.*`, `group.*`, `group.apply`, `initiative.roll`, `ephemeral.*`) e mostra solo quello che il server rimanda.
+
+- **Tracker** (scheda "Iniziativa", `InitiativePanel`): round e turno corrente (riga evidenziata con `aria-current`, anello arancione sul token nella mappa). GM: avvia/avanti/indietro/termina (con conferma), ordina, aggiunta dei token selezionati o scelti da un menu, voce libera (anche nascosta fin dalla creazione), tiro (`initiative.roll`: il client manda solo bonus e modo, il d20 lo tira il server) per chi manca, per tutti o per una riga, valore a mano, riordino a trascinamento o con le frecce su/giù sulla maniglia, nascondi voce o valore, togli. Giocatori: sola lettura, solo cio' che arriva.
+- **Effetti**: elenco con durata residua nell'editor del token (`EffectList`), aggiunta da `ActionSheet` (nome, condizione 5e, durata in round, inizio/fine turno, ancora, segreto) dal token o dall'azione di gruppo, rimozione con `effect.remove`. Sulla mappa un badge col numero di effetti.
+- **Avvisi** (`combat.turn`, `effect.expiring/expired`): `RealtimeClient` li emette come evento `alert` dai delta; `useCombatFeed` li deduplica per round (`AlertDeduper`, anche dopo la riconnessione), mostra un toast breve e un richiamo sul token (anello che si espande; fermo con movimento ridotto). Mai popup bloccanti.
+- **Selezione e azioni**: selezione multipla sulla mappa, per categoria (tutti/PG/mostri/oggetti, fazione) e per gruppo salvato (CRUD, richiamo con un clic) dalla scheda "Bersagli", con elenco e ricerca. Azioni (danno, cura, PF temporanei, condizione, effetto, sposta) da barra, menu contestuale (tasto destro o pressione lunga di 500 ms) e tastiera con il focus sulla mappa: `D` `H` `K` `E` `M`. Ogni azione e' un solo `group.apply` (atomico), con notifica e "Annulla". `faction` si imposta nell'editor del token.
+- **Misure e segnalazioni**: pannello "Misure e segnalazioni" sulla mappa: righello `R`, cerchio `O`, cono `C`, linea `L`, freccia `F`, segnalazione `P`, con la scelta di chi la vede. **Privata** (default, "Solo io"): resta sul client, il server non riceve nulla. **Pubblica** ("Tutti", e per i giocatori "Solo GM"): `ephemeral.show` con lo stesso `id` durante il trascinamento (max ~8 al secondo) e al rilascio con `ttlMs` predefinito; `ephemeral.clear` se si annulla. L'autore non riceve la propria forma dal server: la tiene localmente con la stessa scadenza. Le forme ricevute si disegnano cosi' come arrivano (`cells` = celle evidenziate sulla griglia della nebbia, nessuna ricostruzione), scadono in locale con `ttlMs` e si dissolvono negli ultimi 700 ms (senza dissolvenza con movimento ridotto). Cono 5e: 53,13 gradi (`CONE_ANGLE_DEG`, il client non manda `angle`); la linea e' larga una cella.
+- **Test**: `combat/*.test.ts(x)` (logica pura, UI sul tavolo con server finto, feed delle misure), `map/measure.test.ts`, `map/controllerCombat.test.ts`, `realtime/combatEvents.test.ts` e l'e2e su server reale `e2e/combat.e2e.test.ts` (GM + 2 giocatori con nebbia: voci nascoste assenti dal traffico, tiro del server, avvisi ai diretti interessati, azione di gruppo e annulla, effetti e gruppi segreti, forma ritagliata per la nebbia, misura privata che non parte).
+
+Limiti noti: i gruppi non si aggiornano da soli se un token cambia scena; il righello e' a due punti (niente poligonale); gli effetti si possono solo togliere e aggiungere dall'interfaccia (`effect.update` non ha ancora un modulo); la scelta "Chi vede la misura" non si ricorda tra le sessioni.

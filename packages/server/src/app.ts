@@ -9,7 +9,9 @@ import "./auth/session.js";
 import { loadConfig, type AppConfig } from "./config.js";
 import { openDatabase, type Database } from "./db/client.js";
 import { originGuard } from "./security.js";
+import { archiveRoutes } from "./archive/routes.js";
 import { campaignRoutes } from "./campaigns/routes.js";
+import { libraryRoutes } from "./library/routes.js";
 import { chatRoutes } from "./chat/routes.js";
 import { contentRoutes } from "./content/routes.js";
 import { randomInt as cryptoRandomInt } from "./dice/crypto-rng.js";
@@ -95,6 +97,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       await uploadRoutes(api, config, hub, new TileService({ uploadDir: config.uploadDir }));
       await contentRoutes(api, config);
       await sheetRoutes(api, hub);
+      await archiveRoutes(api, config, hub);
+      await libraryRoutes(api, config);
     },
     { prefix: config.apiPrefix },
   );

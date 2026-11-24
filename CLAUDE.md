@@ -99,13 +99,47 @@ Dettagli e matrice dei permessi in `docs/PROTOCOL.md` (sezione "Schede personagg
 
 ## Combattimento e azioni sulla mappa (M7, logica e server)
 
-Dettagli in `docs/COMBAT.md` e `docs/PROTOCOL.md`. La UI del client non c'è ancora (elenco in fondo a `docs/COMBAT.md`).
+Dettagli in `docs/COMBAT.md` e `docs/PROTOCOL.md`. La UI del client (`packages/client/src/combat`, `map/measure.ts`, strumenti in `map/MapCanvas.tsx`) è descritta nella sezione "Client" di `docs/COMBAT.md`.
 
 - **Stato**: `state.combats` (uno per scena, partecipanti ordinati, `round`, `turnId`), `state.groups` (solo GM), `token.effects` e `token.faction` (facoltativi). Moduli: `shared/src/state/combat.ts` (schemi), `combat-reducer.ts` (iniziativa, turni, effetti, gruppi), `combat-ops.ts` (danno/cura con `rules5e/hp`, `resolveTarget`), `reducer-util.ts` (`done` deriva da solo i cambiamenti di combattimenti e gruppi confrontando gli stati), `shapes.ts` (geometria).
 - **Regole**: tutti i comandi di combattimento, effetto e gruppo sono solo GM (FORBIDDEN prima di guardare lo stato); `group.apply` è una macro di comandi ordinari (atomica, annullabile in un colpo, stessi permessi). Un nuovo comando di combattimento deve avere inverso esatto e voce nella matrice di `combat-access.test.ts`.
 - **Filtro**: tracker ricalcolato per utente (`projectCombat`, anche al cambio di nebbia/token/scena); avvisi `combat.turn`/`effect.*` solo a GM e proprietario; gruppi, fazione e effetti segreti mai ai giocatori.
 - **Effimeri**: `ephemeral.show/clear` mai persistiti; ogni destinatario riceve la forma ritagliata per la sua nebbia (`shapeForViewer`); le misure private non passano dal server. Iniziativa: `initiative.roll` con RNG del server (`hub.rng`).
 - **Test**: `shared/src/state/combat*.test.ts`, `shapes.test.ts`, fuzz in `combat-fuzz.test.ts`; server `src/combat/combat.test.ts` (GM + 2 giocatori, nebbia, riavvio). Migrazione `0006_combat`; nuove variabili in `.env.example`.
+- **Client**: le misure private non partono mai dal client; quelle pubbliche usano `ephemeral.show` (il server ritaglia per la nebbia, il client disegna le `cells` ricevute e non ricostruisce nulla). Ogni azione sui token e' un solo `group.apply`. Test: `src/combat/*.test.ts(x)`, `src/map/measure.test.ts`, `src/map/controllerCombat.test.ts`, e2e `e2e/combat.e2e.test.ts`.
+
+## Esportazione/importazione di campagna e libreria di token (M10)
+
+Dettagli e formato in `docs/PROTOCOL.md` (sezione "Esportazione e importazione di campagna, libreria di token"); uso operativo in `docs/DEPLOY.md` (esportazione vs backup SQLite).
+
+- **REST solo admin** (nessun cambiamento al protocollo WebSocket): `GET /campaigns/:id/export[?chat=true]`, `POST /campaigns/import[?preview=true]` (multipart `file` + `options`), `/library` (CRUD solo admin; lettura giocatore limitata, vedi sotto). Ogni rotta ha il suo caso 401/403 nei test (`src/archive/archive.test.ts`, `src/library/library.test.ts`, riga "esportazione campagna" in `campaigns.test.ts`).
+- **Archivio** (`src/archive/`): zip con `fflate` (puro JS, MIT) in streaming. `export.ts` prepara tutto prima del primo byte e poi produce lo zip a pezzi; `zip-read.ts` legge in streaming contando i byte REALMENTE decompressi (mai fidarsi delle dimensioni dichiarate); `import.ts` valida (`stageArchive`: nomi a elenco chiuso, manifesto con SHA-256, Zod su ogni documento, immagini con `sniffImage` + `exceedsImageLimits` come l'upload) e poi `commitImport` rigenera tutti gli id, rimappa i riferimenti e scrive file + UNA transazione. L'anteprima (`?preview=true`) usa `commitImport(..., dryRun)`: stesse verifiche, nessuna scrittura.
+- **Privacy**: gli utenti non si esportano mai (solo nome e ruolo con riferimento opaco `m1`...; mai email, password, sessioni, segreti). Un nuovo campo di stato che contenga id utente va rimappato in `export.ts`/`import.ts`, altrimenti l'id esce nell'archivio (il test "nessun id utente" lo coglie).
+- **Importazione**: crea una campagna NUOVA, un'importazione alla volta; cartella di parcheggio `UPLOAD_DIR/.import-<uuid>/` (rimossa prima della risposta e all'avvio; il backup la ignora). Limiti in `config.archive` (`ARCHIVE_MAX_*` in `.env.example`).
+- **Libreria** (`src/library/`, tabella `library_item`, migrazione `0007_library`): `LIBRARY_PLAYER_KINDS` (default nessuno); al giocatore mai `stats` né `campaignId`; fuori permesso = 404 identico a "inesistente". Se rebase/merge produce due migrazioni con lo stesso numero, rigenera la tua con `npm run db:generate -w @lanterna/server`.
+- **Client**: `screens/BackupScreen.tsx` (route `#/admin/backup`, voce nel menu utente dell'admin), `library/` (pannello "Libreria", `LibraryPanel`, logica in `libraryLogic.ts`) e "Salva nella libreria" in `table/TokenEditor.tsx`. `#/?campaign=<id>` apre una campagna precisa (non c'è ancora un selettore di campagne). Test: `screens/backup.test.tsx`, `library/library.test.tsx`, e2e `e2e/campaign-io.e2e.test.ts`.
+
+## Finestre multiple e vista giocatore (M9)
+
+Dettagli in `docs/WINDOWS.md`.
+
+- **Solo WebSocket**: ogni finestra è un client autenticato con la sua connessione; niente `BroadcastChannel` né comunicazione fra finestre.
+- **Viste** (`packages/client/src/windows/`): `#/table`, `#/view/map|notes|chat|combat`, `#/view/scene/<id>` e `#/view/player/<userId>` (solo GM). Menu "Apri in nuova finestra" e pulsante nel pannello; disposizione per tipo di vista in `localStorage` (`lanterna.windows.v1`, sempre in try/catch); cornice minimale `ViewFrame`. La sincronizzazione scheda → token gira solo nella finestra del tavolo.
+- **Vista giocatore generata dal server**: `/ws?viewAs=<userId>` (solo GM della campagna, membro guardato; altrimenti 403 all'upgrade o FORBIDDEN + 4403 all'`hello`), attore del membro per ogni filtro (`viewerActor` in `realtime/hub.ts`), sempre in sola lettura. `?readOnly=1` per chiunque. Tessere con `?viewAs=`. Mai ricostruire nel client la vista di un altro utente filtrando quella del GM.
+- **Test**: `server/src/realtime/viewas.test.ts` (stessi frame del giocatore, scritture FORBIDDEN, 403), `client/src/windows/*.test.*`, e2e `client/e2e/windows.e2e.test.ts`. Una nuova richiesta WebSocket che scrive deve passare da `rejectReadOnly`/`roomOf` in `hub.ts`.
+
+## Livelli, oggetti di scena e scene (M10, parte A)
+
+Dettagli in `docs/PROTOCOL.md` (sezione "Livelli, oggetti di scena e gestione scene"). Modello in `packages/shared/src/state/props.ts`.
+
+- **Oggetti**: `state.props` (facoltativo), livelli `background`/`ground`/(token)/`above`, comandi solo GM `prop.create/update/delete` e `scene.duplicate`, ciascuno con inverso esatto. Un nuovo comando va nella matrice di `shared/src/state/props.test.ts` e `server/src/props/props.test.ts`.
+- **Filtro**: `canSeeProp`/`projectProp` (lista bianca; mai `name`/`hidden` ai giocatori, nebbia come per i token). Un nuovo tipo di `StateChange` va gestito anche in `history.ts` (`checkExpect`).
+- **Client**: `map/propLayer.ts` (tre contenitori Pixi, dissolvenza degli `above` in `propLogic.ts`), scheda "Oggetti" (`table/PropsPanel.tsx`, solo GM, posizione e dimensioni da campi numerici), "Duplica" in `ScenePanel`, selettore di campagne nel titolo (`table/CampaignSwitcher.tsx`, `#/?campaign=<id>`).
+- Migrazione `0008_props`. Esportazione/importazione di campagna non copre ancora gli oggetti.
+
+## Scorciatoie e mobile (M10 B, client)
+
+Registro unico delle scorciatoie in `packages/client/src/table/shortcutRegistry.ts` (aiuto con `?`, `shortcutRegistry.test.ts` fallisce sui conflitti): ogni nuova scorciatoia va scritta li'. Libreria trascinabile sulla mappa (`library/libraryLogic.ts`, `dropCommand`). Tablet in verticale: pannello ancorato sotto la mappa (`DOCK` in `TableFrame.tsx`). Dettagli in `docs/QA.md`.
 
 ## Regole non negoziabili
 
