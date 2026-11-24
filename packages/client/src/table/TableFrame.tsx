@@ -28,6 +28,8 @@ export interface TableFrameProps {
   title: string;
   /** Pulsanti accanto al menu utente (annulla, ripeti, stato della connessione). */
   actions?: ReactNode;
+  /** Etichetta di ruolo accanto al titolo (es. "GM"): in barra, mai sopra la mappa. */
+  badge?: ReactNode;
   /** Sotto la barra (avvisi di connessione). */
   banner?: ReactNode;
   /** Schede del pannello laterale; senza, il pannello non c'e'. `closeSheet` chiude lo sheet su telefono. */
@@ -51,6 +53,7 @@ export function TableFrame({
   user,
   title,
   actions,
+  badge,
   banner,
   tabs,
   defaultTab,
@@ -120,6 +123,7 @@ export function TableFrame({
         <div className="a-topbar__title">
           <span className="a-topbar__app t-caption1 a-muted">Lanterna</span>
           <h1 className="t-headline a-topbar__campaign">{title}</h1>
+          {badge}
         </div>
         <div className="a-topbar__actions">
           {actions}

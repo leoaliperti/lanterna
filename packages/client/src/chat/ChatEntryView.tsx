@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Dices, EyeOff, Lock, Sparkles, TriangleAlert } from "lucide-react";
 import type { ChatLogEntry, Member } from "@lanterna/shared";
 import { formatTime, privacyLabel } from "./describe";
+import { presenceColor } from "../presence/colors";
 
 export interface ChatEntryViewProps {
   entry: ChatLogEntry;
@@ -16,6 +17,9 @@ export interface ChatEntryViewProps {
 export const ChatEntryView = memo(function ChatEntryView({ entry, selfId, members }: ChatEntryViewProps) {
   const priv = privacyLabel(entry, selfId, members);
   const mine = entry.authorId === selfId;
+  // Stesso colore di freccia e ping sulla mappa: il GM e ogni giocatore si distinguono a colpo d'occhio.
+  const authorIsGm = members.some((m) => m.userId === entry.authorId && m.role === "admin");
+  const authorColor = presenceColor(entry.authorId, authorIsGm);
   const classes = ["a-chat__entry"];
   if (mine) classes.push("a-chat__entry--mine");
   if (priv) classes.push("a-chat__entry--private");
@@ -28,7 +32,7 @@ export const ChatEntryView = memo(function ChatEntryView({ entry, selfId, member
   return (
     <li className={classes.join(" ")} data-private={priv ? "true" : undefined} data-kind={entry.kind}>
       <div className="a-chat__meta t-caption1">
-        <span className="a-chat__author">{mine ? "Tu" : entry.authorName}</span>
+        <span className="a-chat__author" style={{ color: authorColor }}>{mine ? "Tu" : entry.authorName}{authorIsGm ? " · GM" : ""}</span>
         <time className="a-muted" dateTime={new Date(entry.at).toISOString()}>
           {formatTime(entry.at)}
         </time>

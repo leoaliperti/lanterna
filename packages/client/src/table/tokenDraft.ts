@@ -78,7 +78,7 @@ export interface DraftErrors {
 }
 
 export function healthOf(d: TokenDraft): Health | null {
-  if (!d.hasHealth) return null;
+  if (!d.hasHealth || d.kind === "object") return null;
   const current = parseNumber(d.current, 0, LIMITS.hpMax, true);
   const max = parseNumber(d.max, 0, LIMITS.hpMax, true);
   const temp = parseNumber(d.temp, 0, LIMITS.hpMax, true);
@@ -88,7 +88,7 @@ export function healthOf(d: TokenDraft): Health | null {
 
 /** Vista del token dalla bozza (`null` se disattivata o non valida). */
 export function visionOfDraft(d: TokenDraft): TokenVision | null {
-  if (!d.hasVision) return null;
+  if (!d.hasVision || d.kind === "object") return null;
   const range = d.visionRange.trim() === "" ? null : parseNumber(d.visionRange, 0, LIMITS.visionMaxRange);
   const darkvision = parseNumber(d.darkvision, 0, LIMITS.visionMaxRange);
   const bright = parseNumber(d.lightBright, 0, LIMITS.visionMaxRange);
@@ -186,7 +186,7 @@ export function createCommand(id: string, sceneId: string, d: TokenDraft, imageU
     ownerUserId: d.ownerUserId,
     kind: d.kind,
     hidden: d.hidden,
-    conditions: d.conditions,
+    conditions: d.kind === "object" ? [] : d.conditions,
     health: healthOf(d),
     gmNotes: d.gmNotes,
     vision: visionOfDraft(d)

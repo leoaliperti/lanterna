@@ -324,6 +324,7 @@ export class MapController {
       this.draw.move(this.tool, e, this.toMap(p));
       return;
     }
+    if (!g && this.scene) this.updateHover(this.toMap(p));
     if (!g || !this.scene) return;
 
     if (g.kind === "pinch") {
@@ -486,6 +487,21 @@ export class MapController {
     this.clearTransient();
     this.updateCursor();
     this.invalidate();
+  }
+
+  /** Token sotto il puntatore: la vista lo usa per i badge delle condizioni (solo in hover). */
+  private hoverId: string | null = null;
+  private updateHover(m: Point) {
+    const id = this.hitToken(m)?.id ?? null;
+    if (id === this.hoverId) return;
+    this.hoverId = id;
+    this.handlers.onHoverToken?.(id);
+  }
+  /** Il puntatore è uscito dalla mappa. */
+  pointerLeave() {
+    if (this.hoverId === null) return;
+    this.hoverId = null;
+    this.handlers.onHoverToken?.(null);
   }
 
   pointerCancel(e: PointerInput) {

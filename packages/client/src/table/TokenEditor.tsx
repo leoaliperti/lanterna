@@ -42,6 +42,8 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
   const readOnlyFields = !fields.all;
 
   const [draft, setDraft] = useState<TokenDraft>(() => (token ? draftOfToken(token) : emptyDraft()));
+  // Un oggetto non è una creatura: niente vita, vista e condizioni (vedi `creature` nel form).
+  const creature = draft.kind !== "object";
   const [file, setFile] = useState<File | null>(null);
   const [imageRemoved, setImageRemoved] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -158,8 +160,8 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
               <p className="t-caption1 a-muted">Il proprietario sposta il token e ne vede la barra della vita.</p>
             </div>
             <Toggle label="Nascosto ai giocatori" checked={draft.hidden} onCheckedChange={(v) => set("hidden", v)} />
-            <Toggle label="Vista e luce (aiuto visivo)" checked={draft.hasVision} onCheckedChange={(v) => set("hasVision", v)} />
-            {draft.hasVision ? (
+            {creature ? <Toggle label="Vista e luce (aiuto visivo)" checked={draft.hasVision} onCheckedChange={(v) => set("hasVision", v)} /> : null}
+            {creature && draft.hasVision ? (
               <>
                 <div className="a-form__pair">
                   <NumberField label={`Raggio di vista (${unit})`} value={draft.visionRange} onValueChange={(v) => set("visionRange", v)} min={0} helper="Vuoto = illimitato." />
@@ -175,8 +177,8 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
                 <p className="t-caption1 a-muted">Mostra cosa vede il token (muri compresi) come contorno tratteggiato. Serve solo da aiuto: non scopre mai la nebbia.</p>
               </>
             ) : null}
-            <Toggle label="Barra della vita" checked={draft.hasHealth} onCheckedChange={(v) => set("hasHealth", v)} />
-            {draft.hasHealth ? (
+            {creature ? <Toggle label="Barra della vita" checked={draft.hasHealth} onCheckedChange={(v) => set("hasHealth", v)} /> : null}
+            {creature && draft.hasHealth ? (
               <>
                 <div className="a-form__triple">
                   <NumberField label="Attuali" value={draft.current} onValueChange={(v) => set("current", v)} min={0} error={err(errors.current)} />
@@ -198,6 +200,7 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
           </p>
         ) : null}
 
+        {creature ? (
         <fieldset className="a-conditions" disabled={!fields.conditions}>
           <legend className="t-footnote a-muted">Condizioni</legend>
           <div className="a-conditions__grid">
@@ -218,6 +221,7 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
             })}
           </div>
         </fieldset>
+        ) : null}
 
         {fields.all && perms.canSeeGmNotes ? (
           <TextArea label="Note del GM (private)" value={draft.gmNotes} onChange={(e) => set("gmNotes", e.target.value)} helper="Solo tu le vedi: il server non le invia ai giocatori." />

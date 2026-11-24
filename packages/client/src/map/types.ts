@@ -155,11 +155,15 @@ export interface MapScene {
   wallsVisible?: boolean;
   /** Aiuto visivo della vista dei token. Assente = nascosto. */
   sight?: readonly MapSight[];
+  /** Token sotto il puntatore: solo lì si vedono le condizioni (badge). */
+  hoverTokenId?: string | null;
   /** Misura del righello: Euclidea (default) o a griglia (diagonali = cella, come in 5e). */
   rulerMode?: RulerMode;
 }
 
 export interface MapHandlers {
+  /** Token sotto il puntatore (o `null`): il controller lo comunica alla vista per mostrare i badge. */
+  onHoverToken?: (id: string | null) => void;
   /** Al rilascio, con la posizione del centro gia' agganciata alla cella se `grid.snap`. */
   onMoveToken?: (id: string, x: number, y: number) => void;
   /** Solo GM. `size` in celle. */

@@ -1,5 +1,5 @@
 import { useCallback, useState, type FormEvent } from "react";
-import { ChevronDown, Dices } from "lucide-react";
+import { ChevronDown, Dices, EyeOff } from "lucide-react";
 import type { EntryVisibility, Member } from "@lanterna/shared";
 import { commandErrorToast } from "../realtime/errors";
 import { Button, SegmentedControl, TextField, useToast } from "../ui";
@@ -115,6 +115,18 @@ export function DiceBar({ isGm, targets }: DiceBarProps) {
         >
           <ChevronDown size={18} aria-hidden="true" data-open={open} />
         </button>
+        {isGm ? (
+          <button
+            type="button"
+            className="a-dice__more"
+            aria-pressed={composer.visibility === "gm"}
+            aria-label="Tiro segreto: solo tu vedi il risultato e l'animazione"
+            title="Tiro segreto: solo tu vedi il risultato e l'animazione"
+            onClick={() => store.patchComposer({ visibility: composer.visibility === "gm" ? "public" : "gm" })}
+          >
+            <EyeOff size={18} aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
 
       {effective !== "public" || composer.advantage !== "normal" ? (

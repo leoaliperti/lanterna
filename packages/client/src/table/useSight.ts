@@ -12,12 +12,16 @@ import { fogOfScene, toMapWalls } from "./adapter";
  * e' cambiata, o tutti se cambiano i muri; ogni passata ha un budget di pochi millisecondi e, se non basta,
  * continua al frame successivo.
  */
-export function useSight(view: CampaignView, scene: SceneView | null, enabled: boolean): readonly MapSight[] | undefined {
+/** `onlyTokenId`: solo la vista di questo token (il GM con un token selezionato), senza tutte le altre. */
+export function useSight(view: CampaignView, scene: SceneView | null, enabled: boolean, onlyTokenId: string | null = null): readonly MapSight[] | undefined {
   const engine = useRef<SightEngine | null>(null);
   if (!engine.current) engine.current = new SightEngine();
   const [areas, setAreas] = useState<readonly MapSight[] | undefined>(undefined);
 
-  const tokens = useMemo(() => (scene ? view.tokens.filter((t) => t.sceneId === scene.id && t.vision) : []), [view.tokens, scene]);
+  const tokens = useMemo(
+    () => (scene ? view.tokens.filter((t) => t.sceneId === scene.id && t.vision && (!onlyTokenId || t.id === onlyTokenId)) : []),
+    [view.tokens, scene, onlyTokenId]
+  );
   const segments = useMemo(() => (scene ? blockingOf(toMapWalls(view.walls, scene.id)) : []), [view.walls, scene]);
   const lighting: FogLighting = scene ? (fogOfScene(view, scene.id)?.lighting ?? "bright") : "bright";
 

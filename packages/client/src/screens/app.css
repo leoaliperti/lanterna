@@ -75,7 +75,6 @@
   background-size: 1.75rem 1.75rem;
 }
 .a-map:focus-visible { outline-offset: calc(var(--space-1) * -1); }
-.a-map__badge { position: absolute; left: var(--space-4); bottom: max(var(--space-4), var(--safe-bottom)); display: inline-flex; align-items: center; gap: var(--space-1); }
 
 .a-side {
   width: 22rem;
@@ -88,6 +87,9 @@
   overflow-y: auto;
 }
 .a-side__tabs { flex: 1; }
+/* Pannello stretto: le schede hanno larghezza uguale (come l'indicatore) e le etichette vanno a capo, cosi' sono tutte visibili. */
+.a-side .l-tabs__list { overflow: visible; }
+.a-side .l-tabs__tab { flex: 1 1 0; min-width: 0; padding: var(--space-1) var(--space-1); font-size: var(--text-footnote); line-height: 1.15; white-space: normal; text-align: center; }
 
 /* Skip link */
 .a-skip {

@@ -33,7 +33,7 @@ describe("adattatore stato condiviso -> props del canvas", () => {
 
   it("le condizioni sono visibili a tutti", () => {
     const { map } = sceneFor(sara);
-    expect(map.tokens.find((t) => t.id === "pg-luca")?.conditions).toEqual([{ id: "prone", label: "Prono" }]);
+    expect(map.tokens.find((t) => t.id === "pg-luca")?.conditions).toEqual([{ id: "prone", label: "Prono", icon: "⬇️" }]);
   });
 
   it("converte griglia, scala, tipo e URL degli asset (prefisso /api)", () => {

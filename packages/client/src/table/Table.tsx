@@ -108,7 +108,9 @@ function LiveTable({ user, view, actions }: LiveProps) {
     [view.fogs, view.campaignId, view.viewer.role, scene, controls.viewAs, controls.veil]
   );
   const mapWalls = useMemo(() => (scene ? toMapWalls(view.walls, scene.id) : []), [view.walls, scene]);
-  const sight = useSight(view, scene, controls.sight);
+  // Il GM che seleziona un token con vista ne vede la vista anche con l'interruttore spento.
+  const sightFocusId = perms.isGm && selected.length === 1 && view.tokens.some((t) => t.id === selected[0] && t.vision) ? selected[0]! : null;
+  const sight = useSight(view, scene, controls.sight || sightFocusId !== null, controls.sight ? null : sightFocusId);
   const mapScene = useMemo(
     () => (scene ? toMapScene(view, scene, { fog: mapFog, walls: mapWalls, wallsVisible: perms.isGm ? controls.walls || wallTool : true, sight }) : null),
     [view, scene, mapFog, mapWalls, controls.walls, wallTool, perms.isGm, sight]
@@ -218,6 +220,7 @@ function LiveTable({ user, view, actions }: LiveProps) {
       user={user}
       title={view.name}
       actions={actions}
+      badge={perms.isGm ? <span className="a-role-pill t-caption1"><ShieldCheck size={14} aria-hidden="true" /> GM</span> : null}
       banner={<ConnectionBanner />}
       tabs={tabs}
       defaultTab="token"
@@ -303,11 +306,6 @@ function LiveTable({ user, view, actions }: LiveProps) {
       ) : (
         <EmptyState icon={<MapIcon size={36} />} title="In attesa della mappa" description="Il GM non ha ancora aperto una scena. Comparirà qui appena sarà pronta." />
       )}
-      {perms.isGm ? (
-        <p className="a-map__badge t-caption1 a-muted">
-          <ShieldCheck size={14} aria-hidden="true" /> Sei il GM di questo tavolo
-        </p>
-      ) : null}
 
       <TokenEditor
         view={view}
