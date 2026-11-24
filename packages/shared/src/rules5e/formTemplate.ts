@@ -18,6 +18,8 @@ export type FormValue = string | number | boolean;
 
 interface SourceDef {
   kind: "text" | "number" | "bool";
+  /** Testo lungo: nel modulo è un'area di testo (storia, tratti...). */
+  multiline?: boolean;
   read: (doc: SheetDoc, d: ReturnType<typeof deriveDoc>) => FormValue | null;
   write?: (doc: SheetDoc, value: FormValue) => SheetDoc;
 }
@@ -139,7 +141,7 @@ function setDeath(doc: SheetDoc, key: "successes" | "failures", value: number): 
 
 // --- Testi narrativi (scrivibili) ---
 for (const k of ["traits", "ideals", "bonds", "flaws", "story", "languages", "features"] as const) {
-  add(k, text((d) => d.extras.profile[k], (d, v) => setProfile(d, { [k]: v })));
+  add(k, { ...text((d) => d.extras.profile[k], (d, v) => setProfile(d, { [k]: v })), multiline: true });
 }
 
 // --- Attacchi (fino a 40): nome, bonus calcolato, formula del danno, tipo ---
@@ -162,6 +164,15 @@ for (let i = 0; i < ATTACK_SLOTS; i++) {
   });
   add(`attack.${i}.damage`, text((d) => at(d)?.damage ?? "", (d, v) => setAt(d, { damage: v })));
   add(`attack.${i}.type`, text((d) => at(d)?.damageType ?? "", (d, v) => setAt(d, { damageType: v })));
+}
+
+/** Ids di tutte le sorgenti del registro (il GM ne sceglie una per campo). */
+export const FORM_SOURCE_IDS: readonly string[] = Object.keys(FORM_SOURCES);
+
+/** Tipo, scrivibilità e multilinea di una sorgente (`null` se non esiste). */
+export function formSourceInfo(source: string): { kind: "text" | "number" | "bool"; writable: boolean; multiline: boolean } | null {
+  const d = FORM_SOURCES[source];
+  return d ? { kind: d.kind, writable: Boolean(d.write), multiline: Boolean(d.multiline) } : null;
 }
 
 /** Valore di una sorgente per questa scheda (`null` se non c'è, es. attacco vuoto). */

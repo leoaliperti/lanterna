@@ -13,6 +13,7 @@
   "dependencies": {
     "@lanterna/shared": "*",
     "lucide-react": "^1.76.0",
+    "pdfjs-dist": "^6.5.438",
     "pixi.js": "8.23.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
