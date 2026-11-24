@@ -45,7 +45,7 @@ describe("backup → ripristino con dati reali", () => {
     const restored = await restoreBackup({ source: result.dir, dbPath, uploadDir });
     expect(restored.previousDb).toMatch(/prima-del-ripristino/);
     expect(existsSync(restored.previousDb!)).toBe(true);
-    expect(readdirSync(uploadDir)).toEqual(["mappa.png"]);
+    expect(readdirSync(uploadDir).filter((f) => f !== "forms")).toEqual(["mappa.png"]);
 
     const again = await createTestApp({}, () => {}, { dbPath, uploadDir });
     try {

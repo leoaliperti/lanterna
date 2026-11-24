@@ -298,6 +298,22 @@ export const content = sqliteTable(
  * (non è una chiave esterna: i token stanno in una tabella con chiave composta e si cancellano con i comandi).
  * `version` cresce a ogni scrittura: l'aggiornamento è condizionato alla versione letta (concorrenza).
  */
+/**
+ * Modulo sopra il PDF del GM (una per campagna). `fields` = `FormTemplate` in JSON, validato con
+ * `FormTemplateSchema`. Il PDF è nel disco (`UPLOAD_DIR/forms/<pdfFile>`), mai nel repo.
+ */
+export const formTemplate = sqliteTable("form_template", {
+  campaignId: text("campaign_id")
+    .primaryKey()
+    .references(() => campaign.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  pages: integer("pages").notNull(),
+  fields: text("fields").notNull(),
+  pdfFile: text("pdf_file").notNull(),
+  pdfBytes: integer("pdf_bytes").notNull(),
+  ...timestamps,
+});
+
 export const characterSheet = sqliteTable(
   "character_sheet",
   {
@@ -356,5 +372,6 @@ export const schema = {
   chatEntry,
   content,
   characterSheet,
+  formTemplate,
   libraryItem,
 };

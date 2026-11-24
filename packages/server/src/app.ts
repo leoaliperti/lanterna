@@ -19,6 +19,7 @@ import { Hub, CLOSE } from "./realtime/hub.js";
 import { attachRealtime } from "./realtime/server.js";
 import { uploadRoutes } from "./media/routes.js";
 import { sheetRoutes } from "./sheets/routes.js";
+import { formRoutes } from "./forms/routes.js";
 import { API_CSP, pageCsp, registerClient } from "./web.js";
 import { TileService } from "./media/tiles.js";
 import { adminRoutes } from "./users/routes.js";
@@ -97,6 +98,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       await uploadRoutes(api, config, hub, new TileService({ uploadDir: config.uploadDir }));
       await contentRoutes(api, config);
       await sheetRoutes(api, hub);
+      await formRoutes(api, config);
       await archiveRoutes(api, config, hub);
       await libraryRoutes(api, config);
     },

@@ -252,3 +252,25 @@ export function applyFormEdit(doc: SheetDoc, template: FormTemplate, fieldId: st
   if (!field) throw new FormError("UNKNOWN_SOURCE", `Campo sconosciuto: ${fieldId}`);
   return writeSource(doc, field.source, value);
 }
+
+// --- API (client <-> server) ---
+
+/** Lettura del modulo di una campagna: il template (se c'è) e se il PDF è caricato. */
+export const FormTemplateResponseSchema = z.strictObject({
+  template: z
+    .strictObject({
+      name: z.string(),
+      pages: z.number().int().min(1),
+      fields: z.array(FormFieldSchema),
+    })
+    .nullable(),
+  hasPdf: z.boolean(),
+});
+export type FormTemplateResponse = z.infer<typeof FormTemplateResponseSchema>;
+
+/** Salvataggio dei campi (solo GM): le pagine le fissa il PDF caricato. */
+export const SaveFormTemplateSchema = z.strictObject({
+  name: z.string().trim().min(1).max(120),
+  fields: z.array(FormFieldSchema).max(400),
+});
+export type SaveFormTemplateRequest = z.infer<typeof SaveFormTemplateSchema>;
