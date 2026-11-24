@@ -83,8 +83,9 @@ describe("derive: combattente di livello 5", () => {
   });
   it("abilita e salvezze", () => {
     expect(d.skills.athletics.bonus).toBe(6);
-    expect(d.skills.perception.bonus).toBe(7);
-    expect(d.passivePerception).toBe(17);
+    // Competenza in Percezione: solo il bonus di competenza (niente maestria nelle regole del tavolo).
+    expect(d.skills.perception.bonus).toBe(4);
+    expect(d.passivePerception).toBe(14);
     expect(d.skills.acrobatics.bonus).toBe(2);
     expect(d.abilities.str.save.formula).toBe("1d20+6");
     expect(d.abilities.dex.save.formula).toBe("1d20+2");
@@ -174,7 +175,7 @@ describe("rollFor", () => {
     expect(rollFor(e, content, { kind: "attack", ability: "str" }).formula).toBe("1d20+2");
     expect(rollFor(e, content, { kind: "deathSave" }).formula).toBe("1d20-4");
     expect(derive(e, content).speed).toBe(20);
-    expect(derive(e, content).passivePerception).toBe(17);
+    expect(derive(e, content).passivePerception).toBe(14);
     const w = setExhaustion(parseCharacterSheet(wizard), 1);
     expect(derive(w, content).spellcasting[0]?.saveDc).toBe(11);
   });

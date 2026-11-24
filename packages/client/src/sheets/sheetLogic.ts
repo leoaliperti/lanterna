@@ -53,10 +53,16 @@ export const SKILL_LABEL: Record<Skill, string> = {
 
 export const PROFICIENCY_LABEL: Record<Proficiency, string> = {
   none: "Nessuna",
-  half: "Mezza competenza",
+  half: "Competenza",
   proficient: "Competenza",
-  expertise: "Maestria"
+  expertise: "Competenza"
 };
+
+/** Abilità: solo sì o no (le regole non hanno gradi intermedi). */
+export const SKILL_PROFICIENCY_OPTIONS: ReadonlyArray<{ value: Proficiency; label: string }> = [
+  { value: "none", label: "Nessuna" },
+  { value: "proficient", label: "Competenza" }
+];
 
 export const SIZE_LABEL = {
   tiny: "Minuscola",

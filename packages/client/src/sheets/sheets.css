@@ -83,3 +83,7 @@
   .s-view { animation: none; }
   .s-spin { animation: none; }
 }
+
+/* Elenco delle competenze in armi e strumenti (modifica scheda). */
+.s-list-plain { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+.s-chip-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--hit-min); }

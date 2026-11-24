@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link2, Plus, Trash2 } from "lucide-react";
-import { ABILITIES, SKILLS, type Ability, type ClassEntry, type Proficiency, type Skill, type TokenView } from "@lanterna/shared";
+import { ABILITIES, SKILLS, SKILL_ABILITY, skillProficiency, type Ability, type ClassEntry, type Proficiency, type Skill, type TokenView } from "@lanterna/shared";
 import { Alert, Banner, Button, IconButton, Picker, TextField, Toggle } from "../ui";
 import { NumInput, type SectionProps } from "./fields";
-import { ABILITY_LABEL, CASTER_LABEL, PROFICIENCY_LABEL, SIZE_LABEL, SKILL_LABEL, patchSheet } from "./sheetLogic";
+import { ABILITY_LABEL, ABILITY_SHORT, CASTER_LABEL, SIZE_LABEL, SKILL_LABEL, SKILL_PROFICIENCY_OPTIONS, patchSheet } from "./sheetLogic";
 
 export interface EditSectionProps extends SectionProps {
   isGm: boolean;
@@ -40,6 +40,7 @@ export function EditSection(props: EditSectionProps) {
         </h3>
         <TextField label="Nome" value={s.name} maxLength={200} onChange={(e) => change((d) => patchSheet(d, { name: e.target.value }))} />
         <Picker
+          showLabel
           label="Taglia"
           value={s.size}
           onValueChange={(v) => change((d) => patchSheet(d, { size: v }))}
@@ -58,12 +59,14 @@ export function EditSection(props: EditSectionProps) {
             <TextField label="Nome della classe" value={c.id} maxLength={64} onChange={(e) => setClass(i, { id: e.target.value || "classe" })} />
             <NumInput label="Livello" value={c.level} min={1} max={Math.max(1, 20 - (totalLevel - c.level))} onValueChange={(n) => setClass(i, { level: n })} />
             <Picker
+              showLabel
               label="Dado vita"
               value={String(c.hitDie ?? 8)}
               onValueChange={(v) => setClass(i, { hitDie: Number(v) })}
               options={HIT_DICE.map((d) => ({ value: String(d), label: `d${d}` }))}
             />
             <Picker
+              showLabel
               label="Incantatore"
               value={c.casterKind ?? "none"}
               onValueChange={(v) =>
@@ -83,6 +86,7 @@ export function EditSection(props: EditSectionProps) {
             />
             {c.casterKind ? (
               <Picker
+                showLabel
                 label="Caratteristica da incantatore"
                 value={c.spellcastingAbility ?? "int"}
                 onValueChange={(v) => setClass(i, { spellcastingAbility: v })}
@@ -127,12 +131,23 @@ export function EditSection(props: EditSectionProps) {
           {(SKILLS as readonly Skill[]).map((k) => (
             <Picker
               key={k}
-              label={SKILL_LABEL[k]}
-              value={s.skills[k] ?? "none"}
+              label={`${SKILL_LABEL[k]} (${ABILITY_SHORT[SKILL_ABILITY[k]]})`}
+              showLabel
+              value={skillProficiency(s.skills[k])}
               onValueChange={(v: Proficiency) => change((d) => patchSheet(d, { skills: { ...d.sheet.skills, [k]: v } }))}
-              options={(Object.keys(PROFICIENCY_LABEL) as Proficiency[]).map((p) => ({ value: p, label: PROFICIENCY_LABEL[p] }))}
+              options={[...SKILL_PROFICIENCY_OPTIONS]}
             />
           ))}
+        </div>
+      </section>
+
+      <section className="s-block" aria-labelledby="s-e-prof">
+        <h3 id="s-e-prof" className="t-headline">
+          Competenze in armi e strumenti
+        </h3>
+        <div className="s-grid2">
+          <ProficiencyList label="Armi" items={s.proficiencies.weapons} onChange={(weapons) => change((d) => patchSheet(d, { proficiencies: { ...d.sheet.proficiencies, weapons } }))} />
+          <ProficiencyList label="Strumenti" items={s.proficiencies.tools} onChange={(tools) => change((d) => patchSheet(d, { proficiencies: { ...d.sheet.proficiencies, tools } }))} />
         </div>
       </section>
 
@@ -159,6 +174,7 @@ export function EditSection(props: EditSectionProps) {
           </h3>
           {kind === "pc" ? (
             <Picker
+              showLabel
               label="Giocatore proprietario"
               value={ownerUserId ?? "none"}
               onValueChange={(v) => onMeta({ ownerUserId: v === "none" ? null : v })}
@@ -166,6 +182,7 @@ export function EditSection(props: EditSectionProps) {
             />
           ) : null}
           <Picker
+            showLabel
             label="Token collegato"
             value={tokenId ?? "none"}
             onValueChange={(v) => onMeta({ tokenId: v === "none" ? null : v })}
@@ -194,6 +211,46 @@ export function EditSection(props: EditSectionProps) {
           />
         </section>
       ) : null}
+    </div>
+  );
+}
+
+/** Elenco di competenze (armi o strumenti) con aggiunta da campo di testo e rimozione per voce. */
+function ProficiencyList({ label, items, onChange }: { label: string; items: readonly string[]; onChange: (next: string[]) => void }) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const value = draft.trim();
+    if (!value || items.includes(value)) return;
+    onChange([...items, value]);
+    setDraft("");
+  };
+  return (
+    <div className="s-form">
+      <TextField
+        label={`Nuova competenza (${label.toLowerCase()})`}
+        value={draft}
+        maxLength={60}
+        autoComplete="off"
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            add();
+          }
+        }}
+      />
+      <Button variant="gray" size="sm" icon={<Plus size={16} />} onClick={add} disabled={!draft.trim()}>
+        Aggiungi a {label.toLowerCase()}
+      </Button>
+      {items.length === 0 ? <p className="t-footnote a-muted">Nessuna {label.toLowerCase()} registrata.</p> : null}
+      <ul className="s-list-plain" aria-label={`Competenze in ${label.toLowerCase()}`}>
+        {items.map((item) => (
+          <li key={item} className="s-chip-row">
+            <span>{item}</span>
+            <IconButton label={`Rimuovi ${item}`} icon={<Trash2 size={16} />} variant="plain" onClick={() => onChange(items.filter((x) => x !== item))} />
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

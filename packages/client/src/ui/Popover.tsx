@@ -194,10 +194,12 @@ export interface PickerProps<T extends string> {
   onValueChange?: (v: T) => void;
   label: string;
   className?: string;
+  /** Mostra l'etichetta sopra il selettore (per i moduli con molti campi uguali). Default: solo per chi legge lo schermo. */
+  showLabel?: boolean;
 }
 
 /** Selezione da elenco: un pulsante che mostra il valore e apre un menu con voci radio. */
-export function Picker<T extends string>({ options, value, defaultValue, onValueChange, label, className }: PickerProps<T>) {
+export function Picker<T extends string>({ options, value, defaultValue, onValueChange, label, className, showLabel = false }: PickerProps<T>) {
   const [current, setCurrent] = useControllable<T | undefined>(value, defaultValue ?? options[0]?.value, onValueChange as ((v: T | undefined) => void) | undefined);
   const selected = options.find((o) => o.value === current);
   const [isOpen, setOpen] = useState(false);
@@ -212,7 +214,8 @@ export function Picker<T extends string>({ options, value, defaultValue, onValue
   useOutsidePress([anchor], isOpen, () => setOpen(false));
 
   return (
-    <span ref={anchor} className={cx("l-anchor", className)}>
+    <span ref={anchor} className={cx("l-anchor", showLabel && "l-anchor--labeled", className)}>
+      {showLabel ? <span className="l-picker__caption t-footnote a-muted">{label}</span> : null}
       <button
         type="button"
         className="l-picker"

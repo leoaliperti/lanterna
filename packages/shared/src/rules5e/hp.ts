@@ -15,6 +15,11 @@ export interface HpState {
   /** A 0 PF ma stabilizzato (non tira piu). */
   stable: boolean;
   dead: boolean;
+  /**
+   * Danno pari o superiore ai PF massimi: morte istantanea possibile. NON la applica il sistema:
+   * la decide il GM (`decideInstantDeath`). Finché è vero, il personaggio è a 0 PF.
+   */
+  instantDeathPending?: boolean;
 }
 
 export function newHpState(max: number): HpState {
@@ -75,7 +80,7 @@ export function applyDamage(hp: HpState, amount: number, opts: DamageOptions = {
 
   if (hp.current === 0) {
     // Gia a terra: il danno e un fallimento (due se critico); il danno >= max uccide.
-    if (dmg >= hp.max) return { ...next, dead: true, stable: false };
+    if (dmg >= hp.max) return { ...next, stable: false, instantDeathPending: true };
     next.stable = false;
     next.deathSaves.failures = Math.min(3, next.deathSaves.failures + (opts.critical ? 2 : 1));
     if (next.deathSaves.failures >= 3) next.dead = true;
@@ -90,7 +95,7 @@ export function applyDamage(hp: HpState, amount: number, opts: DamageOptions = {
     next.current = 0;
     next.deathSaves = { successes: 0, failures: 0 };
     next.stable = false;
-    if (overflow >= next.max) next.dead = true;
+    if (overflow >= next.max) next.instantDeathPending = true;
   } else {
     next.current -= rest;
   }
@@ -106,7 +111,24 @@ export function heal(hp: HpState, amount: number): HpState {
     current: Math.min(hp.max, hp.current + n),
     deathSaves: { successes: 0, failures: 0 },
     stable: false,
+    instantDeathPending: false,
   };
+}
+
+/** Il GM decide la morte istantanea: `dead` vero = morto, falso = resta a 0 PF (a terra). */
+export function decideInstantDeath(hp: HpState, dead: boolean): HpState {
+  if (!hp.instantDeathPending) return { ...hp };
+  return dead
+    ? { ...hp, dead: true, stable: false, instantDeathPending: false }
+    : { ...hp, instantDeathPending: false };
+}
+
+/**
+ * Azzera lo stato di morte (morto, stabile, tiri contro la morte, morte istantanea in sospeso).
+ * Serve a sbloccare la barra della vita dopo un errore di conteggio: il morto non si cura.
+ */
+export function resetDeath(hp: HpState): HpState {
+  return { ...hp, dead: false, stable: false, instantDeathPending: false, deathSaves: { successes: 0, failures: 0 } };
 }
 
 /** PF temporanei: non si sommano, si tiene il valore piu alto. */

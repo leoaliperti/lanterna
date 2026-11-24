@@ -5,7 +5,9 @@ import {
   applyDamage,
   deathSave,
   grantTempHp,
+  decideInstantDeath,
   heal,
+  resetDeath,
   stabilize,
   type DamageOptions,
   type HpState,
@@ -27,6 +29,7 @@ export function hpStateOf(sheet: CharacterSheet, content?: RulesContent): HpStat
     deathSaves: { ...sheet.hp.deathSaves },
     stable: sheet.hp.stable,
     dead: sheet.hp.dead || exhaustionIsLethal(sheet.exhaustion),
+    instantDeathPending: sheet.hp.instantDeathPending,
   };
 }
 
@@ -39,6 +42,7 @@ function withHp(sheet: CharacterSheet, hp: HpState): CharacterSheet {
       deathSaves: { ...hp.deathSaves },
       stable: hp.stable,
       dead: hp.dead,
+      instantDeathPending: hp.instantDeathPending === true,
     },
   };
 }
@@ -62,6 +66,16 @@ export function grantTempHpSheet(
   amount: number,
 ) {
   return withHp(sheet, grantTempHp(hpStateOf(sheet, content), amount));
+}
+
+/** Decisione del GM sulla morte istantanea (vedi `decideInstantDeath`). */
+export function decideInstantDeathSheet(sheet: CharacterSheet, content: RulesContent | undefined, dead: boolean) {
+  return withHp(sheet, decideInstantDeath(hpStateOf(sheet, content), dead));
+}
+
+/** Azzera lo stato di morte (vedi `resetDeath`). */
+export function resetDeathSheet(sheet: CharacterSheet, content?: RulesContent) {
+  return withHp(sheet, resetDeath(hpStateOf(sheet, content)));
 }
 
 export function stabilizeSheet(sheet: CharacterSheet, content?: RulesContent) {
@@ -157,6 +171,7 @@ export function longRest(sheet: CharacterSheet, content?: RulesContent): Charact
       deathSaves: { successes: 0, failures: 0 },
       stable: false,
       dead: false,
+      instantDeathPending: false,
     },
     slotsSpent: Array<number>(9).fill(0),
     pactSlotsSpent: 0,

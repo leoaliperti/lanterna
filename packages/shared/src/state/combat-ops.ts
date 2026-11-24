@@ -1,4 +1,4 @@
-import { applyDamage, grantTempHp, heal, type HpState } from "../rules5e/hp.js";
+import { applyDamage, decideInstantDeath, grantTempHp, heal, type HpState } from "../rules5e/hp.js";
 import {
   DEAD_CONDITION,
   UNCONSCIOUS_CONDITION,
@@ -64,7 +64,9 @@ function patchOf(token: Token, health: Token["health"], conditions: TokenConditi
  */
 export function damagePatch(token: Token, amount: number, critical = false): TokenPatch | null {
   if (!token.health || amount <= 0 || hasCondition(token, DEAD_CONDITION.id)) return null;
-  const r = applyDamage(hpOf(token), amount, { critical });
+  const first = applyDamage(hpOf(token), amount, { critical });
+  // Mostri e oggetti muoiono sul colpo; per un PG la morte istantanea la decide il GM (resta privo di sensi).
+  const r = token.kind !== "pc" && first.instantDeathPending ? decideInstantDeath(first, true) : first;
   let conditions = token.conditions;
   if (r.dead) {
     conditions = withCondition(withoutCondition(conditions, UNCONSCIOUS_CONDITION.id), DEAD_CONDITION);

@@ -523,13 +523,15 @@ describe("gruppi, selezione e azioni di gruppo", () => {
     const down = dmg(s, 7);
     expect(p2(down).health!.current).toBe(0);
     expect(p2(down).conditions.map((c) => c.id)).toEqual(["unconscious"]);
-    const dead = dmg(s, 25); // resto 20 >= PF massimi
-    expect(p2(dead).conditions.map((c) => c.id)).toEqual(["dead"]);
+    // Resto 20 >= PF massimi: per un PG la morte istantanea la decide il GM, quindi resta privo di sensi.
+    const dead = dmg(s, 25);
+    expect(p2(dead).conditions.map((c) => c.id)).toEqual(["unconscious"]);
     const up = run(down, { type: "group.apply", target: { kind: "tokens", tokenIds: ["tok-p2"] }, action: { kind: "heal", amount: 4 } }).state;
     expect(p2(up).health!.current).toBe(4);
     expect(p2(up).conditions).toEqual([]);
     // Un morto non si cura né subisce altro danno.
-    const nothing = run(dead, { type: "group.apply", target: { kind: "tokens", tokenIds: ["tok-p2"] }, action: { kind: "heal", amount: 4 } });
+    const deadTok = run(dead, { type: "token.update", tokenId: "tok-p2", patch: { conditions: [{ id: "dead", name: "Morto" }] } }).state;
+    const nothing = run(deadTok, { type: "group.apply", target: { kind: "tokens", tokenIds: ["tok-p2"] }, action: { kind: "heal", amount: 4 } });
     expect(nothing.changes).toEqual([]);
     // Cura oltre il massimo si ferma al massimo.
     const full = run(s, { type: "group.apply", target: { kind: "tokens", tokenIds: ["tok-p2"] }, action: { kind: "heal", amount: 500 } }).state;
