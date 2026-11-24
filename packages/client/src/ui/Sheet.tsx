@@ -17,6 +17,11 @@ export interface SheetProps {
   className?: string;
   /** Elemento che riceve il focus all'apertura (default: il primo controllo, di solito "Fine"). */
   initialFocus?: RefObject<HTMLElement | null>;
+  /**
+   * "Fine" in alto: di norma chiude; con un form, salva e chiude (il form decide se può chiudersi).
+   * Esc e il click sullo sfondo restano "chiudi senza salvare".
+   */
+  onDone?: () => void;
 }
 
 interface Sample { y: number; t: number }
@@ -25,7 +30,7 @@ interface Sample { y: number; t: number }
  * Modale dal basso: maniglia, trascinamento per chiudere (con velocita'), molla di ritorno,
  * focus trap, Esc, click sullo sfondo. Il trascinamento parte dalla maniglia/intestazione.
  */
-export function Sheet({ open, onOpenChange, title, showTitle = true, children, className, initialFocus }: SheetProps) {
+export function Sheet({ open, onOpenChange, title, showTitle = true, children, className, initialFocus, onDone }: SheetProps) {
   const { mounted, state } = usePresence(open);
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -119,7 +124,7 @@ export function Sheet({ open, onOpenChange, title, showTitle = true, children, c
             <span className="l-sheet__handle" aria-hidden="true" />
             <div className="l-sheet__header">
               <h2 id={titleId} className={cx("l-sheet__title", !showTitle && "l-sr-only")}>{title}</h2>
-              <Button variant="plain" size="sm" onClick={() => onOpenChange(false)} onPointerDown={(e) => e.stopPropagation()}>
+              <Button variant="plain" size="sm" onClick={() => (onDone ? onDone() : onOpenChange(false))} onPointerDown={(e) => e.stopPropagation()}>
                 Fine
               </Button>
             </div>

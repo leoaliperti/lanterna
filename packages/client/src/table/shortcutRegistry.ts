@@ -37,7 +37,7 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   { id: "zoom-in", keys: ["+", "="], label: "Ingrandisci", group: "Mappa", scope: "map" },
   { id: "zoom-out", keys: ["-", "_"], label: "Riduci", group: "Mappa", scope: "map" },
   { id: "fit", keys: ["0"], label: "Adatta la mappa allo schermo", group: "Mappa", scope: "map" },
-  { id: "nudge", keys: ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"], label: "Sposta il token selezionato di una cella", group: "Mappa", scope: "map" },
+  { id: "nudge", keys: ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d"], label: "Sposta il token selezionato di una cella (frecce o WASD)", group: "Mappa", scope: "map" },
 
   { id: "ruler", keys: ["r"], label: "Righello", group: "Misure", scope: "map" },
   { id: "circle", keys: ["o"], label: "Cerchio", group: "Misure", scope: "map" },
@@ -46,15 +46,15 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   { id: "arrow", keys: ["f"], label: "Freccia", group: "Misure", scope: "map" },
   { id: "ping", keys: ["p"], label: "Segnalazione", group: "Misure", scope: "map" },
 
-  { id: "damage", keys: ["d"], label: "Danno", group: "Selezione", scope: "selection" },
+  { id: "damage", keys: ["x"], label: "Danno", group: "Selezione", scope: "selection" },
   { id: "heal", keys: ["h"], label: "Cura", group: "Selezione", scope: "selection" },
   { id: "condition", keys: ["k"], label: "Condizione", group: "Selezione", scope: "selection" },
   { id: "effect", keys: ["e"], label: "Effetto", group: "Selezione", scope: "selection" },
-  { id: "move", keys: ["m"], label: "Sposta", group: "Selezione", scope: "selection" },
+  { id: "edit", keys: ["m"], label: "Modifica il token selezionato", group: "Selezione", scope: "selection" },
 
   { id: "select", keys: ["v"], label: "Strumento di selezione", group: "Strumenti del GM", scope: "gm" },
   { id: "fog", keys: ["n"], label: "Nebbia di guerra", group: "Strumenti del GM", scope: "gm" },
-  { id: "wall", keys: ["w"], label: "Muri e porte", group: "Strumenti del GM", scope: "gm" }
+  { id: "wall", keys: ["b"], label: "Muri e porte", group: "Strumenti del GM", scope: "gm" }
 ];
 
 /** Quali contesti possono essere attivi insieme: due scorciatoie in contesti sovrapposti non possono avere lo stesso tasto. */

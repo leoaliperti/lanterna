@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Library, Plus, Trash2 } from "lucide-react";
 import type { CampaignView, LibraryItem, SceneView, TokenView } from "@lanterna/shared";
-import { Alert, Avatar, Badge, Banner, Button, IconButton, List, ListRow, SearchField, SegmentedControl, Spinner, useToast } from "../ui";
+import { Alert, Avatar, Badge, Banner, Button, IconButton, List, ListRow, SearchField, SegmentedControl, Sheet, Spinner, useToast } from "../ui";
 import { userErrorMessage } from "../api/client";
 import { assetUrl } from "../realtime/urls";
 import { useCommands } from "../realtime/RealtimeProvider";
 import { EmptyState } from "../screens/EmptyState";
 import { permissionsFor } from "../table/permissions";
-import { deleteLibraryItem, hasStats, listLibrary, type AnyLibraryItem } from "./libraryApi";
+import { LibraryPicker } from "../sheets/LibraryPicker";
+import { deleteLibraryItem, hasStats, listLibrary, updateLibraryItem, type AnyLibraryItem } from "./libraryApi";
 import { KIND_LABEL, LIBRARY_DRAG_TYPE, instanceCommand, setDraggedItem } from "./libraryLogic";
+import { createLinkedSheet } from "./linkedSheet";
 
 type Filter = "all" | "pc" | "monster" | "object";
 
@@ -38,6 +40,8 @@ export function LibraryPanel({ view, scene, tokens, onAdded }: LibraryPanelProps
   const [state, setState] = useState<{ status: "loading" } | { status: "error"; message: string } | { status: "ready"; items: AnyLibraryItem[]; total: number }>({ status: "loading" });
   const [reload, setReload] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState<LibraryItem | null>(null);
+  // Elemento a cui si sta collegando una scheda (un mostro importato).
+  const [linking, setLinking] = useState<LibraryItem | null>(null);
   const seq = useRef(0);
 
   useEffect(() => {
@@ -61,13 +65,32 @@ export function LibraryPanel({ view, scene, tokens, onAdded }: LibraryPanelProps
   const add = useCallback(
     async (item: LibraryItem) => {
       if (!scene) return;
-      const ok = await run(instanceCommand(item, scene, tokens.filter((t) => t.sceneId === scene.id), crypto.randomUUID()));
+      const id = crypto.randomUUID();
+      const ok = await run(instanceCommand(item, scene, tokens.filter((t) => t.sceneId === scene.id), id));
       if (ok) {
         toast.show({ title: `${item.name} aggiunto alla scena`, tone: "success" });
         onAdded?.();
+        try {
+          await createLinkedSheet(view.campaignId, item, id);
+        } catch (err) {
+          toast.show({ title: "Token aggiunto, ma la scheda non è stata creata", message: userErrorMessage(err), tone: "danger" });
+        }
       }
     },
-    [run, scene, tokens, toast, onAdded]
+    [run, scene, tokens, toast, onAdded, view.campaignId]
+  );
+
+  const link = useCallback(
+    async (item: LibraryItem, contentId: string | null) => {
+      try {
+        await updateLibraryItem(item.id, { contentId });
+        setReload((n) => n + 1);
+        toast.show({ title: contentId ? `Scheda collegata a ${item.name}` : `Scheda scollegata da ${item.name}`, tone: "success" });
+      } catch (err) {
+        toast.show({ title: "Impossibile collegare la scheda", message: userErrorMessage(err), tone: "danger" });
+      }
+    },
+    [toast]
   );
 
   const remove = useCallback(
@@ -84,7 +107,12 @@ export function LibraryPanel({ view, scene, tokens, onAdded }: LibraryPanelProps
   );
 
   const subtitle = (i: AnyLibraryItem) =>
-    [KIND_LABEL[i.kind], i.size === 1 ? "1 cella" : `${i.size} celle`, ...(hasStats(i) && i.stats.hpMax !== null ? [`PF ${i.stats.hpMax}`] : [])].join(" · ");
+    [
+      KIND_LABEL[i.kind],
+      i.size === 1 ? "1 cella" : `${i.size} celle`,
+      ...(hasStats(i) && i.stats.hpMax !== null ? [`PF ${i.stats.hpMax}`] : []),
+      ...(hasStats(i) && i.contentId ? ["scheda collegata"] : []),
+    ].join(" · ");
 
   return (
     <div className="a-panel">
@@ -144,6 +172,16 @@ export function LibraryPanel({ view, scene, tokens, onAdded }: LibraryPanelProps
                   {item.scope === "global" ? <Badge tone="gray">Globale</Badge> : null}
                   {perms.isGm && hasStats(item) ? (
                     <>
+                      {item.kind === "monster" ? (
+                        <Button size="sm" variant="gray" onClick={() => setLinking(item)} aria-label={`Collega la scheda a ${item.name}`}>
+                          {item.contentId ? "Cambia scheda" : "Collega scheda"}
+                        </Button>
+                      ) : null}
+                      {item.kind === "monster" && item.contentId ? (
+                        <Button size="sm" variant="plain" onClick={() => void link(item, null)} aria-label={`Scollega la scheda da ${item.name}`}>
+                          Scollega
+                        </Button>
+                      ) : null}
                       <IconButton label={`Elimina ${item.name} dalla libreria`} icon={<Trash2 size={16} />} onClick={() => setConfirmDelete(item)} />
                       <Button size="sm" icon={<Plus size={14} />} disabled={!scene} aria-label={`Aggiungi ${item.name} alla scena`} onClick={() => void add(item)}>
                         Aggiungi
@@ -157,6 +195,19 @@ export function LibraryPanel({ view, scene, tokens, onAdded }: LibraryPanelProps
         </List>
       )}
       {perms.isGm && !scene ? <p className="t-caption1 a-muted">Per aggiungere elementi serve una scena.</p> : null}
+      <Sheet open={linking !== null} onOpenChange={(open) => !open && setLinking(null)} title="Scheda del mostro">
+        {linking ? (
+          <LibraryPicker
+            kind="monster"
+            actionLabel="Collega"
+            onPick={async (doc) => {
+              const item = linking;
+              setLinking(null);
+              await link(item, doc.id);
+            }}
+          />
+        ) : null}
+      </Sheet>
       <Alert
         open={confirmDelete !== null}
         onOpenChange={(open) => !open && setConfirmDelete(null)}

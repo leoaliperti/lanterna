@@ -12,8 +12,8 @@ describe("registro delle scorciatoie", () => {
     expect(shortcutConflicts([...SHORTCUTS, { id: "x", keys: ["d"], label: "x", group: "Mappa", scope: "map" }]).length).toBe(1);
   });
 
-  it("D/H/K/E/M restano le azioni sulla selezione, come nella tabella usata dal tavolo", () => {
-    const reg = Object.fromEntries(SHORTCUTS.filter((s) => s.scope === "selection").map((s) => [s.keys[0], s.id]));
+  it("X/H/K/E restano le azioni sulla selezione, come nella tabella usata dal tavolo (M apre la modifica)", () => {
+    const reg = Object.fromEntries(SHORTCUTS.filter((s) => s.scope === "selection" && s.id !== "edit").map((s) => [s.keys[0], s.id]));
     expect(reg).toEqual(ACTION_KEYS);
   });
 

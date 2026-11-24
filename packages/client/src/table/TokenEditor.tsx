@@ -154,7 +154,7 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange, onAddEff
   const unit = scene?.scale.unit ?? "unita'";
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} title={title}>
+    <Sheet open={open} onOpenChange={onOpenChange} title={title} onDone={() => void submit()}>
       <form
         className="a-form"
         noValidate

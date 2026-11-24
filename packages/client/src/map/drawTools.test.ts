@@ -63,14 +63,14 @@ describe("strumenti: accesso e tastiera", () => {
     c.setTool("wall");
     expect(c.tool).toBe("select");
     expect(c.keyDown("n")).toBe(false);
-    expect(c.keyDown("w")).toBe(false);
+    expect(c.keyDown("b")).toBe(false);
   });
-  it("N attiva/disattiva la nebbia, W i muri, V torna alla selezione; senza nebbia N non fa nulla", () => {
+  it("N attiva/disattiva la nebbia, B i muri, V torna alla selezione; senza nebbia N non fa nulla", () => {
     expect(c.keyDown("n")).toBe(true);
     expect(c.tool).toBe("fog");
     expect(c.keyDown("N")).toBe(true);
     expect(c.tool).toBe("select");
-    expect(c.keyDown("w")).toBe(true);
+    expect(c.keyDown("b")).toBe(true);
     expect(c.tool).toBe("wall");
     expect(c.keyDown("v")).toBe(true);
     expect(c.tool).toBe("select");
@@ -182,7 +182,7 @@ describe("pennelli della nebbia -> forme", () => {
 
 describe("muri e porte", () => {
   const wall = (id: string, x1: number, y1: number, x2: number, y2: number, door = false, open = false): MapWall => ({ id, door, open, segments: [x1, y1, x2, y2] });
-  beforeEach(() => c.keyDown("w"));
+  beforeEach(() => c.keyDown("b"));
 
   it("trascinamento: segmento agganciato agli incroci", () => {
     drag([68, 72], [213, 3]);

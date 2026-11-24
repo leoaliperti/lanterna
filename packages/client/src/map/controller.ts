@@ -61,6 +61,13 @@ const DRAG_THRESHOLD_TOUCH = 8;
 /** Raggio minimo (px schermo) per afferrare token e maniglie: 22 = bersaglio da 44. */
 const MIN_HIT_SCREEN = 22;
 const KEY_PAN = 64;
+/** Direzioni dei tasti WASD sulla griglia (una cella per pressione). */
+const WASD_STEP: Record<string, { dx: number; dy: number }> = {
+  w: { dx: 0, dy: -1 },
+  s: { dx: 0, dy: 1 },
+  a: { dx: -1, dy: 0 },
+  d: { dx: 1, dy: 0 },
+};
 /** Pressione prolungata (touch) che apre il menu contestuale di un token. */
 const LONG_PRESS_MS = 500;
 
@@ -596,6 +603,19 @@ export class MapController {
 
   /* ---------------- tastiera ---------------- */
 
+  /** Sposta di una cella i token selezionati che si possono muovere. False se non ce n'e' nessuno. */
+  private nudgeSelection(dx: number, dy: number): boolean {
+    if (!this.scene) return false;
+    const movable = [...this.selection].filter((id) => this.canMove(id));
+    if (!movable.length || this.cell <= 0) return false;
+    for (const id of movable) {
+      const t = this.tokensById.get(id)!;
+      const p = resolveDropPosition({ x: t.x + dx * this.cell, y: t.y + dy * this.cell }, t.size, this.scene.grid, this.scene.background);
+      this.handlers.onMoveToken?.(id, p.x, p.y);
+    }
+    return true;
+  }
+
   /** Ritorna true se il tasto e' stato gestito (il chiamante fa preventDefault). */
   keyDown(key: string, shift = false): boolean {
     if (!this.scene) return false;
@@ -613,7 +633,7 @@ export class MapController {
         return true;
       }
       if (key === "n" || key === "N") return this.scene.fog ? toggle("fog") : false;
-      if (key === "w" || key === "W") return toggle("wall");
+      if (key === "b" || key === "B") return toggle("wall");
     }
     switch (key) {
       case " ":
@@ -684,17 +704,22 @@ export class MapController {
       case "ArrowDown": {
         const dx = key === "ArrowLeft" ? -1 : key === "ArrowRight" ? 1 : 0;
         const dy = key === "ArrowUp" ? -1 : key === "ArrowDown" ? 1 : 0;
-        const movable = [...this.selection].filter((id) => this.canMove(id));
-        if (movable.length && this.cell > 0) {
-          for (const id of movable) {
-            const t = this.tokensById.get(id)!;
-            const p = resolveDropPosition({ x: t.x + dx * this.cell, y: t.y + dy * this.cell }, t.size, this.scene.grid, this.scene.background);
-            this.handlers.onMoveToken?.(id, p.x, p.y);
-          }
-        } else {
+        if (!this.nudgeSelection(dx, dy)) {
           this.setViewport({ ...this.viewport, x: this.viewport.x - dx * KEY_PAN, y: this.viewport.y - dy * KEY_PAN });
         }
         return true;
+      }
+      case "w":
+      case "W":
+      case "a":
+      case "A":
+      case "s":
+      case "S":
+      case "d":
+      case "D": {
+        // WASD sposta i token selezionati di una cella (come le frecce). Senza token selezionati non fa nulla.
+        const step = WASD_STEP[key.toLowerCase()]!;
+        return this.nudgeSelection(step.dx, step.dy);
       }
       default:
         return this.handlers.onKey?.(key, shift) ?? false;

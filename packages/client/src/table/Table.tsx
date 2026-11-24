@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CloudFog, Crosshair, Eye, EyeOff, Layers, Library, Map as MapIcon, MessageSquare, Pencil, Redo2, ScrollText, Shapes, ShieldCheck, Swords, Undo2, Users, WifiOff } from "lucide-react";
+import { CloudFog, Crosshair, Eye, EyeOff, Layers, Library, Map as MapIcon, MessageSquare, Pencil, Redo2, ScrollText, Shapes, ShieldCheck, Swords, Trash2, Undo2, Users, WifiOff } from "lucide-react";
 import type { CampaignView, FogShape, TokenView, WallPatch } from "@lanterna/shared";
-import type { SessionUser } from "../api/client";
+import { userErrorMessage, type SessionUser } from "../api/client";
 import { MapCanvas, type MapCanvasHandle, type Point } from "../map";
 import { fogShapeCommand, fogTarget, type FogMode } from "../fog/fogLogic";
 import { wallAddCommand, wallRemoveCommand, wallUpdateCommand } from "../fog/wallLogic";
-import { Button, IconButton, Material, PointMenu, Spinner, type MenuItemSpec } from "../ui";
+import { Button, IconButton, Material, PointMenu, Spinner, useToast, type MenuItemSpec } from "../ui";
 import { ActionButtons } from "../combat/ActionButtons";
 import { ActionSheet, type ActionRequest } from "../combat/ActionSheet";
 import { addTokenCommand, combatOf, tokensToAdd, turnTokenId } from "../combat/combatLogic";
@@ -32,6 +32,7 @@ import { useHistoryShortcuts } from "./shortcuts";
 import { ShortcutsHelp } from "./ShortcutsHelp";
 import { useHelpShortcut } from "./shortcutRegistry";
 import { LIBRARY_DRAG_TYPE, draggedItem, dropCommand, setDraggedItem } from "../library/libraryLogic";
+import { createLinkedSheet } from "../library/linkedSheet";
 import { TableFrame } from "./TableFrame";
 import { GameClock } from "./GameClock";
 import { TokenEditor } from "./TokenEditor";
@@ -135,6 +136,7 @@ interface LiveProps {
 function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
   const commands = useCommands();
   const { run } = commands;
+  const toast = useToast();
   const readOnly = mapOnly?.readOnly ?? false;
   const basePerms = permissionsFor(view);
   // Sola lettura (vista giocatore): nessuno strumento, nessun trascinamento. Il server rifiuterebbe comunque.
@@ -235,6 +237,10 @@ function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
   // Scorciatoie delle azioni (solo GM, con il focus sulla mappa e almeno un token selezionato).
   const onMapKey = (key: string): boolean => {
     if (!perms.isGm || selected.length === 0 || isTypingTarget(document.activeElement)) return false;
+    if (key.toLowerCase() === "m") {
+      setEditor({ open: true, tokenId: selected[0]! });
+      return true;
+    }
     const kind = actionForKey(key);
     if (!kind) return false;
     openAction(kind, selected);
@@ -254,24 +260,29 @@ function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
     if (!perms.isGm) {
       return perms.canOpenEditor(token) ? [{ id: "edit", label: "Condizioni", icon: <Pencil size={16} />, onSelect: () => setEditor({ open: true, tokenId: token.id }) }] : [];
     }
-    const act = (kind: ActionKind, key: string): MenuItemSpec => ({ id: kind, label: `${ACTION_LABELS[kind]} (${key})`, onSelect: () => openAction(kind, ids) });
+    const act = (kind: ActionKind, key: string | null): MenuItemSpec => ({
+      id: kind,
+      label: key ? `${ACTION_LABELS[kind]} (${key})` : ACTION_LABELS[kind],
+      onSelect: () => openAction(kind, ids),
+    });
     const inCombat = combat?.participants.some((p) => p.tokenId === token.id) ?? false;
     return [
-      act("damage", "D"),
+      act("damage", "X"),
       act("heal", "H"),
       act("condition", "K"),
       act("effect", "E"),
-      act("move", "M"),
+      act("move", null),
       ...(scene && !inCombat && tokensToAdd([token], scene.id, combat).length > 0
         ? [{ id: "combat", label: "Aggiungi al combattimento", icon: <Swords size={16} />, onSelect: () => void run(addTokenCommand(crypto.randomUUID(), scene.id, token.id)) } satisfies MenuItemSpec]
         : []),
-      { id: "edit", label: "Modifica", icon: <Pencil size={16} />, onSelect: () => setEditor({ open: true, tokenId: token.id }) },
+      { id: "edit", label: "Modifica (M)", icon: <Pencil size={16} />, onSelect: () => setEditor({ open: true, tokenId: token.id }) },
       {
         id: "hide",
         label: token.hidden ? "Rivela" : "Nascondi",
         icon: token.hidden ? <Eye size={16} /> : <EyeOff size={16} />,
         onSelect: () => void run({ type: "token.update", tokenId: token.id, patch: { hidden: !token.hidden } })
-      }
+      },
+      { id: "delete", label: "Elimina", icon: <Trash2 size={16} />, destructive: true, onSelect: () => void run({ type: "token.delete", tokenId: token.id }) }
     ];
   };
   const audienceOptions = perms.isGm
@@ -405,7 +416,16 @@ function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
                   e.preventDefault();
                   setDraggedItem(null);
                   const at = mapRef.current?.clientToMap(e.clientX, e.clientY);
-                  if (at) void run(dropCommand(item, scene, at, crypto.randomUUID()));
+                  if (!at) return;
+                  const id = crypto.randomUUID();
+                  void run(dropCommand(item, scene, at, id)).then(async (ok) => {
+                    if (!ok) return;
+                    try {
+                      await createLinkedSheet(view.campaignId, item, id);
+                    } catch (err) {
+                      toast.show({ title: "Token messo in scena, ma la scheda non è stata creata", message: userErrorMessage(err), tone: "danger" });
+                    }
+                  });
                 }
               : undefined
           }

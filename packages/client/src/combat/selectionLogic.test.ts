@@ -78,12 +78,12 @@ describe("gruppi", () => {
 
 describe("azioni rapide", () => {
   it("mappa le scorciatoie", () => {
-    expect(actionForKey("d")).toBe("damage");
+    expect(actionForKey("x")).toBe("damage");
     expect(actionForKey("H")).toBe("heal");
     expect(actionForKey("k")).toBe("condition");
     expect(actionForKey("e")).toBe("effect");
-    expect(actionForKey("m")).toBe("move");
-    expect(actionForKey("x")).toBeNull();
+    expect(actionForKey("m")).toBeNull();
+    expect(actionForKey("d")).toBeNull();
   });
 
   it("produce un solo group.apply valido per ogni azione", () => {

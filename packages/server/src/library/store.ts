@@ -122,7 +122,7 @@ export async function countInScope(db: Db, campaignId: string | null): Promise<n
 }
 
 function contentOf(input: LibraryContent): LibraryContent {
-  return { size: input.size, imageUrl: input.imageUrl, stats: input.stats, tags: input.tags };
+  return { size: input.size, imageUrl: input.imageUrl, stats: input.stats, tags: input.tags, ...(input.contentId !== undefined ? { contentId: input.contentId } : {}) };
 }
 
 export async function insertItem(db: Db, input: CreateLibraryItem): Promise<LibraryItem> {
@@ -148,6 +148,7 @@ export async function updateItem(db: Db, id: string, patch: UpdateLibraryItem): 
     imageUrl: patch.imageUrl !== undefined ? patch.imageUrl : current.imageUrl,
     stats: patch.stats ?? current.stats,
     tags: patch.tags ?? current.tags,
+    ...(patch.contentId !== undefined ? { contentId: patch.contentId } : current.contentId !== undefined ? { contentId: current.contentId } : {}),
   };
   await db
     .update(libraryItem)

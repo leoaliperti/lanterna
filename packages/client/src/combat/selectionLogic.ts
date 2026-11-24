@@ -94,7 +94,8 @@ export const ACTION_LABELS: Record<ActionKind, string> = {
 };
 
 /** Scorciatoie da tastiera (con il focus sulla mappa): una lettera per azione. */
-export const ACTION_KEYS: Record<string, ActionKind> = { d: "damage", h: "heal", k: "condition", e: "effect", m: "move" };
+// `d` non e' piu' danno (e' WASD per muovere); `m` apre la modifica del token, non uno spostamento.
+export const ACTION_KEYS: Record<string, ActionKind> = { x: "damage", h: "heal", k: "condition", e: "effect" };
 
 export function actionForKey(key: string): ActionKind | null {
   return ACTION_KEYS[key.toLowerCase()] ?? null;

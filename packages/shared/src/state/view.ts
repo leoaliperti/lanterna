@@ -199,6 +199,9 @@ export function projectToken(token: Token, viewer: Actor): TokenView {
     health: privileged && token.health ? { ...token.health } : null,
     vision: privileged && token.vision ? { ...token.vision } : null,
     effects: projectEffects(token.effects ?? [], viewer),
+    // Forma e numero si vedono da tutti (vedi `TokenViewSchema`): sono nel modello, vanno copiati qui.
+    ...(token.shape !== undefined ? { shape: token.shape } : {}),
+    ...(token.number != null ? { number: token.number } : {}),
   };
   if (isGm(viewer)) {
     view.gmNotes = token.gmNotes;

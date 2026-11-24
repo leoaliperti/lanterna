@@ -24,7 +24,7 @@ function setup(over: Partial<MapScene> = {}) {
     onShape: vi.fn(),
     onShapeCancel: vi.fn(),
     onContextMenu: vi.fn(),
-    onKey: vi.fn((k: string) => k === "d")
+    onKey: vi.fn((k: string) => k === "x")
   };
   c.handlers = h;
   c.init({ x: 0, y: 0, scale: 1 }); // viewport identita': schermo = mappa
@@ -102,7 +102,7 @@ describe("misure e segnalazioni", () => {
 
   it("le lettere non gestite arrivano a onKey (scorciatoie delle azioni)", () => {
     const { c, h } = setup();
-    expect(c.keyDown("d")).toBe(true);
+    expect(c.keyDown("x")).toBe(true);
     expect(c.keyDown("q")).toBe(false);
     expect(h.onKey).toHaveBeenCalledTimes(2);
   });

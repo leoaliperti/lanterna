@@ -12,7 +12,7 @@ import {
 import { requireRole, requireSession } from "../auth/session.js";
 import { campaignExists } from "../campaigns/store.js";
 import type { AppConfig } from "../config.js";
-import { asset } from "../db/schema.js";
+import { asset, content } from "../db/schema.js";
 import { parseAssetUrl } from "../media/assetUrl.js";
 import { isMember } from "../sheets/store.js";
 import { countInScope, deleteItem, getItem, insertItem, listLibrary, toPublic, updateItem } from "./store.js";
@@ -42,6 +42,14 @@ export async function libraryRoutes(app: FastifyInstance, config: AppConfig) {
   const playerKinds = config.libraryPlayerKinds.filter((k): k is TokenKind => TokenKindSchema.safeParse(k).success);
 
   /** `null` se l'immagine è accettabile, altrimenti il motivo. Un file caricato deve esistere. */
+  /** La scheda collegata a un elemento è un mostro importato (documento di `content`). */
+  async function checkContent(id: string | null | undefined): Promise<string | null> {
+    if (!id) return null;
+    const row = await db.query.content.findFirst({ where: eq(content.id, id), columns: { id: true, kind: true } });
+    if (!row) return "scheda inesistente";
+    return row.kind === "monster" ? null : "la scheda collegata deve essere un mostro";
+  }
+
   async function checkImage(url: string | null): Promise<string | null> {
     if (url === null) return null;
     const parsed = parseAssetUrl(url);
@@ -115,7 +123,7 @@ export async function libraryRoutes(app: FastifyInstance, config: AppConfig) {
       if (input.scope === "campaign" && !(await campaignExists(db, input.campaignId!))) {
         return reply.code(404).send({ error: "Campagna inesistente" });
       }
-      const bad = await checkImage(input.imageUrl);
+      const bad = (await checkImage(input.imageUrl)) ?? (await checkContent(input.contentId));
       if (bad) return reply.code(400).send({ error: `Dati non validi: ${bad}` });
       if ((await countInScope(db, input.scope === "campaign" ? input.campaignId! : null)) >= LIBRARY_LIMITS.maxItemsPerScope) {
         return reply.code(409).send({ error: "Libreria piena" });
@@ -133,6 +141,10 @@ export async function libraryRoutes(app: FastifyInstance, config: AppConfig) {
       if (!parsed.success) return invalid(reply, parsed.error.issues);
       if (parsed.data.imageUrl !== undefined) {
         const bad = await checkImage(parsed.data.imageUrl);
+        if (bad) return reply.code(400).send({ error: `Dati non validi: ${bad}` });
+      }
+      if (parsed.data.contentId) {
+        const bad = await checkContent(parsed.data.contentId);
         if (bad) return reply.code(400).send({ error: `Dati non validi: ${bad}` });
       }
       const item = await updateItem(db, request.params.id, parsed.data);

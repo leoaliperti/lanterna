@@ -45,6 +45,11 @@ export const LibraryContentSchema = z.strictObject({
   size: tokenSize,
   imageUrl: ImageUrlSchema.nullable(),
   stats: LibraryStatsSchema,
+  /**
+   * Facoltativo: il mostro importato (documento di `content`, tipo `monster`) che fa da scheda a questo
+   * elemento. Trascinandolo in scena il client crea anche la scheda collegata al token. Solo GM.
+   */
+  contentId: z.string().min(1).max(LIMITS.idMaxLength).regex(/^[A-Za-z0-9_-]+$/).nullable().optional(),
   tags: z
     .array(LibraryTagSchema)
     .max(LIBRARY_LIMITS.maxTags)

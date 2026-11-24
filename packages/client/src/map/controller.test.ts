@@ -268,6 +268,21 @@ describe("tastiera", () => {
     c.keyDown("ArrowRight");
     expect(c.viewport.x).toBeLessThan(0);
   });
+  it("WASD spostano il token selezionato di una cella (come le frecce); senza selezione non fanno nulla", () => {
+    const { c, h } = setup();
+    expect(c.keyDown("d")).toBe(false);
+    expect(h.onMoveToken).not.toHaveBeenCalled();
+    drag(c, [125, 125], [125, 125]);
+    expect(c.keyDown("d")).toBe(true);
+    expect(h.onMoveToken).toHaveBeenLastCalledWith("a", 175, 125);
+    // Il mock di onMoveToken non aggiorna il token: ogni passo parte dalla posizione di partenza.
+    expect(c.keyDown("S")).toBe(true);
+    expect(h.onMoveToken).toHaveBeenLastCalledWith("a", 125, 175);
+    expect(c.keyDown("a")).toBe(true);
+    expect(h.onMoveToken).toHaveBeenLastCalledWith("a", 75, 125);
+    expect(c.keyDown("w")).toBe(true);
+    expect(h.onMoveToken).toHaveBeenLastCalledWith("a", 125, 75);
+  });
   it("+, - e 0 controllano lo zoom", () => {
     const { c } = setup();
     c.keyDown("+");
