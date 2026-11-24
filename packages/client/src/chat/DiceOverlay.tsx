@@ -8,7 +8,7 @@ import "./chat.css";
 
 const SUPPORTED = new Set([4, 6, 8, 10, 12, 20, 100]);
 /** Oltre questo numero di dadi l'animazione sarebbe solo confusione: il testo in chat basta. */
-export const MAX_ANIMATED_DICE = 10;
+export const MAX_ANIMATED_DICE = 20;
 const SHOW_MS = 3600;
 const FADE_MS = 300;
 

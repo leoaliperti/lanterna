@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Archive, ExternalLink, KeyRound, LogOut, PanelRight, Settings, Users } from "lucide-react";
+import { Archive, ExternalLink, KeyRound, LogOut, Maximize, Minimize, PanelRight, Settings, Users } from "lucide-react";
 import { Avatar, IconButton, Menu, Sheet, Tabs, useToast, type MenuItemSpec, type TabItem } from "../ui";
 import { openViewWindow } from "../windows/layout";
 import { POPUP_BLOCKED } from "../windows/WindowsMenu";
@@ -35,6 +35,8 @@ export interface TableFrameProps {
   title: string;
   /** Pulsanti accanto al menu utente (annulla, ripeti, stato della connessione). */
   actions?: ReactNode;
+  /** Etichetta accanto al titolo (ruolo, orologio): in barra, mai sopra la mappa. */
+  badge?: ReactNode;
   /** Sotto la barra (avvisi di connessione). */
   banner?: ReactNode;
   /** Schede del pannello laterale; senza, il pannello non c'e'. `closeSheet` chiude lo sheet su telefono. */
@@ -60,6 +62,7 @@ export function TableFrame({
   user,
   title,
   actions,
+  badge,
   banner,
   tabs,
   defaultTab,
@@ -152,9 +155,11 @@ export function TableFrame({
         <div className="a-topbar__title">
           <span className="a-topbar__app t-caption1 a-muted">Lanterna</span>
           <CampaignSwitcher title={title} />
+          {badge}
         </div>
         <div className="a-topbar__actions">
           {actions}
+          <FullscreenButton />
           {tabs ? (
             <IconButton
               label={inline && panelOpen ? "Nascondi pannello" : panelBadge > 0 ? `Mostra pannello (${panelBadge} nuovi)` : "Mostra pannello"}
@@ -197,5 +202,33 @@ export function TableFrame({
       <ChangePasswordSheet open={passwordOpen} onOpenChange={setPasswordOpen} />
       <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
+  );
+}
+
+/**
+ * Schermo intero del tavolo (API Fullscreen del browser). Se il browser non lo supporta il pulsante
+ * non compare.
+ */
+function FullscreenButton() {
+  const supported = typeof document !== "undefined" && typeof document.documentElement.requestFullscreen === "function";
+  const [active, setActive] = useState(() => typeof document !== "undefined" && !!document.fullscreenElement);
+  useEffect(() => {
+    const onChange = () => setActive(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  if (!supported) return null;
+  const toggle = () => {
+    if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => undefined);
+    else void document.documentElement.requestFullscreen().catch(() => undefined);
+  };
+  return (
+    <IconButton
+      label={active ? "Esci dallo schermo intero" : "Schermo intero"}
+      icon={active ? <Minimize size={18} /> : <Maximize size={18} />}
+      variant={active ? "tinted" : "plain"}
+      aria-pressed={active}
+      onClick={toggle}
+    />
   );
 }

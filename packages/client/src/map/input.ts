@@ -22,6 +22,7 @@ export function bindCanvasInput(canvas: HTMLElement, controller: MapController):
     controller.pointerDown(toInput(e));
   };
   const move = (e: PointerEvent) => controller.pointerMove(toInput(e));
+  const leave = () => controller.pointerLeave();
   const up = (e: PointerEvent) => controller.pointerUp(toInput(e));
   const cancel = (e: PointerEvent) => controller.pointerCancel(toInput(e));
   const wheel = (e: WheelEvent) => {
@@ -41,6 +42,7 @@ export function bindCanvasInput(canvas: HTMLElement, controller: MapController):
   canvas.addEventListener("pointermove", move);
   canvas.addEventListener("pointerup", up);
   canvas.addEventListener("pointercancel", cancel);
+  canvas.addEventListener("pointerleave", leave);
   canvas.addEventListener("wheel", wheel, { passive: false });
   canvas.addEventListener("keydown", keydown);
   canvas.addEventListener("keyup", keyup);
@@ -51,6 +53,7 @@ export function bindCanvasInput(canvas: HTMLElement, controller: MapController):
     canvas.removeEventListener("pointermove", move);
     canvas.removeEventListener("pointerup", up);
     canvas.removeEventListener("pointercancel", cancel);
+    canvas.removeEventListener("pointerleave", leave);
     canvas.removeEventListener("wheel", wheel);
     canvas.removeEventListener("keydown", keydown);
     canvas.removeEventListener("keyup", keyup);

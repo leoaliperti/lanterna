@@ -10,7 +10,7 @@ import { type BackgroundPlan, MAX_LOADED_TILES, needsDetail, planBackground, til
 import { type MapTheme, healthColor, kindColor, readTheme } from "./theme";
 import { cellRects, ephemeralAlpha, measureLabel, outlinePolygon } from "./measure";
 import type { Shape } from "@lanterna/shared";
-import type { MapEphemeral, MapPulse, MapScene, MapToken, Point, Size } from "./types";
+import type { MapEphemeral, MapPulse, MapScene, MapToken, Point, Size, TokenShape } from "./types";
 
 /**
  * Resa PixiJS della mappa. Si carica con import() dinamico (vedi MapCanvas) e non conosce React.
@@ -40,6 +40,8 @@ interface TokenView {
   barBg: Graphics | null;
   barFg: Graphics | null;
   badges: Container | null;
+  /** Testo "attuali/massimi" sotto la barra della vita. */
+  hpText: Text | null;
   effectBadge: Container | null;
   /** Posizione disegnata (puo' essere in transizione verso quella dei dati). */
   x: number;
@@ -71,10 +73,37 @@ function mipmapped(source: ImageSource | CanvasSource): Texture {
   return new Texture({ source });
 }
 
+/** Percorso della forma del token, centrata in (0,0) con raggio `r` (pixel di mappa). Cerchio per default. */
+export function shapePath(g: Graphics, shape: TokenShape, r: number): void {
+  switch (shape) {
+    case "square":
+      g.rect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7);
+      return;
+    case "diamond":
+      g.poly([0, -r, r, 0, 0, r, -r, 0]);
+      return;
+    case "hexagon": {
+      const pts: number[] = [];
+      for (let i = 0; i < 6; i++) {
+        const a = (-90 + 60 * i) * (Math.PI / 180);
+        pts.push(r * Math.cos(a), r * Math.sin(a));
+      }
+      g.poly(pts);
+      return;
+    }
+    case "triangle":
+      g.poly([0, -r, r * 0.9, r * 0.6, -r * 0.9, r * 0.6]);
+      return;
+    default:
+      g.circle(0, 0, r);
+  }
+}
+
 function tokenSignature(t: MapToken, role: string, cell: number, theme: MapTheme): string {
   const cond = t.conditions?.map((c) => `${c.id}${c.icon ?? ""}${c.color ?? ""}${c.label}`).join(",") ?? "";
+  const shape = t.shape ?? "circle";
   const h = t.health ? `${t.health.current}/${t.health.max}` : "";
-  return [t.size, t.imageUrl ?? "", t.color ?? "", t.label ?? "", t.kind, t.hidden ? 1 : 0, cond, h, role, cell, theme.tint, t.turn ? 1 : 0, t.effects ?? 0].join("|");
+  return [t.size, t.imageUrl ?? "", t.color ?? "", t.label ?? "", t.kind, t.hidden ? 1 : 0, cond, h, shape, t.number ?? "", role, cell, theme.tint, t.turn ? 1 : 0, t.effects ?? 0].join("|");
 }
 
 export class PixiMapView {
@@ -230,6 +259,7 @@ export class PixiMapView {
     this.fogLayer.sync(scene);
     this.propLayer.sync(scene);
     this.syncTokens(scene);
+    this.syncHover(scene);
     this.syncPulses(scene.pulses ?? []);
     this.requestRender();
   }
@@ -480,12 +510,19 @@ export class PixiMapView {
     }
   }
 
+  /** Mostra i badge delle condizioni solo sul token sotto il puntatore. */
+  private syncHover(scene: MapScene) {
+    for (const v of this.views.values()) {
+      if (v.badges) v.badges.alpha = v.token.id === scene.hoverTokenId ? 1 : 0;
+    }
+  }
+
   private createView(t: MapToken): TokenView {
     const root = new Container();
     const body = new Container();
     const decor = new Container();
     root.addChild(body, decor);
-    return { token: t, sig: "", root, body, decor, label: null, barBg: null, barFg: null, badges: null, effectBadge: null, x: t.x, y: t.y, imageUrl: null, layoutKey: "", shown: true };
+    return { token: t, sig: "", root, body, decor, label: null, barBg: null, barFg: null, badges: null, hpText: null, effectBadge: null, x: t.x, y: t.y, imageUrl: null, layoutKey: "", shown: true };
   }
 
   private destroyView(v: TokenView) {
@@ -500,14 +537,16 @@ export class PixiMapView {
     const theme = this.theme;
     v.body.removeChildren().forEach((ch) => ch.destroy({ children: true }));
     v.decor.removeChildren().forEach((ch) => ch.destroy({ children: true }));
-    v.label = v.barBg = v.barFg = v.badges = v.effectBadge = null;
+    v.label = v.barBg = v.barFg = v.badges = v.hpText = v.effectBadge = null;
     v.layoutKey = "";
 
     const base = kindColor(theme, t.kind);
     const fill = t.color ? parseCssColor(t.color).value : base;
     const g = new Graphics();
-    g.circle(0, 0, r).fill(fill);
-    g.circle(0, 0, r).stroke({ width: Math.max(2, r * 0.07), color: base });
+    shapePath(g, t.shape ?? "circle", r);
+    g.fill(fill);
+    shapePath(g, t.shape ?? "circle", r);
+    g.stroke({ width: Math.max(2, r * 0.07), color: base });
     // Tacca di orientamento: mostra la rotazione anche senza immagine.
     g.poly([-r * 0.18, -r * 0.78, r * 0.18, -r * 0.78, 0, -r * 1.02]).fill(base);
     v.body.addChild(g);
@@ -533,7 +572,14 @@ export class PixiMapView {
         const s = new Sprite(tex);
         s.anchor.set(0.5);
         s.width = s.height = r * 1.86;
+        // L'immagine segue la forma del token (la maschera non è nella scena: solo ritaglio).
+        const mask = new Graphics();
+        shapePath(mask, t.shape ?? "circle", r);
+        mask.fill(0xffffff);
+        s.mask = mask;
         v.body.addChildAt(s, 1);
+        v.body.addChildAt(mask, 2);
+        mask.renderable = false;
         this.requestRender();
       });
     }
@@ -552,6 +598,14 @@ export class PixiMapView {
       v.barFg = new Graphics().rect(0, 0, 1, 1).fill(healthColor(theme, ratio));
       v.barFg.scale.x = ratio;
       v.decor.addChild(v.barBg, v.barFg);
+      // Numeri: attuali/massimi (+temporanei), come chiesto dal GM.
+      const temp = t.health.temp ?? 0;
+      v.hpText = new Text({
+        text: `${t.health.current}/${t.health.max}${temp > 0 ? ` +${temp}` : ""}`,
+        style: { fontFamily: "system-ui, sans-serif", fontSize: 10, fontWeight: "600", fill: theme.label, stroke: { color: theme.scrim, width: 3 } }
+      });
+      v.hpText.anchor.set(0.5, 0);
+      v.decor.addChild(v.hpText);
     }
     if (t.conditions?.length) {
       v.badges = new Container();
@@ -560,13 +614,24 @@ export class PixiMapView {
         const col = cnd.color ? parseCssColor(cnd.color).value : theme.tint;
         const b = new Container();
         b.addChild(new Graphics().circle(0, 0, 9).fill(col).stroke({ width: 1.5, color: theme.scrim }));
-        const glyph = new Text({ text: cnd.icon ?? cnd.label.slice(0, 1).toUpperCase(), style: { fontFamily: "system-ui, sans-serif", fontSize: 10, fontWeight: "700", fill: theme.onTint } });
+        const glyph = new Text({ text: cnd.icon ?? cnd.label.slice(0, 1).toUpperCase(), style: { fontFamily: "system-ui, sans-serif", fontSize: 11, fontWeight: "700", fill: theme.onTint } });
         glyph.anchor.set(0.5);
         b.addChild(glyph);
         b.position.set((i - (shown.length - 1) / 2) * 20, 0);
         v.badges!.addChild(b);
       });
+      v.badges.alpha = 0; // visibili solo con il puntatore sopra (vedi syncTokens)
       v.decor.addChild(v.badges);
+    }
+    if (t.number !== undefined && t.number !== null) {
+      // Numero del token: distingue i personaggi in battaglia (angolo in alto a sinistra).
+      const nb = new Container();
+      nb.label = "number-badge";
+      const disc = new Graphics().circle(0, 0, 9).fill({ color: theme.scrim, alpha: 0.92 });
+      const txt = new Text({ text: String(t.number), style: { fontFamily: "system-ui, sans-serif", fontSize: 11, fontWeight: "700", fill: theme.label } });
+      txt.anchor.set(0.5);
+      nb.addChild(disc, txt);
+      v.decor.addChild(nb);
     }
     if (t.effects) {
       v.effectBadge = new Container();
@@ -610,6 +675,10 @@ export class PixiMapView {
       v.barBg.scale.x = w;
       const ratio = v.token.health ? Math.min(1, Math.max(0, v.token.health.current / v.token.health.max)) : 0;
       v.barFg.scale.x = w * ratio;
+      if (v.hpText) {
+        v.hpText.visible = !small;
+        v.hpText.position.set(0, y + 8);
+      }
     }
     if (v.badges) {
       v.badges.visible = !small;
@@ -618,6 +687,11 @@ export class PixiMapView {
     if (v.effectBadge) v.effectBadge.position.set(-rs * 0.7, -rs * 0.7);
     const icon = v.decor.getChildByLabel("hidden-icon");
     if (icon) icon.position.set(rs * 0.7, -rs * 0.7);
+    const nb = v.decor.getChildByLabel("number-badge");
+    if (nb) {
+      nb.visible = !small;
+      nb.position.set(-rs * 0.72, -rs * 0.72);
+    }
   }
 
   /* ---------------- frame ---------------- */

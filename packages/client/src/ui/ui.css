@@ -117,6 +117,8 @@
 
 /* ---------- Picker, Menu, Popover ---------- */
 .l-anchor { position: relative; display: inline-block; }
+.l-anchor--labeled { display: grid; gap: var(--space-1); justify-items: start; }
+.l-anchor--labeled .l-picker { width: 100%; }
 .l-picker { display: inline-flex; align-items: center; gap: var(--space-1); min-height: var(--hit-min); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-md); background: var(--fill-tertiary); color: var(--tint-text); font-size: var(--text-body); cursor: pointer; transition: transform var(--dur-press) var(--ease-out); }
 .l-picker:active { transform: scale(var(--press-scale)); }
 

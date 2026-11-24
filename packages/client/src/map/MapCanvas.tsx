@@ -81,11 +81,12 @@ export function MapCanvas({
   const [status, setStatus] = useState<Status>("loading");
   const [tool, setTool] = useState<Tool>("select");
   const [zoom, setZoom] = useState(() => Math.round((defaultViewport?.scale ?? 1) * 100));
+  const [hoverTokenId, setHoverTokenId] = useState<string | null>(null);
   const [measuresOpen, setMeasuresOpen] = useState(false);
 
   const scene = useMemo<MapScene>(
-    () => ({ background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight, ephemerals, pulses, objects }),
-    [background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight, ephemerals, pulses, objects]
+    () => ({ background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight, ephemerals, pulses, objects, hoverTokenId }),
+    [background, grid, scale, tokens, role, movableTokenIds, rulerMode, fog, walls, wallsVisible, sight, ephemerals, pulses, objects, hoverTokenId]
   );
   const toolStateRef = useRef(onToolStateChange);
   toolStateRef.current = onToolStateChange;
@@ -104,6 +105,7 @@ export function MapCanvas({
           }
         : undefined,
       onMoveToken, onResizeToken, onRotateToken, onSelectionChange, onFogShape, onWallAdd, onWallUpdate, onWallRemove, onWallSelect,
+      onHoverToken: setHoverTokenId,
       onViewportChange: (vp) => {
         setZoom(Math.round(vp.scale * 100));
         onViewportChange?.(vp);

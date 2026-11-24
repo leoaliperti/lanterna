@@ -12,6 +12,8 @@ export interface SectionProps {
   roller: SheetRoller;
   /** Testo della ricerca della scheda: ogni sezione filtra le proprie voci. */
   query: string;
+  /** Solo il GM decide la morte istantanea. */
+  isGm: boolean;
 }
 
 export interface NumInputProps {

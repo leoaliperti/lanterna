@@ -76,6 +76,7 @@ export type StateChange =
       activeSceneId: string | null;
       fog: Fog | null;
     }
+  | { type: "clock"; before: { day: number; minute: number }; after: { day: number; minute: number } }
   | { type: "token"; before: Token | null; after: Token | null; activeSceneId: string | null; fog?: Fog | null }
   | { type: "scene"; before: Scene | null; after: Scene | null; activeSceneId: string | null; fog?: Fog | null }
   | {

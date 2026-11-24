@@ -199,7 +199,7 @@ export function SheetView({ sheetId }: SheetViewProps) {
 
   const kind = record.kind;
   const linkedToken = record.tokenId ? (view?.tokens.find((t) => t.id === record.tokenId) ?? null) : null;
-  const props: SectionProps = { doc, kind, derived: derivedResult, change, roller, query };
+  const props: SectionProps = { doc, kind, derived: derivedResult, change, roller, query, isGm };
 
   const tabs: TabItem[] = [
     { id: "base", label: "Base", content: <AbilitiesSection {...props} /> },

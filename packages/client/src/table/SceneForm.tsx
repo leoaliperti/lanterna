@@ -6,6 +6,7 @@ import { assetUrl } from "../realtime/urls";
 import { useCommands } from "../realtime/RealtimeProvider";
 import { ImagePicker } from "./ImagePicker";
 import { NumberField, parseNumber } from "./NumberField";
+import { GridPreview, cellFromCalibration, type Point } from "./GridPreview";
 
 export interface SceneFormProps {
   open: boolean;
@@ -57,6 +58,11 @@ export function SceneForm({ open, onOpenChange, scene, onCreated }: SceneFormPro
   const { run } = useCommands();
   const [draft, setDraft] = useState<Draft>(() => draftOf(scene));
   const [file, setFile] = useState<File | null>(null);
+  // Anteprima della griglia e misura di calibrazione (solo nel form).
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [calibrating, setCalibrating] = useState(false);
+  const [points, setPoints] = useState<Point[]>([]);
+  const [realDistance, setRealDistance] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -73,10 +79,23 @@ export function SceneForm({ open, onOpenChange, scene, onCreated }: SceneFormPro
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value }));
 
+  // Anteprima locale del file scelto (si rilascia quando cambia o il form si chiude).
+  useEffect(() => {
+    if (!file) {
+      setFileUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setFileUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
   const cell = parseNumber(draft.cellSize, LIMITS.cellMinSize, LIMITS.cellMaxSize);
   const offX = parseNumber(draft.offsetX, -LIMITS.cellMaxSize, LIMITS.cellMaxSize);
   const offY = parseNumber(draft.offsetY, -LIMITS.cellMaxSize, LIMITS.cellMaxSize);
   const units = parseNumber(draft.unitsPerCell, Number.MIN_VALUE, LIMITS.unitsPerCellMax);
+  const previewSrc = fileUrl ?? (scene?.map && !file ? assetUrl(scene.map.url) : null);
+  const calibrated = points.length === 2 && units !== null ? cellFromCalibration(points[0]!, points[1]!, Number(realDistance.replace(",", ".")), units) : null;
   const errors = {
     name: draft.name.trim() === "" ? "Dai un nome alla scena." : draft.name.trim().length > LIMITS.nameMaxLength ? "Nome troppo lungo." : null,
     cell: cell === null ? `Tra ${LIMITS.cellMinSize} e ${LIMITS.cellMaxSize} pixel.` : null,
@@ -160,9 +179,43 @@ export function SceneForm({ open, onOpenChange, scene, onCreated }: SceneFormPro
           disabled={busy}
           helper="PNG, JPEG o WebP, fino a 25 MB. Le dimensioni della scena seguono quelle dell'immagine."
         />
+        {previewSrc ? (
+          <GridPreview
+            src={previewSrc}
+            alt={draft.name.trim() || "Scena"}
+            cellSize={cell}
+            offsetX={offX ?? 0}
+            offsetY={offY ?? 0}
+            color={draft.color}
+            opacity={draft.opacity}
+            calibrating={calibrating}
+            points={points}
+            onPointsChange={setPoints}
+          />
+        ) : null}
 
         <h3 className="t-headline a-form__section">Griglia</h3>
         <NumberField label="Lato della cella (pixel)" value={draft.cellSize} onValueChange={(v) => set("cellSize", v)} min={LIMITS.cellMinSize} max={LIMITS.cellMaxSize} error={show(errors.cell)} />
+        {previewSrc ? (
+          <div className="a-field-group">
+            <Button variant="gray" size="sm" onClick={() => { setCalibrating((c) => !c); setPoints([]); }} aria-pressed={calibrating}>
+              {calibrating ? "Annulla la misura" : "Misura la cella dalla mappa"}
+            </Button>
+            {calibrating ? (
+              <>
+                <p className="t-footnote a-muted">
+                  Clicca due punti sulla mappa la cui distanza reale conosci (es. due angoli di una stanza). {points.length === 0 ? "Primo punto da scegliere." : points.length === 1 ? "Secondo punto da scegliere." : "Due punti scelti: indica la distanza reale."}
+                </p>
+                <NumberField label="Distanza reale fra i due punti" value={realDistance} onValueChange={setRealDistance} min={0} helper={`In ${draft.unit.trim() || "unità"}, come la scala qui sotto.`} />
+                {calibrated !== null ? (
+                  <p className="t-footnote">
+                    Cella calcolata: <strong>{Math.round(calibrated * 10) / 10} px</strong>. <Button size="sm" onClick={() => { set("cellSize", String(Math.round(calibrated * 10) / 10)); setCalibrating(false); setPoints([]); }}>Usa questa misura</Button>
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+        ) : null}
         <div className="a-form__pair">
           <NumberField label="Spostamento orizzontale" value={draft.offsetX} onValueChange={(v) => set("offsetX", v)} error={show(errors.offX)} />
           <NumberField label="Spostamento verticale" value={draft.offsetY} onValueChange={(v) => set("offsetY", v)} error={show(errors.offY)} />

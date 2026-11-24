@@ -33,6 +33,7 @@ import { ShortcutsHelp } from "./ShortcutsHelp";
 import { useHelpShortcut } from "./shortcutRegistry";
 import { LIBRARY_DRAG_TYPE, draggedItem, dropCommand, setDraggedItem } from "../library/libraryLogic";
 import { TableFrame } from "./TableFrame";
+import { GameClock } from "./GameClock";
 import { TokenEditor } from "./TokenEditor";
 import { TokenPanel } from "./TokenPanel";
 import { ViewFrame } from "../windows/ViewFrame";
@@ -171,13 +172,15 @@ function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
     [view.fogs, view.campaignId, view.viewer.role, scene, controls.viewAs, controls.veil, mapOnly?.tilesAs]
   );
   const mapWalls = useMemo(() => (scene ? toMapWalls(view.walls, scene.id) : []), [view.walls, scene]);
-  const sight = useSight(view, scene, controls.sight);
+  // Il GM che seleziona un token con vista ne vede la vista anche con l'interruttore spento.
+  const sightFocusId = perms.isGm && selected.length === 1 && view.tokens.some((t) => t.id === selected[0] && t.vision) ? selected[0]! : null;
+  const sight = useSight(view, scene, controls.sight || sightFocusId !== null, controls.sight ? null : sightFocusId);
   const mapScene = useMemo(() => {
     if (!scene) return null;
     const s = toMapScene(view, scene, {
       fog: mapFog,
       walls: mapWalls,
-      wallsVisible: perms.isGm ? controls.walls || wallTool : true,
+      wallsVisible: perms.isGm ? controls.walls || wallTool : false,
       sight,
       ephemerals: feed.shapes,
       pulses: feed.pulses,
@@ -196,6 +199,7 @@ function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
     if (fitKey) mapRef.current?.fit();
   }, [fitKey]);
 
+  const onClockChange = useCallback((c: { day: number; minute: number }) => void run({ type: "clock.set", day: c.day, minute: c.minute }), [run]);
   const onMoveToken = useCallback((id: string, x: number, y: number) => void run({ type: "token.move", tokenId: id, x, y }), [run]);
   const onResizeToken = useCallback((id: string, size: number) => void run({ type: "token.update", tokenId: id, patch: { size } }), [run]);
   const onRotateToken = useCallback(
@@ -492,11 +496,6 @@ function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
       ) : (
         <EmptyState icon={<MapIcon size={36} />} title="In attesa della mappa" description="Il GM non ha ancora aperto una scena. Comparirà qui appena sarà pronta." />
       )}
-      {perms.isGm && !mapOnly ? (
-        <p className="a-map__badge t-caption1 a-muted">
-          <ShieldCheck size={14} aria-hidden="true" /> Sei il GM di questo tavolo
-        </p>
-      ) : null}
 
       <ShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} isGm={perms.isGm} />
       {readOnly ? null : (
@@ -539,6 +538,12 @@ function LiveTable({ user, view, actions, mapOnly }: LiveProps) {
       user={user}
       title={view.name}
       actions={actions}
+      badge={
+        <>
+          {perms.isGm ? <span className="a-role-pill t-caption1"><ShieldCheck size={14} aria-hidden="true" /> GM</span> : null}
+          <GameClock clock={view.clock} isGm={perms.isGm} onChange={onClockChange} />
+        </>
+      }
       banner={<ConnectionBanner />}
       tabs={tabs}
       tabWindows={tabWindows}

@@ -2,6 +2,7 @@ import type { CampaignView, FogView, SceneView, TokenView } from "@lanterna/shar
 import type { MapEphemeral, MapFog, MapProp, MapPulse, MapScene, MapSight, MapToken, MapWall, TokenKind as MapTokenKind } from "../map";
 import { availableTiles, geometryOf, tileUrl, viewMask } from "../fog/fogLogic";
 import { API_BASE, assetUrl } from "../realtime/urls";
+import { conditionSymbol } from "./conditions";
 
 /**
  * Adattatore stato condiviso -> props di `MapCanvas`. Mostra esattamente cio' che il server ha
@@ -75,7 +76,9 @@ export function toMapToken(token: TokenView, turnTokenId: string | null = null):
     label: token.name,
     kind: KIND_MAP[token.kind],
     hidden: token.hidden,
-    conditions: token.conditions.map((c) => ({ id: c.id, label: c.name })),
+    conditions: token.conditions.map((c) => ({ id: c.id, label: c.name, icon: conditionSymbol(c.id) + (c.level !== undefined ? String(c.level) : "") })),
+    shape: token.shape ?? "circle",
+    number: token.number ?? null,
     // Solo se il server l'ha inviata (GM e proprietario): mai dedotta dal client.
     health: token.health ? { current: token.health.current, max: token.health.max, temp: token.health.temp } : undefined,
     turn: token.id === turnTokenId ? true : undefined,

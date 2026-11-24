@@ -69,6 +69,13 @@ export const characterSheetSchema = z
     baseSpeed: z.number().int().min(0).default(30),
     skills: z.partialRecord(z.enum(SKILLS), z.enum(["none", "half", "proficient", "expertise"])).default({}),
     saveProficiencies: z.array(abilityEnum).default([]),
+    /** Competenze in armi e strumenti: testo libero (il nome come sta nel manuale del tuo gioco). */
+    proficiencies: z
+      .object({
+        weapons: z.array(z.string().trim().min(1).max(60)).max(40).default([]),
+        tools: z.array(z.string().trim().min(1).max(60)).max(40).default([]),
+      })
+      .default({ weapons: [], tools: [] }),
     equipment: z
       .object({ armorId: z.string().optional(), shield: z.boolean().default(false) })
       .default({ shield: false }),
@@ -90,8 +97,10 @@ export const characterSheetSchema = z
           .default({ successes: 0, failures: 0 }),
         stable: z.boolean().default(false),
         dead: z.boolean().default(false),
+        /** Danno oltre i PF massimi: la morte istantanea la decide il GM. */
+        instantDeathPending: z.boolean().default(false),
       })
-      .default({ temp: 0, deathSaves: { successes: 0, failures: 0 }, stable: false, dead: false }),
+      .default({ temp: 0, deathSaves: { successes: 0, failures: 0 }, stable: false, dead: false, instantDeathPending: false }),
     /** Slot spesi per livello di slot (indice 0 = 1 livello). */
     slotsSpent: z.array(z.number().int().min(0)).length(9).default([0, 0, 0, 0, 0, 0, 0, 0, 0]),
     pactSlotsSpent: z.number().int().min(0).default(0),
@@ -192,6 +201,14 @@ export function hitDiceByLevel(classes: readonly ResolvedClass[]): number[] {
   return classes.flatMap((c) => Array<number>(c.level).fill(c.hitDie));
 }
 
+/**
+ * Competenza in un'abilità: solo sì o no (si aggiunge il bonus di competenza). Le vecchie schede con
+ * "mezza competenza" o "maestria" contano come competenza piena: nelle regole non ci sono gradi intermedi.
+ */
+export function skillProficiency(value: Proficiency | undefined): Proficiency {
+  return value === undefined || value === "none" ? "none" : "proficient";
+}
+
 export function derive(sheet: CharacterSheet, content?: RulesContent): DerivedSheet {
   const level = characterLevel(sheet);
   const prof = proficiencyBonus(level);
@@ -227,7 +244,7 @@ export function derive(sheet: CharacterSheet, content?: RulesContent): DerivedSh
   const skills = {} as DerivedSheet["skills"];
   for (const s of SKILLS) {
     const ability = SKILL_ABILITY[s];
-    const proficiency: Proficiency = sheet.skills[s] ?? "none";
+    const proficiency: Proficiency = skillProficiency(sheet.skills[s]);
     const bonus = mods[ability] + proficiencyContribution(proficiency, prof);
     const extra: RollMode = s === "stealth" && stealthDisadvantage ? "disadvantage" : "normal";
     skills[s] = { ability, proficiency, bonus, roll: makeRollSpec(bonus - penalty, checkMode(extra)) };

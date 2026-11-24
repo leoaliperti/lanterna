@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   applyDamage,
+  decideInstantDeath,
+  resetDeath,
   deathSave,
   grantTempHp,
   heal,
@@ -40,11 +42,25 @@ describe("danno e cura", () => {
     expect(r.current).toBe(0);
     expect(r.dead).toBe(false);
   });
-  it("morte istantanea se il danno residuo >= PF massimi", () => {
-    expect(applyDamage(newHpState(10), 20).dead).toBe(true);
-    expect(applyDamage(newHpState(10), 19).dead).toBe(false);
+  it("danno residuo >= PF massimi: morte istantanea in sospeso, decide il GM (non morto da solo)", () => {
+    const hit = applyDamage(newHpState(10), 20);
+    expect(hit.dead).toBe(false);
+    expect(hit.instantDeathPending).toBe(true);
+    expect(applyDamage(newHpState(10), 19).instantDeathPending).toBeFalsy();
     const wounded = { ...newHpState(10), current: 4 };
-    expect(applyDamage(wounded, 14).dead).toBe(true);
+    expect(applyDamage(wounded, 14).instantDeathPending).toBe(true);
+  });
+  it("il GM decide: morto, oppure resta a terra; il reset sblocca la vita", () => {
+    const pending = applyDamage(newHpState(10), 20);
+    expect(decideInstantDeath(pending, true).dead).toBe(true);
+    const alive = decideInstantDeath(pending, false);
+    expect(alive.dead).toBe(false);
+    expect(alive.current).toBe(0);
+    expect(alive.instantDeathPending).toBe(false);
+    const stuck = { ...newHpState(10), current: 0, dead: true };
+    const reset = resetDeath(stuck);
+    expect(reset.dead).toBe(false);
+    expect(heal(reset, 4).current).toBe(4);
   });
   it("danno a 0 PF: un fallimento, due se critico, morte a 3", () => {
     const down = applyDamage(newHpState(30), 30);
@@ -54,9 +70,11 @@ describe("danno e cura", () => {
     expect(b.deathSaves.failures).toBe(3);
     expect(b.dead).toBe(true);
   });
-  it("danno a 0 PF >= massimo uccide", () => {
+  it("danno a 0 PF >= massimo: morte istantanea in sospeso, decide il GM", () => {
     const down = applyDamage(newHpState(10), 10);
-    expect(applyDamage(down, 10).dead).toBe(true);
+    const hit = applyDamage(down, 10);
+    expect(hit.dead).toBe(false);
+    expect(hit.instantDeathPending).toBe(true);
   });
   it("cura: non oltre il massimo, azzera i tiri contro la morte", () => {
     const hp = { ...newHpState(20), current: 15 };

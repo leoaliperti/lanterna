@@ -41,7 +41,39 @@ const ICONS: Record<Condition, typeof Eye> = {
   unconscious: Moon
 };
 
-export const CONDITION_LIST: ReadonlyArray<{ id: Condition; name: string }> = CONDITIONS.map((id) => ({ id, name: CONDITION_LABELS[id] }));
+/**
+ * Condizioni del token: le 15 della 5e più "Morto" (non è una condizione 5e, ma uno stato del token).
+ * Esaurimento compare nell'elenco come le altre; il livello (1-6) si sceglie a parte.
+ */
+export const DEAD_ID = "dead";
+export const CONDITION_LIST: ReadonlyArray<{ id: string; name: string }> = [
+  ...CONDITIONS.map((id) => ({ id, name: CONDITION_LABELS[id] })),
+  { id: DEAD_ID, name: "Morto" }
+];
+
+/** Simbolo disegnato sulla mappa al posto della lettera (le emoji si vedono su tutti i sistemi). */
+export const CONDITION_SYMBOLS: Record<string, string> = {
+  blinded: "🙈",
+  charmed: "💖",
+  deafened: "🔇",
+  exhaustion: "🔋",
+  frightened: "😱",
+  grappled: "✊",
+  incapacitated: "🚫",
+  invisible: "👻",
+  paralyzed: "⚡",
+  petrified: "🗿",
+  poisoned: "☠️",
+  prone: "⬇️",
+  restrained: "⛓️",
+  stunned: "💫",
+  unconscious: "💤",
+  [DEAD_ID]: "💀"
+};
+
+export function conditionSymbol(id: string): string {
+  return CONDITION_SYMBOLS[id] ?? "✦";
+}
 
 function isKnown(id: string): id is Condition {
   return (CONDITIONS as readonly string[]).includes(id);
@@ -49,6 +81,6 @@ function isKnown(id: string): id is Condition {
 
 /** Icona di una condizione; per un id sconosciuto (condizione personalizzata) una stella generica. */
 export function ConditionIcon({ id, size = 16 }: { id: string; size?: number }): ReactNode {
-  const Icon = isKnown(id) ? ICONS[id] : Sparkles;
+  const Icon = id === DEAD_ID ? Skull : isKnown(id) ? ICONS[id] : Sparkles;
   return <Icon size={size} aria-hidden="true" />;
 }

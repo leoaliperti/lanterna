@@ -24,7 +24,8 @@ describe("formula dei tiri", () => {
   it("modificatori e competenza dalla scheda", () => {
     const doc = hero();
     expect(formulaOf(rollTargetFor(doc, { kind: "skill", skill: "perception" }))).toBe("1d20+3");
-    expect(formulaOf(rollTargetFor(doc, { kind: "skill", skill: "stealth" }))).toBe("1d20+6");
+    // Competenza in Furtività: solo il bonus di competenza (nessuna maestria).
+    expect(formulaOf(rollTargetFor(doc, { kind: "skill", skill: "stealth" }))).toBe("1d20+4");
     expect(formulaOf(rollTargetFor(doc, { kind: "check", ability: "str" }))).toBe("1d20");
     expect(signed(-2)).toBe("−2");
   });

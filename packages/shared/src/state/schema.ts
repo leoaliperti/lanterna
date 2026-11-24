@@ -78,9 +78,21 @@ export type Scene = z.infer<typeof SceneSchema>;
 export const TokenKindSchema = z.enum(["pc", "monster", "object"]);
 export type TokenKind = z.infer<typeof TokenKindSchema>;
 
+/** Forma del token sulla mappa (solo varietà visiva; la vita e le regole restano uguali). */
+export const TokenShapeSchema = z.enum(["circle", "square", "diamond", "hexagon", "triangle"]);
+export type TokenShape = z.infer<typeof TokenShapeSchema>;
+
+/** Numero da mostrare sul token per distinguere i personaggi in battaglia (es. 1, 2, 3...). */
+export const TokenNumberSchema = z.number().int().min(0).max(999);
+
 export const TokenConditionSchema = z.strictObject({
   id: IdSchema,
   name: NameSchema,
+  /**
+   * Solo per l'Esaurimento 2024: livello 1-6 (6 = morte). Assente per le altre condizioni.
+   * Il limite 6 è `MAX_EXHAUSTION` in rules5e/conditions.ts.
+   */
+  level: z.number().int().min(1).max(6).optional(),
 });
 export type TokenCondition = z.infer<typeof TokenConditionSchema>;
 
@@ -139,8 +151,23 @@ export const TokenSchema = z.strictObject({
   faction: z.string().trim().min(1).max(LIMITS.nameMaxLength).nullable().optional(),
   /** Facoltativo (M7): effetti temporanei con durata. */
   effects: EffectsSchema.optional(),
+  /** Facoltativo: forma sulla mappa (assente = cerchio). */
+  shape: TokenShapeSchema.optional(),
+  /** Facoltativo: numero sul token (assente o null = nessuno). */
+  number: TokenNumberSchema.nullable().optional(),
 });
 export type Token = z.infer<typeof TokenSchema>;
+
+/**
+ * Orologio di gioco (campagna): giorno (dal 1) e minuto del giorno (0-1439). Lo imposta il GM;
+ * lo vedono tutti. Facoltativo: assente = `DEFAULT_CLOCK` (giorno 1, ore 8:00).
+ */
+export const ClockSchema = z.strictObject({
+  day: z.number().int().min(1).max(100000),
+  minute: z.number().int().min(0).max(1439),
+});
+export type Clock = z.infer<typeof ClockSchema>;
+export const DEFAULT_CLOCK: Clock = { day: 1, minute: 8 * 60 };
 
 export const CampaignStateSchema = z.strictObject({
   campaignId: IdSchema,
@@ -159,6 +186,8 @@ export const CampaignStateSchema = z.strictObject({
   fogs: z.array(FogSchema).max(LIMITS.maxScenes).optional(),
   /** Muri e porte (M6), di tutte le scene. Facoltativo come `fogs`. */
   walls: z.array(WallSchema).max(LIMITS.maxWalls).optional(),
+  /** Orologio di gioco (GM imposta, tutti vedono). Facoltativo: vedi `DEFAULT_CLOCK`. */
+  clock: ClockSchema.optional(),
   /** Combattimenti (M7), al più uno per scena. Facoltativo. */
   combats: z.array(CombatSchema).max(LIMITS.maxScenes).optional(),
   /** Oggetti di scena su livelli (M10), di tutte le scene. Facoltativo. */

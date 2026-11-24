@@ -10,7 +10,9 @@ import {
   ScaleSchema,
   SceneSchema,
   TokenKindSchema,
+  TokenNumberSchema,
   TokenSchema,
+  TokenShapeSchema,
   TokenVisionSchema,
 } from "./schema.js";
 import { FogLightingSchema, FogSchema, FogShapeSchema, FogStateSchema, FogTargetSchema } from "./fog.js";
@@ -71,6 +73,8 @@ export const TokenPatchSchema = z
     faction: z.string().trim().min(1).max(LIMITS.nameMaxLength).nullable(),
     /** Solo GM (M7): di norma si cambia con `effect.*`; qui serve all'annulla/ripeti. */
     effects: EffectsSchema,
+    shape: TokenShapeSchema,
+    number: TokenNumberSchema.nullable(),
   })
   .partial()
   .refine((p) => Object.keys(p).length > 0, { message: "patch vuota" });
@@ -140,6 +144,13 @@ export const DeleteSceneSchema = z.strictObject({
 export const ChangeSceneSchema = z.strictObject({
   type: z.literal("scene.activate"),
   sceneId: IdSchema.nullable(),
+});
+
+/** Orologio di gioco (solo GM): valori assoluti; i campi assenti restano uguali. */
+export const ClockSetSchema = z.strictObject({
+  type: z.literal("clock.set"),
+  day: z.number().int().min(1).max(100000).optional(),
+  minute: z.number().int().min(0).max(1439).optional(),
 });
 
 /**
@@ -365,6 +376,7 @@ export const CommandSchema = z.discriminatedUnion("type", [
   SetSceneGridSchema,
   DeleteSceneSchema,
   ChangeSceneSchema,
+  ClockSetSchema,
   DuplicateSceneSchema,
   PropCreateSchema,
   PropUpdateSchema,

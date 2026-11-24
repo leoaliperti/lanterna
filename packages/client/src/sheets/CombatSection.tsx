@@ -6,6 +6,8 @@ import {
   addCondition,
   damageSheet,
   deathSaveSheet,
+  decideInstantDeathSheet,
+  resetDeathSheet,
   engineSheet,
   grantTempHpSheet,
   healSheet,
@@ -72,7 +74,7 @@ export function CombatSection(props: SectionProps) {
         <p className="s-hp__value" aria-live="polite">
           <strong className="t-title1">{hp.current}</strong> <span className="a-muted">/ {hp.max}</span>
           {hp.temp > 0 ? <Badge tone="tint">+{hp.temp} temporanei</Badge> : null}
-          {hp.dead ? <Badge tone="red">Morto</Badge> : down ? <Badge tone="red">A terra</Badge> : hp.stable ? <Badge tone="orange">Stabile</Badge> : null}
+          {hp.dead ? <Badge tone="red">Morto</Badge> : hp.instantDeathPending ? <Badge tone="red">Morte da decidere</Badge> : down ? <Badge tone="red">A terra</Badge> : hp.stable ? <Badge tone="orange">Stabile</Badge> : null}
         </p>
         <ProgressView value={hp.max > 0 ? hp.current / hp.max : 0} label="Punti ferita" />
         <div className="s-row">
@@ -91,7 +93,7 @@ export function CombatSection(props: SectionProps) {
         </div>
       </section>
 
-      {down || hp.dead || hp.stable || hp.deathSaves.failures + hp.deathSaves.successes > 0 ? (
+      {down || hp.dead || hp.stable || hp.instantDeathPending || hp.deathSaves.failures + hp.deathSaves.successes > 0 ? (
         <section className="s-block" aria-labelledby="s-death">
           <h3 id="s-death" className="t-headline">
             <Skull size={16} aria-hidden="true" /> Tiri contro la morte
@@ -99,6 +101,23 @@ export function CombatSection(props: SectionProps) {
           <p>
             Successi {hp.deathSaves.successes}/3 &middot; Fallimenti {hp.deathSaves.failures}/3
           </p>
+          {hp.instantDeathPending ? (
+            <div className="s-stack" role="status">
+              <p className="t-body">
+                Il danno ha superato i PF massimi: la morte istantanea la decide il GM, non il sistema.
+              </p>
+              {props.isGm ? (
+                <div className="s-actions">
+                  <Button size="sm" variant="destructive" onClick={() => change((d) => applySheetOp(d, (s, c) => decideInstantDeathSheet(s, c, true)))}>
+                    Il personaggio muore
+                  </Button>
+                  <Button size="sm" variant="gray" onClick={() => change((d) => applySheetOp(d, (s, c) => decideInstantDeathSheet(s, c, false)))}>
+                    Resta a terra
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <div className="s-actions">
             <Button
               size="sm"
@@ -115,6 +134,9 @@ export function CombatSection(props: SectionProps) {
             </Button>
             <Button variant="gray" size="sm" disabled={!down} onClick={() => change((d) => applySheetOp(d, (s, c) => stabilizeSheet(s, c)))}>
               Stabilizza
+            </Button>
+            <Button variant="gray" size="sm" onClick={() => change((d) => applySheetOp(d, (s, c) => resetDeathSheet(s, c)))}>
+              Azzera stato di morte
             </Button>
           </div>
         </section>

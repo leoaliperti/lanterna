@@ -29,7 +29,7 @@ import {
 import { WallSchema } from "./walls.js";
 import { PropSchema, type Prop, type PropPatch } from "./props.js";
 import type { WallPatch } from "./commands.js";
-import { combatOf, fogOf, propsOf, wallsOf } from "./schema.js";
+import { DEFAULT_CLOCK, combatOf, fogOf, propsOf, wallsOf } from "./schema.js";
 import {
   done,
   findScene,
@@ -268,6 +268,18 @@ function apply(state: CampaignState, cmd: Command, actor: Actor): ApplyResult {
       return done(state, s1, changes, inverse);
     }
 
+    case "clock.set": {
+      if (!gm) return err("FORBIDDEN", MESSAGES.gmOnly);
+      const before = state.clock ?? DEFAULT_CLOCK;
+      const after = { day: cmd.day ?? before.day, minute: cmd.minute ?? before.minute };
+      if (after.day === before.day && after.minute === before.minute) return done(state, state, [], []);
+      return done(
+        state,
+        { ...state, clock: after },
+        [{ type: "clock", before, after }],
+        [{ type: "clock.set", day: before.day, minute: before.minute }],
+      );
+    }
     case "scene.activate": {
       if (!gm) return err("FORBIDDEN", MESSAGES.gmOnly);
       const target = cmd.sceneId === null ? null : findScene(state, cmd.sceneId);

@@ -56,6 +56,8 @@ export interface GameScale {
 }
 
 export type TokenKind = "character" | "npc" | "monster" | "object";
+/** Forma del token: cerchio di default. */
+export type TokenShape = "circle" | "square" | "diamond" | "hexagon" | "triangle";
 
 export interface TokenCondition {
   id: string;
@@ -87,6 +89,10 @@ export interface MapToken {
   color?: string;
   label?: string;
   kind: TokenKind;
+  /** Forma (assente = cerchio). */
+  shape?: TokenShape;
+  /** Numero da mostrare sul token (assente o null = nessuno). */
+  number?: number | null;
   hidden?: boolean;
   conditions?: readonly TokenCondition[];
   /** Mostrata solo se il padre la fornisce (il server la invia solo a GM e proprietario). */
@@ -199,6 +205,8 @@ export interface MapScene {
   wallsVisible?: boolean;
   /** Aiuto visivo della vista dei token. Assente = nascosto. */
   sight?: readonly MapSight[];
+  /** Token sotto il puntatore: solo lì si vedono le condizioni (badge). */
+  hoverTokenId?: string | null;
   /** Forme effimere (misure pubbliche, frecce, ping) con scadenza e dissolvenza. */
   ephemerals?: readonly MapEphemeral[];
   /** Richiami visivi sui token. */
@@ -211,6 +219,8 @@ export interface MapScene {
 export type ShapePhase = "draft" | "end";
 
 export interface MapHandlers {
+  /** Token sotto il puntatore (o `null`): il controller lo comunica alla vista per mostrare i badge. */
+  onHoverToken?: (id: string | null) => void;
   /** Una forma di misura o segnalazione e' cambiata (trascinamento) o e' finita (rilascio). Il padre decide chi la vede. */
   onShape?: (shape: Shape, phase: ShapePhase) => void;
   /** La forma in costruzione e' stata annullata (Esc, cambio strumento). */

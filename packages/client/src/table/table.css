@@ -3,8 +3,8 @@
 /* Mappa a tutta area (al posto dello stato vuoto centrato) */
 .a-map:has(> .a-map__live) { display: block; padding: 0; background-image: none; }
 .a-map__live { position: absolute; inset: 0; }
-/* Con la mappa visibile, il badge del GM va in alto a sinistra su una pillola: in basso c'è già la scala. */
-.a-map:has(> .a-map__live) .a-map__badge { top: var(--space-3); bottom: auto; left: max(var(--space-3), var(--safe-left)); z-index: 1; padding: var(--space-1) var(--space-3); border-radius: var(--radius-full); background: var(--material-regular); -webkit-backdrop-filter: var(--blur-regular); backdrop-filter: var(--blur-regular); }
+/* Badge del ruolo nella barra superiore, fuori dalla mappa che non deve coprirlo. */
+.a-role-pill { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-2); border-radius: var(--radius-full); background: var(--tint-solid); color: var(--on-tint); font-weight: 600; white-space: nowrap; }
 .a-map__live .lanterna-map { border-radius: 0; }
 
 .a-map__hint {
@@ -141,6 +141,15 @@
   .a-fogbar__help { max-width: none; }
 }
 
+/* Orologio di gioco nella barra del tavolo. */
+.a-clock { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-full); background: var(--fill-tertiary); color: var(--label-secondary); font: inherit; white-space: nowrap; }
+.a-clock--gm { cursor: pointer; }
+.a-clock--gm:hover { background: var(--fill-secondary); }
+
+/* Anteprima della griglia nel form della scena (con misura di calibrazione). */
+.a-gridpreview { position: relative; width: 100%; overflow: hidden; border-radius: var(--radius-md); background: var(--bg-secondary); }
+.a-gridpreview__img { display: block; width: 100%; height: auto; }
+.a-gridpreview__svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 /* Finestra delle scorciatoie */
 .a-shortcuts { display: grid; gap: var(--space-4); padding-bottom: var(--space-4); }
 .a-shortcuts__group { margin: 0 0 var(--space-1); text-transform: uppercase; letter-spacing: 0.04em; }

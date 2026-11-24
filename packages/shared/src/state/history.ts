@@ -5,7 +5,7 @@ import { deepEqual } from "./filter.js";
 import { applyCommand, applyCommands } from "./reducer.js";
 import type { Actor, CampaignState, Scene, Token } from "./schema.js";
 import { canSeeToken, isGm } from "./view.js";
-import { combatOf, fogOf } from "./schema.js";
+import { DEFAULT_CLOCK, combatOf, fogOf } from "./schema.js";
 import type { Wall } from "./walls.js";
 import type { Prop } from "./props.js";
 
@@ -168,6 +168,9 @@ function checkExpect(state: CampaignState, expect: StateChange[], actor: Actor):
     } else if (c.type === "fog") {
       // La nebbia è un oggetto unico: deve essere esattamente quella lasciata dall'azione.
       if (!deepEqual(fogOf(state, c.sceneId), c.after)) return { code: "CONFLICT", message: MESSAGES.stale };
+    } else if (c.type === "clock") {
+      // L'orologio deve essere ancora quello lasciato dall'azione (o quello di default, se non è mai stato impostato).
+      if (!deepEqual(state.clock ?? DEFAULT_CLOCK, c.after)) return { code: "CONFLICT", message: MESSAGES.stale };
     } else if (state.activeSceneId !== c.after) {
       return { code: "CONFLICT", message: MESSAGES.stale };
     }

@@ -56,6 +56,8 @@ export function applyServerEvent(view: CampaignView, event: ServerEvent): Campai
       return { ...view, walls: (view.walls ?? []).map((w) => (w.id === event.wall.id ? event.wall : w)) };
     case "wall.deleted":
       return { ...view, walls: (view.walls ?? []).filter((w) => w.id !== event.wallId) };
+    case "clock.changed":
+      return { ...view, clock: event.clock };
     case "prop.created":
       if ((view.props ?? []).some((p) => p.id === event.prop.id)) return view;
       return { ...view, props: [...(view.props ?? []), event.prop] };

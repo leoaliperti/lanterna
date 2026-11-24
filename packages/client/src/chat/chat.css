@@ -102,7 +102,7 @@
   translate: -50% 0; z-index: var(--z-bar);
   width: min(34rem, calc(100% - var(--space-6)));
   pointer-events: none; user-select: none;
-  --lanterna-dice-height: 19rem; --lanterna-surface: transparent; --lanterna-border: transparent; --lanterna-text: var(--label);
+  --lanterna-dice-height: 24rem; --lanterna-surface: transparent; --lanterna-border: transparent; --lanterna-text: var(--label);
   animation: a-dice-in var(--dur-base) var(--ease-out) both;
   transition: opacity var(--dur-base) var(--ease-out);
 }
