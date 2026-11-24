@@ -65,7 +65,7 @@ describe("scrittura delle sorgenti", () => {
     const before = readSource(doc, "acrobatics.bonus") as number;
     const on = writeSource(doc, "acrobatics.prof", true);
     expect(readSource(on, "acrobatics.prof")).toBe(true);
-    expect(readSource(on, "acrobatics.bonus")).toBe(before + readSource(on, "prof")!);
+    expect(readSource(on, "acrobatics.bonus")).toBe(before + (readSource(on, "prof") as number));
   });
 
   it("i tre successi contro la morte si accendono e si spengono in ordine", () => {
