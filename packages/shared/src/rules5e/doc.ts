@@ -66,7 +66,30 @@ export const sheetSpellSchema = z.strictObject({
 });
 export type SheetSpell = z.infer<typeof sheetSpellSchema>;
 
+/**
+ * Dati anagrafici e narrativi del personaggio: campi della scheda cartacea (razza, background, tratti,
+ * ideali, legami, difetti, storia, lingue, privilegi). Tutto facoltativo: vuoto = non compilato.
+ */
+export const sheetProfileSchema = z.strictObject({
+  playerName: z.string().max(120).default(""),
+  race: z.string().max(120).default(""),
+  background: z.string().max(120).default(""),
+  alignment: z.string().max(60).default(""),
+  experience: z.number().int().min(0).max(10000000).default(0),
+  inspiration: z.boolean().default(false),
+  traits: z.string().max(2000).default(""),
+  ideals: z.string().max(2000).default(""),
+  bonds: z.string().max(2000).default(""),
+  flaws: z.string().max(2000).default(""),
+  story: z.string().max(20000).default(""),
+  languages: z.string().max(2000).default(""),
+  features: z.string().max(20000).default(""),
+});
+export type SheetProfile = z.infer<typeof sheetProfileSchema>;
+
 export const sheetExtrasSchema = z.strictObject({
+  /** Anagrafica e narrativa (vedi `sheetProfileSchema`). */
+  profile: sheetProfileSchema.prefault({}),
   notes: z.string().max(20000).default(""),
   inventory: z.array(sheetItemSchema).max(300).default([]),
   attacks: z.array(sheetAttackSchema).max(40).default([]),

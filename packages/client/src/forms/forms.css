@@ -1,0 +1,76 @@
+/* Modulo sopra il PDF del GM: pagine, campi sovrapposti, calibrazione, pannello del GM. */
+
+.fp-tab { display: grid; gap: var(--space-3); }
+.fp-pages { display: grid; gap: var(--space-4); justify-items: center; }
+
+/* Ogni pagina è larga quanto il contenitore; il testo dei campi scala con cqw. */
+.fp-page {
+  position: relative;
+  container-type: inline-size;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  box-shadow: var(--shadow-md);
+}
+.fp-canvas-host { position: absolute; inset: 0; }
+.fp-canvas { display: block; width: 100%; height: 100%; }
+
+.fp-field { position: absolute; box-sizing: border-box; min-width: 0; display: flex; align-items: center; }
+.fp-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0 0.25em;
+  border: 0;
+  border-radius: 2px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.6);
+  color: #111;
+  font: inherit;
+  line-height: 1.15;
+}
+textarea.fp-input { resize: none; padding: 0.2em 0.3em; }
+.fp-input:focus { background: rgba(255, 255, 255, 0.95); box-shadow: inset 0 0 0 2px var(--tint-solid); }
+.fp-input[readonly] { background: transparent; cursor: default; }
+.fp-field--check { justify-content: center; cursor: pointer; }
+.fp-field--check input { width: 80%; height: 80%; margin: 0; cursor: inherit; accent-color: #111; }
+
+/* Calibrazione: il riquadro è un bottone trasparente con l'identificativo in alto. */
+.fp-field--calibrate {
+  padding: 0;
+  align-items: flex-start;
+  border: 1.5px dashed var(--tint-solid);
+  background: rgba(0, 120, 255, 0.12);
+  cursor: pointer;
+}
+.fp-field--calibrate[data-selected] { background: rgba(0, 120, 255, 0.3); border-style: solid; }
+.fp-field__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 3px;
+  background: var(--tint-solid);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1.3;
+}
+.fp-draw { position: absolute; inset: 0; cursor: crosshair; touch-action: none; }
+.fp-draw__rect { position: absolute; border: 2px solid var(--tint-solid); background: rgba(0, 120, 255, 0.2); }
+
+.fp-calibrator { display: grid; gap: var(--space-3); }
+.fp-calibrator__bar { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-end; }
+.fp-calibrator__editor {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-grouped-secondary);
+}
+
+.fp-manager { display: grid; gap: var(--space-3); }
+.fp-manager__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.fp-manager__empty { display: grid; gap: var(--space-3); justify-items: start; }
+.fp-manager__file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }

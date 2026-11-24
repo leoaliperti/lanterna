@@ -3,6 +3,9 @@ import { Check, CloudOff, LoaderCircle } from "lucide-react";
 import { blankDoc, deriveDoc, type SheetDoc, type SheetRecord } from "@lanterna/shared";
 import { Banner, Button, SearchField, Spinner, Tabs, useToast, type TabItem } from "../ui";
 import { useRealtimeState } from "../realtime/RealtimeProvider";
+import { useSession } from "../session/SessionProvider";
+import { FormTab } from "../forms/FormTab";
+import { useFormTemplate } from "../forms/useFormTemplate";
 import { AbilitiesSection, SkillsSection } from "./AbilitiesSection";
 import { CombatSection } from "./CombatSection";
 import { EditSection } from "./EditSection";
@@ -30,6 +33,9 @@ export interface SheetViewProps {
  */
 export function SheetView({ sheetId }: SheetViewProps) {
   const { campaignId, isGm, upsert, remove } = useSheets();
+  // Modulo sopra il PDF del GM (se c'è): solo per i personaggi, mai per gli statblock.
+  const formTpl = useFormTemplate(campaignId);
+  const session = useSession();
   const toast = useToast();
   const [record, setRecord] = useState<SheetRecord | null>(null);
   const [draft, setDraft] = useState<SheetDoc | null>(null);
@@ -201,7 +207,26 @@ export function SheetView({ sheetId }: SheetViewProps) {
   const linkedToken = record.tokenId ? (view?.tokens.find((t) => t.id === record.tokenId) ?? null) : null;
   const props: SectionProps = { doc, kind, derived: derivedResult, change, roller, query, isGm };
 
+  const formTab: TabItem[] =
+    kind === "pc" && formTpl.template && formTpl.hasPdf
+      ? [
+          {
+            id: "form",
+            label: "Modulo",
+            content: (
+              <FormTab
+                campaignId={campaignId}
+                doc={doc}
+                template={formTpl.template}
+                canEdit={isGm || record.ownerUserId === session.user?.id}
+                change={change}
+              />
+            ),
+          },
+        ]
+      : [];
   const tabs: TabItem[] = [
+    ...formTab,
     { id: "base", label: "Base", content: <AbilitiesSection {...props} /> },
     { id: "skills", label: "Abilità", content: <SkillsSection {...props} /> },
     { id: "combat", label: "Combattimento", content: <CombatSection {...props} /> },

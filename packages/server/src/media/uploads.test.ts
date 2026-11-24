@@ -86,7 +86,7 @@ describe("POST /uploads/:kind e GET /assets/:name", () => {
       expect((await upload(player.cookie, multipart(makePng(2, 2)), kind)).statusCode).toBe(403);
       expect((await upload(gm.cookie, multipart(makePng(2, 2)), kind, null)).statusCode).toBe(403);
     }
-    expect(readdirSync(ctx.config.uploadDir)).toEqual([]);
+    expect(readdirSync(ctx.config.uploadDir).filter((f) => f !== "forms")).toEqual([]);
   });
 
   it("rifiuta SVG, falso PNG, file non immagine, multipart assente", async () => {
@@ -106,7 +106,7 @@ describe("POST /uploads/:kind e GET /assets/:name", () => {
       payload: { file: "x" },
     });
     expect(json.statusCode).toBe(415);
-    expect(readdirSync(ctx.config.uploadDir)).toEqual([]);
+    expect(readdirSync(ctx.config.uploadDir).filter((f) => f !== "forms")).toEqual([]);
   });
 
   it("rifiuta file troppo grandi in byte e in pixel", async () => {
@@ -118,7 +118,7 @@ describe("POST /uploads/:kind e GET /assets/:name", () => {
     expect((await upload(gm.cookie, multipart(makePng(1001, 1000, true)))).statusCode).toBe(413);
     expect((await upload(gm.cookie, multipart(makeWebpVP8X(16_385, 1)))).statusCode).toBe(413);
     expect((await upload(gm.cookie, multipart(makePng(1000, 1000, true)))).statusCode).toBe(201);
-    expect(readdirSync(ctx.config.uploadDir).filter((f) => !f.startsWith("."))).toHaveLength(1);
+    expect(readdirSync(ctx.config.uploadDir).filter((f) => f !== "forms").filter((f) => !f.startsWith("."))).toHaveLength(1);
   });
 
   it("path traversal e nomi non validi: 404, mai file fuori dalla cartella", async () => {

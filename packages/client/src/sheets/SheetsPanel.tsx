@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, ScrollText, Skull, UserRound } from "lucide-react";
+import { FileText, Plus, ScrollText, Skull, UserRound } from "lucide-react";
 import { blankDoc, monsterDocFromContent, type SheetSummary } from "@lanterna/shared";
 import { Badge, Banner, Button, List, ListRow, Picker, SearchField, SegmentedControl, Sheet, Spinner, TextField, useToast } from "../ui";
 import { EmptyState } from "../screens/EmptyState";
@@ -8,6 +8,7 @@ import { LibraryPicker } from "./LibraryPicker";
 import { matchesQuery } from "./sheetLogic";
 import { createSheet, sheetErrorMessage } from "./sheetsApi";
 import { useSheets } from "./SheetsProvider";
+import { FormManager } from "../forms/FormManager";
 
 type Filter = "all" | "pc" | "monster";
 
@@ -29,6 +30,7 @@ export function SheetsPanel({ onOpened }: SheetsPanelProps) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [creating, setCreating] = useState<"pc" | "monster-library" | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
   const [name, setName] = useState("");
   const [owner, setOwner] = useState("none");
   const [busy, setBusy] = useState(false);
@@ -76,7 +78,13 @@ export function SheetsPanel({ onOpened }: SheetsPanelProps) {
             Mostro
           </Button>
         ) : null}
+        {isGm ? (
+          <Button size="sm" variant="gray" icon={<FileText size={16} />} onClick={() => setFormOpen(true)}>
+            Modulo PDF
+          </Button>
+        ) : null}
       </div>
+      {isGm ? <FormManager open={formOpen} onOpenChange={setFormOpen} campaignId={campaignId} /> : null}
       <SearchField placeholder="Cerca una scheda" label="Cerca una scheda" value={query} onValueChange={setQuery} />
       {isGm ? (
         <SegmentedControl
