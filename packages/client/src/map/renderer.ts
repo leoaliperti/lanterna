@@ -7,7 +7,7 @@ import type { MapController } from "./controller";
 import { isTokenShown, rectsIntersect, tokenRadius, visibleRect } from "./geometry";
 import { type BackgroundPlan, MAX_LOADED_TILES, needsDetail, planBackground, tileRect, tilesToEvict, visibleTiles } from "./tiles";
 import { type MapTheme, healthColor, kindColor, readTheme } from "./theme";
-import type { MapScene, MapToken, Point, Size } from "./types";
+import type { MapScene, MapToken, Point, Size, TokenShape } from "./types";
 
 /**
  * Resa PixiJS della mappa. Si carica con import() dinamico (vedi MapCanvas) e non conosce React.
@@ -65,10 +65,37 @@ function mipmapped(source: ImageSource | CanvasSource): Texture {
   return new Texture({ source });
 }
 
+/** Percorso della forma del token, centrata in (0,0) con raggio `r` (pixel di mappa). Cerchio per default. */
+export function shapePath(g: Graphics, shape: TokenShape, r: number): void {
+  switch (shape) {
+    case "square":
+      g.rect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7);
+      return;
+    case "diamond":
+      g.poly([0, -r, r, 0, 0, r, -r, 0]);
+      return;
+    case "hexagon": {
+      const pts: number[] = [];
+      for (let i = 0; i < 6; i++) {
+        const a = (-90 + 60 * i) * (Math.PI / 180);
+        pts.push(r * Math.cos(a), r * Math.sin(a));
+      }
+      g.poly(pts);
+      return;
+    }
+    case "triangle":
+      g.poly([0, -r, r * 0.9, r * 0.6, -r * 0.9, r * 0.6]);
+      return;
+    default:
+      g.circle(0, 0, r);
+  }
+}
+
 function tokenSignature(t: MapToken, role: string, cell: number, theme: MapTheme): string {
   const cond = t.conditions?.map((c) => `${c.id}${c.icon ?? ""}${c.color ?? ""}${c.label}`).join(",") ?? "";
+  const shape = t.shape ?? "circle";
   const h = t.health ? `${t.health.current}/${t.health.max}` : "";
-  return [t.size, t.imageUrl ?? "", t.color ?? "", t.label ?? "", t.kind, t.hidden ? 1 : 0, cond, h, role, cell, theme.tint].join("|");
+  return [t.size, t.imageUrl ?? "", t.color ?? "", t.label ?? "", t.kind, t.hidden ? 1 : 0, cond, h, shape, t.number ?? "", role, cell, theme.tint].join("|");
 }
 
 export class PixiMapView {
@@ -493,8 +520,10 @@ export class PixiMapView {
     const base = kindColor(theme, t.kind);
     const fill = t.color ? parseCssColor(t.color).value : base;
     const g = new Graphics();
-    g.circle(0, 0, r).fill(fill);
-    g.circle(0, 0, r).stroke({ width: Math.max(2, r * 0.07), color: base });
+    shapePath(g, t.shape ?? "circle", r);
+    g.fill(fill);
+    shapePath(g, t.shape ?? "circle", r);
+    g.stroke({ width: Math.max(2, r * 0.07), color: base });
     // Tacca di orientamento: mostra la rotazione anche senza immagine.
     g.poly([-r * 0.18, -r * 0.78, r * 0.18, -r * 0.78, 0, -r * 1.02]).fill(base);
     v.body.addChild(g);
@@ -513,7 +542,14 @@ export class PixiMapView {
         const s = new Sprite(tex);
         s.anchor.set(0.5);
         s.width = s.height = r * 1.86;
+        // L'immagine segue la forma del token (la maschera non è nella scena: solo ritaglio).
+        const mask = new Graphics();
+        shapePath(mask, t.shape ?? "circle", r);
+        mask.fill(0xffffff);
+        s.mask = mask;
         v.body.addChildAt(s, 1);
+        v.body.addChildAt(mask, 2);
+        mask.renderable = false;
         this.requestRender();
       });
     }
@@ -556,6 +592,16 @@ export class PixiMapView {
       });
       v.badges.alpha = 0; // visibili solo con il puntatore sopra (vedi syncTokens)
       v.decor.addChild(v.badges);
+    }
+    if (t.number !== undefined && t.number !== null) {
+      // Numero del token: distingue i personaggi in battaglia (angolo in alto a sinistra).
+      const nb = new Container();
+      nb.label = "number-badge";
+      const disc = new Graphics().circle(0, 0, 9).fill({ color: theme.scrim, alpha: 0.92 });
+      const txt = new Text({ text: String(t.number), style: { fontFamily: "system-ui, sans-serif", fontSize: 11, fontWeight: "700", fill: theme.label } });
+      txt.anchor.set(0.5);
+      nb.addChild(disc, txt);
+      v.decor.addChild(nb);
     }
     if (t.hidden) {
       // Icona "occhio barrato" per i token nascosti (visibili solo al GM).
@@ -602,6 +648,11 @@ export class PixiMapView {
     }
     const icon = v.decor.getChildByLabel("hidden-icon");
     if (icon) icon.position.set(rs * 0.7, -rs * 0.7);
+    const nb = v.decor.getChildByLabel("number-badge");
+    if (nb) {
+      nb.visible = !small;
+      nb.position.set(-rs * 0.72, -rs * 0.72);
+    }
   }
 
   /* ---------------- frame ---------------- */

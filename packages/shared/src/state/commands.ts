@@ -10,7 +10,9 @@ import {
   ScaleSchema,
   SceneSchema,
   TokenKindSchema,
+  TokenNumberSchema,
   TokenSchema,
+  TokenShapeSchema,
   TokenVisionSchema,
 } from "./schema.js";
 import { FogLightingSchema, FogSchema, FogShapeSchema, FogStateSchema, FogTargetSchema } from "./fog.js";
@@ -70,6 +72,8 @@ export const TokenPatchSchema = z
     faction: z.string().trim().min(1).max(LIMITS.nameMaxLength).nullable(),
     /** Solo GM (M7): di norma si cambia con `effect.*`; qui serve all'annulla/ripeti. */
     effects: EffectsSchema,
+    shape: TokenShapeSchema,
+    number: TokenNumberSchema.nullable(),
   })
   .partial()
   .refine((p) => Object.keys(p).length > 0, { message: "patch vuota" });

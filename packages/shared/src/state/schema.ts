@@ -77,9 +77,21 @@ export type Scene = z.infer<typeof SceneSchema>;
 export const TokenKindSchema = z.enum(["pc", "monster", "object"]);
 export type TokenKind = z.infer<typeof TokenKindSchema>;
 
+/** Forma del token sulla mappa (solo varietà visiva; la vita e le regole restano uguali). */
+export const TokenShapeSchema = z.enum(["circle", "square", "diamond", "hexagon", "triangle"]);
+export type TokenShape = z.infer<typeof TokenShapeSchema>;
+
+/** Numero da mostrare sul token per distinguere i personaggi in battaglia (es. 1, 2, 3...). */
+export const TokenNumberSchema = z.number().int().min(0).max(999);
+
 export const TokenConditionSchema = z.strictObject({
   id: IdSchema,
   name: NameSchema,
+  /**
+   * Solo per l'Esaurimento 2024: livello 1-6 (6 = morte). Assente per le altre condizioni.
+   * Il limite 6 è `MAX_EXHAUSTION` in rules5e/conditions.ts.
+   */
+  level: z.number().int().min(1).max(6).optional(),
 });
 export type TokenCondition = z.infer<typeof TokenConditionSchema>;
 
@@ -138,6 +150,10 @@ export const TokenSchema = z.strictObject({
   faction: z.string().trim().min(1).max(LIMITS.nameMaxLength).nullable().optional(),
   /** Facoltativo (M7): effetti temporanei con durata. */
   effects: EffectsSchema.optional(),
+  /** Facoltativo: forma sulla mappa (assente = cerchio). */
+  shape: TokenShapeSchema.optional(),
+  /** Facoltativo: numero sul token (assente o null = nessuno). */
+  number: TokenNumberSchema.nullable().optional(),
 });
 export type Token = z.infer<typeof TokenSchema>;
 

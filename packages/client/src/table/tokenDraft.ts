@@ -1,4 +1,4 @@
-import { LIMITS, type Command, type Health, type Token, type TokenPatch, type TokenView, type TokenVision } from "@lanterna/shared";
+import { LIMITS, type Command, type Health, type Token, type TokenPatch, type TokenShape, type TokenView, type TokenVision } from "@lanterna/shared";
 import { parseNumber } from "./NumberField";
 
 /** Bozza di modifica di un token: tutti i campi come li vede il modulo (testo per i numeri). */
@@ -12,8 +12,12 @@ export interface TokenDraft {
   current: string;
   max: string;
   temp: string;
-  conditions: Array<{ id: string; name: string }>;
+  /** `level` solo per l'Esaurimento (1-6). */
+  conditions: Array<{ id: string; name: string; level?: number }>;
   gmNotes: string;
+  /** Forma sulla mappa e numero del token (solo GM). `number` è testo: vuoto = nessuno. */
+  shape: TokenShape;
+  number: string;
   /** Vista e luce (aiuto visivo, mai la nebbia), in unita' di gioco. `visionRange` vuoto = vista illimitata. */
   hasVision: boolean;
   visionRange: string;
@@ -37,6 +41,8 @@ export function emptyDraft(): TokenDraft {
     temp: "0",
     conditions: [],
     gmNotes: "",
+    shape: "circle",
+    number: "",
     hasVision: false,
     visionRange: "",
     darkvision: "0",
@@ -57,8 +63,10 @@ export function draftOfToken(t: TokenView): TokenDraft {
     current: String(t.health?.current ?? 10),
     max: String(t.health?.max ?? 10),
     temp: String(t.health?.temp ?? 0),
-    conditions: t.conditions.map((c) => ({ id: c.id, name: c.name })),
+    conditions: t.conditions.map((c) => ({ id: c.id, name: c.name, ...(c.level !== undefined ? { level: c.level } : {}) })),
     gmNotes: t.gmNotes ?? "",
+    shape: t.shape ?? "circle",
+    number: t.number == null ? "" : String(t.number),
     hasVision: !!t.vision,
     visionRange: t.vision?.range == null ? "" : String(t.vision.range),
     darkvision: String(t.vision?.darkvision ?? 0),
@@ -114,7 +122,15 @@ export function validateDraft(d: TokenDraft): DraftErrors {
 export const hasErrors = (e: DraftErrors) => Object.values(e).some((v) => v !== null);
 
 const sameConditions = (a: TokenDraft["conditions"], b: TokenView["conditions"]) =>
-  a.length === b.length && a.every((c, i) => c.id === b[i]?.id);
+  a.length === b.length && a.every((c, i) => c.id === b[i]?.id && c.level === b[i]?.level);
+
+/** Numero del token dalla bozza: vuoto o non valido = nessun numero. */
+export function numberOf(d: TokenDraft): number | null {
+  const t = d.number.trim();
+  if (t === "") return null;
+  const n = Number(t);
+  return Number.isInteger(n) && n >= 0 && n <= 999 ? n : null;
+}
 
 /**
  * Differenza fra la bozza e il token: solo i campi cambiati. `onlyConditions` per il giocatore
@@ -129,6 +145,8 @@ export function diffDraft(token: TokenView, d: TokenDraft, imageUrl: string | nu
   if (d.size !== token.size) patch.size = d.size;
   if (d.ownerUserId !== token.ownerUserId) patch.ownerUserId = d.ownerUserId;
   if (d.hidden !== token.hidden) patch.hidden = d.hidden;
+  if (d.shape !== (token.shape ?? "circle")) patch.shape = d.shape;
+  if (numberOf(d) !== (token.number ?? null)) patch.number = numberOf(d);
   if (imageUrl !== token.imageUrl) patch.imageUrl = imageUrl;
   if ((d.gmNotes ?? "") !== (token.gmNotes ?? "")) patch.gmNotes = d.gmNotes;
   const vision = visionOfDraft(d);
@@ -187,6 +205,8 @@ export function createCommand(id: string, sceneId: string, d: TokenDraft, imageU
     kind: d.kind,
     hidden: d.hidden,
     conditions: d.kind === "object" ? [] : d.conditions,
+    shape: d.shape,
+    number: numberOf(d),
     health: healthOf(d),
     gmNotes: d.gmNotes,
     vision: visionOfDraft(d)

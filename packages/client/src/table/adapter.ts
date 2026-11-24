@@ -76,7 +76,9 @@ export function toMapToken(token: TokenView): MapToken {
     label: token.name,
     kind: KIND_MAP[token.kind],
     hidden: token.hidden,
-    conditions: token.conditions.map((c) => ({ id: c.id, label: c.name, icon: conditionSymbol(c.id) })),
+    conditions: token.conditions.map((c) => ({ id: c.id, label: c.name, icon: conditionSymbol(c.id) + (c.level !== undefined ? String(c.level) : "") })),
+    shape: token.shape ?? "circle",
+    number: token.number ?? null,
     // Solo se il server l'ha inviata (GM e proprietario): mai dedotta dal client.
     health: token.health ? { current: token.health.current, max: token.health.max, temp: token.health.temp } : undefined
   };

@@ -56,6 +56,8 @@ export interface GameScale {
 }
 
 export type TokenKind = "character" | "npc" | "monster" | "object";
+/** Forma del token: cerchio di default. */
+export type TokenShape = "circle" | "square" | "diamond" | "hexagon" | "triangle";
 
 export interface TokenCondition {
   id: string;
@@ -87,6 +89,10 @@ export interface MapToken {
   color?: string;
   label?: string;
   kind: TokenKind;
+  /** Forma (assente = cerchio). */
+  shape?: TokenShape;
+  /** Numero da mostrare sul token (assente o null = nessuno). */
+  number?: number | null;
   hidden?: boolean;
   conditions?: readonly TokenCondition[];
   /** Mostrata solo se il padre la fornisce (il server la invia solo a GM e proprietario). */

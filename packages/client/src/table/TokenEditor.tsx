@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
-import type { CampaignView, SceneView } from "@lanterna/shared";
+import type { CampaignView, SceneView, TokenShape } from "@lanterna/shared";
 import { uploadErrorMessage, uploadImage } from "../api/client";
 import { Alert, Button, Picker, SegmentedControl, Sheet, Stepper, TextArea, TextField, Toggle } from "../ui";
 import { assetUrl } from "../realtime/urls";
@@ -22,6 +22,14 @@ export interface TokenEditorProps {
 }
 
 const NO_OWNER = "__none__";
+
+const SHAPE_OPTIONS = [
+  { value: "circle", label: "Cerchio" },
+  { value: "square", label: "Quadrato" },
+  { value: "diamond", label: "Rombo" },
+  { value: "hexagon", label: "Esagono" },
+  { value: "triangle", label: "Triangolo" }
+] as const;
 
 const KIND_OPTIONS = [
   { value: "pc", label: "Personaggio" },
@@ -74,8 +82,15 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
   function toggleCondition(id: string, name: string) {
     setDraft((d) => ({
       ...d,
-      conditions: d.conditions.some((c) => c.id === id) ? d.conditions.filter((c) => c.id !== id) : [...d.conditions, { id, name }]
+      conditions: d.conditions.some((c) => c.id === id)
+        ? d.conditions.filter((c) => c.id !== id)
+        : [...d.conditions, id === "exhaustion" ? { id, name, level: 1 } : { id, name }]
     }));
+  }
+
+  /** Esaurimento: livello 1-6 (6 = morte, come da regole); il livello 0 lo toglie. */
+  function setExhaustion(level: number) {
+    setDraft((d) => ({ ...d, conditions: d.conditions.map((c) => (c.id === "exhaustion" ? { ...c, level } : c)) }));
   }
 
   async function submit() {
@@ -136,6 +151,15 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
               <span className="t-body">Dimensione: {draft.size === 1 ? "1 cella" : `${draft.size} celle`}</span>
               <Stepper label="dimensione" value={draft.size} onValueChange={(v) => set("size", v)} min={0.5} max={12} step={0.5} />
             </div>
+            <Picker label="Forma" options={[...SHAPE_OPTIONS]} value={draft.shape} onValueChange={(v) => set("shape", v as TokenShape)} />
+            <TextField
+              label="Numero sul token"
+              value={draft.number}
+              onChange={(e) => set("number", e.target.value.replace(/[^0-9]/g, "").slice(0, 3))}
+              helper="Vuoto = nessuno. Lo vedono tutti: utile per distinguere i personaggi in battaglia."
+              inputMode="numeric"
+              autoComplete="off"
+            />
             <ImagePicker
               label="Immagine"
               file={file}
@@ -215,11 +239,21 @@ export function TokenEditor({ view, scene, tokenId, open, onOpenChange }: TokenE
                   onClick={() => toggleCondition(c.id, c.name)}
                 >
                   <ConditionIcon id={c.id} size={16} />
-                  <span>{c.name}</span>
+                  <span>{c.name}{on && c.id === "exhaustion" ? ` ${draft.conditions.find((x) => x.id === "exhaustion")?.level ?? 1}` : ""}</span>
                 </button>
               );
             })}
           </div>
+          {draft.conditions.some((c) => c.id === "exhaustion") ? (
+            <Stepper
+              label="Livello di esaurimento"
+              value={draft.conditions.find((c) => c.id === "exhaustion")?.level ?? 1}
+              onValueChange={setExhaustion}
+              min={1}
+              max={6}
+              step={1}
+            />
+          ) : null}
         </fieldset>
         ) : null}
 
