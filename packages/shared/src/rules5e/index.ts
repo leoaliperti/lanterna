@@ -3,6 +3,7 @@ export * from "./armor.js";
 export * from "./carrying.js";
 export * from "./conditions.js";
 export * from "./doc.js";
+export * from "./formTemplate.js";
 export * from "./hp.js";
 export * from "./ops.js";
 export * from "./rolls.js";
