@@ -145,6 +145,13 @@ export const ChangeSceneSchema = z.strictObject({
   sceneId: IdSchema.nullable(),
 });
 
+/** Orologio di gioco (solo GM): valori assoluti; i campi assenti restano uguali. */
+export const ClockSetSchema = z.strictObject({
+  type: z.literal("clock.set"),
+  day: z.number().int().min(1).max(100000).optional(),
+  minute: z.number().int().min(0).max(1439).optional(),
+});
+
 // ---------------------------------------------------------------------------
 // Nebbia di guerra (M6): tutti solo GM
 // ---------------------------------------------------------------------------
@@ -349,6 +356,7 @@ export const CommandSchema = z.discriminatedUnion("type", [
   SetSceneGridSchema,
   DeleteSceneSchema,
   ChangeSceneSchema,
+  ClockSetSchema,
   FogEnableSchema,
   FogDisableSchema,
   FogRestoreSchema,

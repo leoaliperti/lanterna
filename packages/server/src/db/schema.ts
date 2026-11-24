@@ -87,6 +87,9 @@ export const campaign = sqliteTable("campaign", {
   /** Linea dello stato: cambia quando lo stato viene riscritto fuori dai comandi (membri, ripristino). */
   epoch: text("epoch").notNull(),
   activeSceneId: text("active_scene_id"),
+  /** Orologio di gioco (M-feedback): giorno e minuto del giorno; entrambi `null` = orologio di default. */
+  clockDay: integer("clock_day"),
+  clockMinute: integer("clock_minute"),
   createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
   ...timestamps,
 });

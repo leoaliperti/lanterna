@@ -100,6 +100,7 @@ export async function loadCampaign(db: Db, id: string): Promise<(LoadedCampaign 
     name: row.name,
     version: row.version,
     activeSceneId: row.activeSceneId,
+    ...(row.clockDay !== null && row.clockMinute !== null ? { clock: { day: row.clockDay, minute: row.clockMinute } } : {}),
     members,
     scenes: sceneRows.map((r) => parse(SceneSchema, r.data, `scena ${r.id}`)),
     tokens: tokenRows.map((r) => parse(TokenSchema, r.data, `token ${r.id}`)),
@@ -240,7 +241,13 @@ export async function persistChanges(
   const ops: BatchItem<"sqlite">[] = [
     db
       .update(campaign)
-      .set({ version: next.version, activeSceneId: next.activeSceneId, updatedAt: new Date() })
+      .set({
+        version: next.version,
+        activeSceneId: next.activeSceneId,
+        clockDay: next.clock?.day ?? null,
+        clockMinute: next.clock?.minute ?? null,
+        updatedAt: new Date(),
+      })
       .where(eq(campaign.id, id)),
   ];
   for (const c of changes) {

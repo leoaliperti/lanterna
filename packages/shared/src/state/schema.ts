@@ -157,6 +157,17 @@ export const TokenSchema = z.strictObject({
 });
 export type Token = z.infer<typeof TokenSchema>;
 
+/**
+ * Orologio di gioco (campagna): giorno (dal 1) e minuto del giorno (0-1439). Lo imposta il GM;
+ * lo vedono tutti. Facoltativo: assente = `DEFAULT_CLOCK` (giorno 1, ore 8:00).
+ */
+export const ClockSchema = z.strictObject({
+  day: z.number().int().min(1).max(100000),
+  minute: z.number().int().min(0).max(1439),
+});
+export type Clock = z.infer<typeof ClockSchema>;
+export const DEFAULT_CLOCK: Clock = { day: 1, minute: 8 * 60 };
+
 export const CampaignStateSchema = z.strictObject({
   campaignId: IdSchema,
   name: NameSchema,
@@ -174,6 +185,8 @@ export const CampaignStateSchema = z.strictObject({
   fogs: z.array(FogSchema).max(LIMITS.maxScenes).optional(),
   /** Muri e porte (M6), di tutte le scene. Facoltativo come `fogs`. */
   walls: z.array(WallSchema).max(LIMITS.maxWalls).optional(),
+  /** Orologio di gioco (GM imposta, tutti vedono). Facoltativo: vedi `DEFAULT_CLOCK`. */
+  clock: ClockSchema.optional(),
   /** Combattimenti (M7), al più uno per scena. Facoltativo. */
   combats: z.array(CombatSchema).max(LIMITS.maxScenes).optional(),
   /** Gruppi salvati di token (M7), solo GM. Facoltativo. */

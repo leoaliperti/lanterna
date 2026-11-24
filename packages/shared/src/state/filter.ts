@@ -30,6 +30,10 @@ import { CombatViewSchema, GroupSchema } from "./combat.js";
  * (`token.deleted`) e uno che viene rivelato una "creazione" (`token.created`).
  */
 export const ServerEventSchema = z.discriminatedUnion("type", [
+  z.strictObject({
+    type: z.literal("clock.changed"),
+    clock: z.strictObject({ day: z.number().int().min(1), minute: z.number().int().min(0).max(1439) }),
+  }),
   z.strictObject({ type: z.literal("token.created"), token: TokenViewSchema }),
   z.strictObject({
     type: z.literal("token.updated"),
@@ -171,6 +175,9 @@ function fogEvents(sceneId: string, b: FogView | null, a: FogView | null): Serve
  */
 export function filterEventFor(change: StateChange, viewer: Actor): ServerEvent[] {
   switch (change.type) {
+    // L'orologio è pubblico: lo vedono tutti.
+    case "clock":
+      return [{ type: "clock.changed", clock: change.after }];
     case "combat": {
       const b = projectCombat(change.before, change.tokensBefore, viewer, change.activeBefore, change.fogBefore);
       const a = projectCombat(change.after, change.tokensAfter, viewer, change.activeAfter, change.fogAfter);

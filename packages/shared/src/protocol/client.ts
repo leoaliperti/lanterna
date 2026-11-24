@@ -55,6 +55,8 @@ export function applyServerEvent(view: CampaignView, event: ServerEvent): Campai
       return { ...view, walls: (view.walls ?? []).map((w) => (w.id === event.wall.id ? event.wall : w)) };
     case "wall.deleted":
       return { ...view, walls: (view.walls ?? []).filter((w) => w.id !== event.wallId) };
+    case "clock.changed":
+      return { ...view, clock: event.clock };
     case "combat.updated": {
       const others = (view.combats ?? []).filter((c) => c.sceneId !== event.sceneId);
       return { ...view, combats: event.combat ? [...others, event.combat] : others };

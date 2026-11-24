@@ -140,3 +140,8 @@
   .a-fogbar__mode { min-width: 7.5rem; }
   .a-fogbar__help { max-width: none; }
 }
+
+/* Orologio di gioco nella barra del tavolo. */
+.a-clock { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-full); background: var(--fill-tertiary); color: var(--label-secondary); font: inherit; white-space: nowrap; }
+.a-clock--gm { cursor: pointer; }
+.a-clock--gm:hover { background: var(--fill-secondary); }

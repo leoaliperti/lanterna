@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { KeyRound, LogOut, PanelRight, Settings, Users } from "lucide-react";
+import { KeyRound, LogOut, Maximize, Minimize, PanelRight, Settings, Users } from "lucide-react";
 import { Avatar, IconButton, Menu, Sheet, Tabs, type MenuItemSpec, type TabItem } from "../ui";
 import type { SessionUser } from "../api/client";
 import { useSession } from "../session/SessionProvider";
@@ -127,6 +127,7 @@ export function TableFrame({
         </div>
         <div className="a-topbar__actions">
           {actions}
+          <FullscreenButton />
           {tabs ? (
             <IconButton
               label={wide && panelOpen ? "Nascondi pannello" : panelBadge > 0 ? `Mostra pannello (${panelBadge} nuovi)` : "Mostra pannello"}
@@ -169,5 +170,33 @@ export function TableFrame({
       <ChangePasswordSheet open={passwordOpen} onOpenChange={setPasswordOpen} />
       <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
+  );
+}
+
+/**
+ * Schermo intero del tavolo (API Fullscreen del browser). Se il browser non lo supporta (es. iPhone
+ * in Safari, che lo permette solo per i video) il pulsante non compare.
+ */
+function FullscreenButton() {
+  const supported = typeof document !== "undefined" && typeof document.documentElement.requestFullscreen === "function";
+  const [active, setActive] = useState(() => typeof document !== "undefined" && !!document.fullscreenElement);
+  useEffect(() => {
+    const onChange = () => setActive(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  if (!supported) return null;
+  const toggle = () => {
+    if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => undefined);
+    else void document.documentElement.requestFullscreen().catch(() => undefined);
+  };
+  return (
+    <IconButton
+      label={active ? "Esci dallo schermo intero" : "Schermo intero"}
+      icon={active ? <Minimize size={18} /> : <Maximize size={18} />}
+      variant={active ? "tinted" : "plain"}
+      aria-pressed={active}
+      onClick={toggle}
+    />
   );
 }

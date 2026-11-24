@@ -106,6 +106,8 @@ export const CampaignViewSchema = z.strictObject({
   combats: z.array(CombatViewSchema).optional(),
   /** Gruppi di token (M7): solo GM. */
   groups: z.array(GroupSchema).optional(),
+  /** Orologio di gioco (visibile a tutti). Assente = `DEFAULT_CLOCK`. */
+  clock: z.strictObject({ day: z.number().int().min(1), minute: z.number().int().min(0).max(1439) }).optional(),
 });
 export type CampaignView = z.infer<typeof CampaignViewSchema>;
 
@@ -310,6 +312,7 @@ export function viewFor(state: CampaignState, viewer: Actor): CampaignView {
     version: state.version,
     viewer: { userId: viewer.userId, role: viewer.role },
     activeSceneId: active,
+    ...(state.clock ? { clock: state.clock } : {}),
     members: state.members.map((m) => ({ userId: m.userId, displayName: m.displayName, role: m.role })),
     scenes: visibleScenes.map((s) => projectScene(s, viewer, fogOf(state, s.id))),
     tokens: state.tokens

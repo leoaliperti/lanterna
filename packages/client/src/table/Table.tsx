@@ -21,6 +21,7 @@ import { SceneForm } from "./SceneForm";
 import { ScenePanel } from "./ScenePanel";
 import { useHistoryShortcuts } from "./shortcuts";
 import { TableFrame } from "./TableFrame";
+import { GameClock } from "./GameClock";
 import { TokenEditor } from "./TokenEditor";
 import { TokenPanel } from "./TokenPanel";
 import "./table.css";
@@ -125,6 +126,7 @@ function LiveTable({ user, view, actions }: LiveProps) {
     if (fitKey) mapRef.current?.fit();
   }, [fitKey]);
 
+  const onClockChange = useCallback((c: { day: number; minute: number }) => void run({ type: "clock.set", day: c.day, minute: c.minute }), [run]);
   const onMoveToken = useCallback((id: string, x: number, y: number) => void run({ type: "token.move", tokenId: id, x, y }), [run]);
   const onResizeToken = useCallback((id: string, size: number) => void run({ type: "token.update", tokenId: id, patch: { size } }), [run]);
   const onRotateToken = useCallback(
@@ -220,7 +222,12 @@ function LiveTable({ user, view, actions }: LiveProps) {
       user={user}
       title={view.name}
       actions={actions}
-      badge={perms.isGm ? <span className="a-role-pill t-caption1"><ShieldCheck size={14} aria-hidden="true" /> GM</span> : null}
+      badge={
+        <>
+          {perms.isGm ? <span className="a-role-pill t-caption1"><ShieldCheck size={14} aria-hidden="true" /> GM</span> : null}
+          <GameClock clock={view.clock} isGm={perms.isGm} onChange={onClockChange} />
+        </>
+      }
       banner={<ConnectionBanner />}
       tabs={tabs}
       defaultTab="token"
